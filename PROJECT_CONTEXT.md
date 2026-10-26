@@ -149,10 +149,24 @@ The approval workflow is determined by the total estimated requisition value in 
 - Scaffolded strict TypeScript interfaces and predictive domain algorithms in [types/requisition.ts](file:///Volumes/Essensials/spfdemoapp/types/requisition.ts).
 - Enforced 5% variance anomaly justification gate and 3-tier monetary approval routing hierarchy.
 
-### `v1.2.1-ui-binding` (Active)
+### `v1.2.1-ui-binding` (2026-10-26)
 - **UI Sub-Ledger Integration**: Bound [app/page.tsx](file:///Volumes/Essensials/spfdemoapp/app/page.tsx) and dashboard components to [types/requisition.ts](file:///Volumes/Essensials/spfdemoapp/types/requisition.ts).
 - **Smart Requisition Form**: Deployed [RequisitionForm.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionForm.tsx) featuring Caesar block selection (ZENO, PHUKET, PATTAYA, KOH SAMUI), bilingual TR/EN material catalog selector, live architectural volume calculation, and mandatory variance justification for >5% overruns.
 - **Requisition Sub-Ledger Table**: Deployed [RequisitionTable.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionTable.tsx) with search, multi-tier filtering, variance status pills, and ticket inspection.
 - **3-Tier Approval Action Center**: Deployed [RequisitionApprovalDrawer.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionApprovalDrawer.tsx) supporting role authority checks (`FOREMAN`, `PURCHASING_MGR`, `PROJECT_DIRECTOR`, `EXECUTIVE`), blocked PO state enforcement for unauthorized tiers, and simulated cryptographic sign-offs.
 - **Supabase Cloud SQL Integration**: Configured graceful live data fetching for `material_catalog` and `construction_blocks` with resilient offline seed fallbacks.
+
+### `v2.0.0-caesar-ui` (Active)
+- **Design System Overhaul**: Deployed universal **Oswald** typography (`latin-ext`) with 3-tier typographic hierarchy and Caesar dual-mode tokens (Caesar Obsidian Dark `#05080f` and Slate Light `#f8fafc`).
+- **Tailwind v4 Dark Mode Safeguard**: Declared `@custom-variant dark (&:where(.dark, .dark *));` in [app/globals.css](file:///Volumes/Essensials/spfdemoapp/app/globals.css) ensuring clean `.dark` class overriding.
+- **Bilingual Localization Engine**: Deployed [lib/i18n.ts](file:///Volumes/Essensials/spfdemoapp/lib/i18n.ts) with complete TR/EN dictionaries, Turkic uppercase casing (`i -> İ`, `ı -> I`), and currency/number formatters with `tabular-nums`.
+- **Anchored Header**: Redesigned [Header.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/Header.tsx) featuring the official Caesar Emblem (`CAESAR_EMBLEM_NO_TEXT.png`), double-decker title stack, and clean role switcher. Permanently removed Supabase status container and manual refresh.
+- **Hero Action Section & 3-Card Telemetry**: Canonically styled Resort hero banner with site ribbon (`CAESAR RESORT & SPA — PHASES 7 & 8`), block filters, search bar, and primary modal trigger (`+ YENİ MALZEME TALEBİ` / `+ NEW REQUISITION`). 3-card telemetry grid for velocity, variance, and financial commitment.
+- **Dual View Controller & Mobile Cards**: [RequisitionTable.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionTable.tsx) now toggles between **Block Matrix View** (interactive cards for ZENO, PHUKET, PATTAYA, KOH SAMUI) and **Sub-Ledger View** (high-density desktop table vs tailored mobile vertical cards).
+- **Persistent Utility Stack & Mobile FAB**: Deployed [FloatingActions.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/FloatingActions.tsx) with bottom-left Language/Theme buttons and bottom-right mobile quick requisition FAB.
+- **IDE Tailwind v4 Custom At-Rule Recognition**: Created [.vscode/css-custom-data.json](file:///Volumes/Essensials/spfdemoapp/.vscode/css-custom-data.json) and updated [.vscode/settings.json](file:///Volumes/Essensials/spfdemoapp/.vscode/settings.json) to declare Tailwind v4 directives (`@theme`, `@custom-variant`, `@utility`, `@variant`, `@source`, `@plugin`) and suppressed unknown at-rule warnings.
+- **Hydration Invariant & Zero-Mismatch Architecture**: Replaced client-only `localStorage` evaluation with React 19 `useSyncExternalStore` hooks (`useCaesarLanguage`, `useCaesarTheme`) in [lib/i18n.ts](file:///Volumes/Essensials/spfdemoapp/lib/i18n.ts) and [app/page.tsx](file:///Volumes/Essensials/spfdemoapp/app/page.tsx), guaranteeing identical SSR and initial client tree.
+- **Port 3000 Lifecycle Management**: Cleaned orphaned background daemons; port 3000 verified completely free.
+- **Tailwind v4 Theme Token Standardization**: Refactored all arbitrary hex color classes and deprecated gradient syntaxes (`bg-[#05080f]`, `bg-[#111827]`, `bg-[#090d16]`, `bg-[#1f2937]`, `border-[#1f2937]`, `text-[#9ca3af]`, `bg-[#facc15]`, `bg-gradient-to-r`) across all application components to canonical theme tokens (`bg-canvas-dark`, `bg-surface-dark`, `bg-elevation-dark`, `border-border-dark`, `text-subtext-dark`, `bg-accent-yellow`, `bg-linear-to-r`, `stroke-3`, `min-w-60`, `z-9999`).
+
 

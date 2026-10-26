@@ -1,28 +1,37 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Search, Plus, Building, Sparkles } from 'lucide-react';
 import { Header } from '@/components/dashboard/Header';
 import { RequisitionMetrics } from '@/components/dashboard/RequisitionMetrics';
 import { RequisitionForm } from '@/components/dashboard/RequisitionForm';
 import { RequisitionTable } from '@/components/dashboard/RequisitionTable';
 import { RequisitionApprovalDrawer } from '@/components/dashboard/RequisitionApprovalDrawer';
+import { FloatingActions } from '@/components/dashboard/FloatingActions';
 import {
   MaterialItem,
   ConstructionBlock,
   PurchaseRequisition,
-  CorporateRole
+  CorporateRole,
+  CaesarBlock
 } from '@/types/requisition';
+import {
+  DICTIONARY,
+  toLocaleUpper,
+  useCaesarLanguage,
+  useCaesarTheme
+} from '@/lib/i18n';
 import { supabase } from '@/lib/supabaseClient';
 
-// Seed Initial Caesar Blocks
+// Canonical Caesar Resort Blocks
 const SEED_BLOCKS: ConstructionBlock[] = [
-  { block_id: 'b_zeno', project_id: 'proj_caesar', block_name: 'ZENO', active_phase: 'Kaba Yapı / Frame' },
-  { block_id: 'b_phuket', project_id: 'proj_caesar', block_name: 'PHUKET', active_phase: 'Temel & Bodrum' },
+  { block_id: 'b_zeno', project_id: 'proj_caesar', block_name: 'ZENO', active_phase: 'Kaba Yapı (28 Kat)' },
+  { block_id: 'b_phuket', project_id: 'proj_caesar', block_name: 'PHUKET', active_phase: 'Temel & Radye' },
   { block_id: 'b_pattaya', project_id: 'proj_caesar', block_name: 'PATTAYA', active_phase: 'Duvar & İnce İşler' },
   { block_id: 'b_samui', project_id: 'proj_caesar', block_name: 'KOH SAMUI', active_phase: 'Tesisat & Altyapı' },
 ];
 
-// Seed Initial Material Catalog Items
+// Master Material Catalog
 const SEED_MATERIALS: MaterialItem[] = [
   {
     item_id: 'mat_concrete_c30',
@@ -46,7 +55,7 @@ const SEED_MATERIALS: MaterialItem[] = [
   },
   {
     item_id: 'mat_bims_25',
-    item_name_tr: "25'lik Bims Blok Duvar Elemanı",
+    item_name_tr: "25'lik Hafif Bims Blok",
     item_name_en: '25cm Lightweight Pumice Block',
     unit_of_measure: 'pcs',
     category: 'MASONRY',
@@ -101,7 +110,7 @@ const INITIAL_REQUISITIONS: PurchaseRequisition[] = [
       name: 'Ali Yılmaz (Saha Şefi)',
       email: 'ali.yilmaz@afikgroup.com',
       role: 'FOREMAN',
-      department: 'Caesar İnşaat',
+      department: 'Caesar İnşaat Operasyon',
     },
   },
   {
@@ -128,7 +137,7 @@ const INITIAL_REQUISITIONS: PurchaseRequisition[] = [
       name: 'Burak Demir (Saha Şefi)',
       email: 'burak.demir@afikgroup.com',
       role: 'FOREMAN',
-      department: 'Caesar İnşaat',
+      department: 'Caesar İnşaat Operasyon',
     },
   },
   {
@@ -154,7 +163,7 @@ const INITIAL_REQUISITIONS: PurchaseRequisition[] = [
       name: 'Ali Yılmaz (Saha Şefi)',
       email: 'ali.yilmaz@afikgroup.com',
       role: 'FOREMAN',
-      department: 'Caesar İnşaat',
+      department: 'Caesar İnşaat Operasyon',
     },
   },
   {
@@ -181,161 +190,230 @@ const INITIAL_REQUISITIONS: PurchaseRequisition[] = [
       name: 'Mehmet Kaya (Saha Şefi)',
       email: 'mehmet.kaya@afikgroup.com',
       role: 'FOREMAN',
-      department: 'Caesar İnşaat',
+      department: 'Caesar İnşaat Operasyon',
     },
   },
 ];
 
 export default function Home() {
+  const [lang, setLang] = useCaesarLanguage();
+  const [theme, setTheme] = useCaesarTheme();
+
   const [currentRole, setCurrentRole] = useState<CorporateRole>('PURCHASING_MGR');
   const [blocks, setBlocks] = useState<ConstructionBlock[]>(SEED_BLOCKS);
   const [materials, setMaterials] = useState<MaterialItem[]>(SEED_MATERIALS);
   const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>(INITIAL_REQUISITIONS);
   const [selectedRequisition, setSelectedRequisition] = useState<PurchaseRequisition | null>(null);
-  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
-  const [supabaseConnected, setSupabaseConnected] = useState<boolean>(true);
+  const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [blockFilter, setBlockFilter] = useState<'all' | CaesarBlock>('all');
 
-  const fetchSupabaseData = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      const { data: matData, error: matErr } = await supabase
-        .from('material_catalog')
-        .select('*');
+  const t = DICTIONARY[lang];
 
-      if (!matErr && matData && matData.length > 0) {
-        setMaterials(matData as MaterialItem[]);
-        setSupabaseConnected(true);
-      }
+  // Synchronize DOM attributes with current language and theme
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [lang, theme]);
 
-      const { data: blockData, error: blockErr } = await supabase
-        .from('construction_blocks')
-        .select('*');
+  // Sync Language
+  const handleToggleLang = () => {
+    setLang(lang === 'tr' ? 'en' : 'tr');
+  };
 
-      if (!blockErr && blockData && blockData.length > 0) {
-        setBlocks(blockData as ConstructionBlock[]);
-        setSupabaseConnected(true);
-      }
-    } catch {
-      setSupabaseConnected(false);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, []);
+  // Sync Theme
+  const handleToggleTheme = () => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  };
 
+  // Supabase Data Polling with Fallback
   useEffect(() => {
     let active = true;
-    const initData = async () => {
+    const fetchSupabase = async () => {
       try {
-        const { data: matData, error: matErr } = await supabase
-          .from('material_catalog')
-          .select('*');
-
+        const { data: matData, error: matErr } = await supabase.from('material_catalog').select('*');
         if (active && !matErr && matData && matData.length > 0) {
           setMaterials(matData as MaterialItem[]);
-          setSupabaseConnected(true);
         }
 
-        const { data: blockData, error: blockErr } = await supabase
-          .from('construction_blocks')
-          .select('*');
-
+        const { data: blockData, error: blockErr } = await supabase.from('construction_blocks').select('*');
         if (active && !blockErr && blockData && blockData.length > 0) {
           setBlocks(blockData as ConstructionBlock[]);
-          setSupabaseConnected(true);
         }
       } catch {
-        if (active) setSupabaseConnected(false);
+        // Fallback to seeds
       }
     };
-    initData();
+    fetchSupabase();
     return () => {
       active = false;
     };
   }, []);
 
-  // Handle New Requisition Creation
+  // Requisition Handlers
   const handleRequisitionSubmit = (newReq: PurchaseRequisition) => {
     setRequisitions((prev) => [newReq, ...prev]);
   };
 
-  // Handle Approval Action
   const handleApprove = (ticketId: string) => {
     setRequisitions((prev) =>
-      prev.map((req) => {
-        if (req.ticket_id === ticketId) {
-          // If approved by required tier or higher
-          return {
-            ...req,
-            status: 'APPROVED',
-            updated_at: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-          };
-        }
-        return req;
-      })
+      prev.map((req) =>
+        req.ticket_id === ticketId
+          ? {
+              ...req,
+              status: 'APPROVED',
+              updated_at: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+            }
+          : req
+      )
     );
   };
 
-  // Handle Reject Action
   const handleReject = (ticketId: string) => {
     setRequisitions((prev) =>
-      prev.map((req) => {
-        if (req.ticket_id === ticketId) {
-          return {
-            ...req,
-            status: 'REJECTED',
-            updated_at: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-          };
-        }
-        return req;
-      })
+      prev.map((req) =>
+        req.ticket_id === ticketId
+          ? {
+              ...req,
+              status: 'REJECTED',
+              updated_at: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+            }
+          : req
+      )
     );
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50/70 font-sans text-zinc-900 transition-colors dark:bg-zinc-950 dark:text-zinc-50">
-      {/* Header with Active Corporate Role Simulator */}
+    <div className="min-h-screen bg-canvas-dark text-slate-100 dark:bg-canvas-dark dark:text-slate-100 transition-colors">
+      {/* Anchored Header */}
       <Header
         currentRole={currentRole}
         onRoleChange={setCurrentRole}
-        onRefresh={fetchSupabaseData}
-        isRefreshing={isRefreshing}
-        supabaseConnected={supabaseConnected}
+        lang={lang}
       />
 
-      {/* Main Workspace Container */}
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
-        {/* KPI Requisition Sub-Ledger Metrics */}
-        <section aria-label="Alt-Defter Metrikleri">
-          <RequisitionMetrics requisitions={requisitions} />
+      {/* Main Container */}
+      <main className="mx-auto max-w-7xl px-4 py-6 md:px-8 space-y-6">
+        {/* HERO ACTION SECTION: Resort Identity + Ribbon + Search + Primary Modal Trigger */}
+        <section
+          aria-label="Caesar Resort Hero"
+          className="relative overflow-hidden rounded-2xl border border-amber-600/40 bg-linear-to-r from-amber-500/15 via-amber-600/10 to-yellow-600/15 p-5 md:p-6 backdrop-blur-md shadow-xl"
+        >
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            {/* Site Ribbon & Subtitle */}
+            <div>
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-400 border border-amber-500/40">
+                <Sparkles className="h-3 w-3" />
+                <span>{t.siteRibbon}</span>
+              </div>
+              <h2 className="mt-2 text-xl md:text-2xl lg:text-[26px] font-bold uppercase tracking-wider text-white">
+                {toLocaleUpper(t.appTitle, lang)}
+              </h2>
+            </div>
+
+            {/* Primary Action Button */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setIsFormOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl bg-accent-yellow px-5 py-3 text-xs md:text-sm font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-amber-500/30 transition-all hover:bg-amber-400 active:scale-95"
+              >
+                <Plus className="h-4 w-4 stroke-3" />
+                <span>{t.newRequisition}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Block Filter Pills & Search Input Row */}
+          <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-amber-500/20">
+            {/* Block Pills */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={() => setBlockFilter('all')}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold uppercase transition-all ${
+                  blockFilter === 'all'
+                    ? 'bg-amber-500 text-slate-950 shadow-md'
+                    : 'bg-elevation-dark/80 text-slate-300 hover:bg-border-dark border border-slate-700/60'
+                }`}
+              >
+                {t.allBlocks}
+              </button>
+              {(['ZENO', 'PHUKET', 'PATTAYA', 'KOH SAMUI'] as CaesarBlock[]).map((b) => (
+                <button
+                  key={b}
+                  onClick={() => setBlockFilter(b)}
+                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold uppercase transition-all ${
+                    blockFilter === b
+                      ? 'bg-amber-500 text-slate-950 shadow-md'
+                      : 'bg-elevation-dark/80 text-slate-300 hover:bg-border-dark border border-slate-700/60'
+                  }`}
+                >
+                  <Building className="h-3 w-3 opacity-60" />
+                  <span>{b}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Search Input */}
+            <div className="relative min-w-60">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t.searchPlaceholder}
+                className="w-full rounded-xl border border-slate-700/80 bg-surface-dark/80 py-2 pl-9 pr-3 text-xs font-medium text-slate-100 placeholder-slate-400 focus:border-amber-500 focus:outline-hidden"
+              />
+            </div>
+          </div>
         </section>
 
-        {/* Smart Material Requisition Intake Form */}
-        <section aria-label="Akıllı Talep Formu">
-          <RequisitionForm
-            materials={materials}
-            blocks={blocks}
-            currentRole={currentRole}
-            onSubmit={handleRequisitionSubmit}
-          />
+        {/* EXECUTIVE 3-CARD OVERVIEW TELEMETRY */}
+        <section aria-label="Executive Overview">
+          <RequisitionMetrics requisitions={requisitions} lang={lang} />
         </section>
 
-        {/* Live Requisition Sub-Ledger Repository Table */}
-        <section aria-label="Malzeme Alt-Defteri">
+        {/* DUAL VIEW CONTROLLER (Square Matrix vs Full Sub-Ledger & Mobile Cards) */}
+        <section aria-label="Requisition Ledger">
           <RequisitionTable
             requisitions={requisitions}
             onSelectRequisition={setSelectedRequisition}
             selectedTicketId={selectedRequisition?.ticket_id}
+            lang={lang}
+            blockFilter={blockFilter}
+            onBlockFilterChange={setBlockFilter}
+            searchQuery={searchQuery}
           />
         </section>
       </main>
 
-      {/* 3-Tier Multi-Role Approval Drawer */}
+      {/* SMART REQUISITION FORM (Slide-over Modal Drawer) */}
+      <RequisitionForm
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        materials={materials}
+        blocks={blocks}
+        currentRole={currentRole}
+        onSubmit={handleRequisitionSubmit}
+        lang={lang}
+      />
+
+      {/* REQUISITION & 3-TIER APPROVAL DRAWER */}
       <RequisitionApprovalDrawer
         requisition={selectedRequisition}
         currentRole={currentRole}
         onClose={() => setSelectedRequisition(null)}
         onApprove={handleApprove}
         onReject={handleReject}
+        lang={lang}
+      />
+
+      {/* PERSISTENT BOTTOM-LEFT UTILITY CLUSTER & MOBILE FAB */}
+      <FloatingActions
+        lang={lang}
+        onToggleLang={handleToggleLang}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
+        onOpenNewRequisition={() => setIsFormOpen(true)}
       />
     </div>
   );
