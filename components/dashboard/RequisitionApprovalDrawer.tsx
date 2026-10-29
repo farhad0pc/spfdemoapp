@@ -58,7 +58,7 @@ export const RequisitionApprovalDrawer: React.FC<RequisitionApprovalDrawerProps>
   // FOREMAN: None
   const hasAuthority = (() => {
     if (currentRole === 'EXECUTIVE') return true;
-    if (currentRole === 'PROJECT_DIRECTOR') return requisition.approval_tier <= 2;
+    if (currentRole === 'PROJECT_DIRECTOR') return (requisition.approval_tier ?? 1) <= 2;
     if (currentRole === 'PURCHASING_MGR') return requisition.approval_tier === 1;
     return false;
   })();
@@ -143,7 +143,7 @@ export const RequisitionApprovalDrawer: React.FC<RequisitionApprovalDrawerProps>
               <div>
                 <span className="text-[10px] text-slate-400 uppercase">{t.drawer.architecturalVolume}:</span>
                 <div className="font-bold text-slate-900 dark:text-slate-100 tabular-nums">
-                  {formatNumber(requisition.architectural_volume, lang)} m³
+                  {formatNumber(requisition.architectural_volume || 0, lang)} m³
                 </div>
               </div>
               <div>
@@ -172,7 +172,7 @@ export const RequisitionApprovalDrawer: React.FC<RequisitionApprovalDrawerProps>
                 isAnomaly ? 'bg-rose-500/20 text-rose-500' : 'bg-emerald-500/20 text-emerald-500'
               }`}>
                 {isAnomaly ? <AlertTriangle className="h-3 w-3" /> : <CheckCircle2 className="h-3 w-3" />}
-                {requisition.variance_percentage > 0 ? `+${requisition.variance_percentage}%` : `${requisition.variance_percentage}%`}
+                {(requisition.variance_percentage ?? 0) > 0 ? `+${requisition.variance_percentage ?? 0}%` : `${requisition.variance_percentage ?? 0}%`}
               </span>
             </div>
 

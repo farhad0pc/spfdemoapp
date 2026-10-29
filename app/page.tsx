@@ -1,9 +1,9 @@
-"use client";
+'use client';
+
+import RequisitionTable from '@/components/dashboard/RequisitionTable';
 
 import React, { useState, useEffect } from 'react';
-import {
-  Search,
-  Plus,
+import { Search, Plus,
   Building,
   Sparkles,
   AlertTriangle,
@@ -13,12 +13,10 @@ import {
   ShieldAlert,
   Coins,
   TrendingUp,
-  Layers
-} from 'lucide-react';
+  Layers } from 'lucide-react';
 import { Header } from '@/components/dashboard/Header';
 import { RequisitionMetrics } from '@/components/dashboard/RequisitionMetrics';
 import { RequisitionForm } from '@/components/dashboard/RequisitionForm';
-import { RequisitionTable } from '@/components/dashboard/RequisitionTable';
 import { RequisitionApprovalDrawer } from '@/components/dashboard/RequisitionApprovalDrawer';
 import { FloatingActions } from '@/components/dashboard/FloatingActions';
 import {
@@ -240,6 +238,7 @@ export default function Home() {
   const [materials, setMaterials] = useState<MaterialItem[]>(SEED_MATERIALS);
   const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>(INITIAL_REQUISITIONS);
   const [selectedRequisition, setSelectedRequisition] = useState<PurchaseRequisition | null>(null);
+  const [highlightedTicketId, setHighlightedTicketId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [blockFilter, setBlockFilter] = useState<'all' | CaesarBlock>('all');
@@ -326,6 +325,40 @@ export default function Home() {
     fetchSupabase();
     return () => {
       active = false;
+    };
+  }, []);
+
+  // Supabase Realtime Listener (Live Sub-Ledger Push)
+  useEffect(() => {
+    const channel = supabase
+      .channel('subledger-live-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'purchase_requisitions' },
+        (payload) => {
+          if (payload.eventType === 'UPDATE' && payload.new) {
+            const updated = payload.new as Partial<PurchaseRequisition> & { id?: string; ticket_id?: string };
+            setRequisitions((prev) =>
+              prev.map((item) =>
+                item.id === updated.id || item.ticket_id === updated.ticket_id
+                  ? { ...item, ...updated }
+                  : item
+              )
+            );
+            setHighlightedTicketId(updated.id || updated.ticket_id || null);
+            setTimeout(() => setHighlightedTicketId(null), 4000);
+          } else if (payload.eventType === 'INSERT' && payload.new) {
+            const inserted = payload.new as PurchaseRequisition & { id?: string; ticket_id?: string };
+            setRequisitions((prev) => [inserted, ...prev]);
+            setHighlightedTicketId(inserted.id || inserted.ticket_id || null);
+            setTimeout(() => setHighlightedTicketId(null), 4000);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -918,10 +951,12 @@ export default function Home() {
           <RequisitionTable
             requisitions={requisitions}
             onSelectRequisition={setSelectedRequisition}
+            onSelectTicket={setSelectedRequisition}
             selectedTicketId={selectedRequisition?.ticket_id}
+            highlightedTicketId={highlightedTicketId}
             lang={lang}
             blockFilter={blockFilter}
-            onBlockFilterChange={setBlockFilter}
+            onBlockFilterChange={(b) => setBlockFilter(b as CaesarBlock | 'all')}
             searchQuery={searchQuery}
             currentRole={currentRole}
             statusFilter={statusFilter}

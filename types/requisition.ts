@@ -10,6 +10,7 @@ export type MaterialCategory =
 export type CaesarBlock = 'ZENO' | 'PHUKET' | 'PATTAYA' | 'KOH SAMUI';
 
 export type CorporateRole = 'FOREMAN' | 'PURCHASING_MGR' | 'PROJECT_DIRECTOR' | 'EXECUTIVE';
+export type UserRole = CorporateRole;
 
 export type RequisitionStatus =
   | 'PENDING_PURCHASING'
@@ -60,142 +61,129 @@ export const SEED_USERS: CorporateUser[] = [
     name: 'Farhad Mokhtari',
     email: 'farhadmokhtari22@gmail.com',
     role: 'FOREMAN',
-    department: 'Caesar Construction Operations',
+    department: 'Site Engineering',
   },
   {
     user_id: 'user_purchasing_01',
-    name: 'Ayşe Kaya',
-    email: 'ayse.kaya@caesarprojects.com',
+    name: 'Purchasing Manager',
+    email: 'purchasing@caesar.com',
     role: 'PURCHASING_MGR',
-    department: 'Procurement & Supply Chain',
+    department: 'Procurement',
   },
   {
     user_id: 'user_director_01',
-    name: 'Ahmet Demir',
-    email: 'ahmet.demir@caesarprojects.com',
+    name: 'Project Director',
+    email: 'director@caesar.com',
     role: 'PROJECT_DIRECTOR',
-    department: 'Project Management & Engineering',
+    department: 'Executive Operations',
   },
   {
-    user_id: 'user_exec_01',
-    name: 'Executive Board / Approver',
-    email: 'test.approver@caesarprojects.com',
+    user_id: 'user_executive_01',
+    name: 'Executive Approver',
+    email: 'cr.system.approver@gmail.com',
     role: 'EXECUTIVE',
-    department: 'Executive Board & Investment',
+    department: 'Board of Directors',
   },
 ];
 
-export const SEED_USERS_MAP: Record<CorporateRole, CorporateUser> = {
-  FOREMAN: SEED_USERS[0],
-  PURCHASING_MGR: SEED_USERS[1],
-  PROJECT_DIRECTOR: SEED_USERS[2],
-  EXECUTIVE: SEED_USERS[3],
-};
-
-export function getSeedUser(role: CorporateRole): CorporateUser {
-  return SEED_USERS_MAP[role] || SEED_USERS[0];
+export function getSeedUser(role: CorporateRole | string): CorporateUser {
+  const user = SEED_USERS.find((u) => u.role === role);
+  return user || SEED_USERS[0];
 }
 
-export interface PurchaseRequisition {
-  ticket_id: string;
-  requisition_number: string;
-  project_id: string;
-  block_id: string;
-  item_id: string;
-  foreman_id: string;
-  architectural_volume: number;
-  predicted_quantity: number;
-  requested_quantity: number;
-  variance_percentage: number;
-  variance_justification?: string;
-  estimated_total_eur: number;
-  approval_tier: ApprovalTier;
-  status: RequisitionStatus;
-  created_at: string;
-  updated_at: string;
-  // Relational joins
-  material?: MaterialItem;
-  block?: ConstructionBlock;
-  foreman?: CorporateUser;
+export function calculatePredictedQuantity(architecturalVolume: number, consumptionRate: number): number {
+  return Number(((architecturalVolume || 0) * (consumptionRate || 0)).toFixed(2));
 }
 
-export interface RequisitionApproval {
-  approval_id: string;
-  ticket_id: string;
-  approver_id: string;
-  approver_role: CorporateRole;
-  action: 'APPROVED' | 'REJECTED' | 'ESCALATED';
-  tier: ApprovalTier;
-  comments?: string;
-  timestamp: string;
+export interface VarianceResult {
+  variancePercentage: number;
+  isAnomaly: boolean;
 }
 
-/**
- * Baseline Prediction: predicted_quantity = architectural_volume * consumption_rate
- */
-export function calculatePredictedQuantity(
-  architecturalVolume: number,
-  consumptionRate: number
-): number {
-  return Number((architecturalVolume * consumptionRate).toFixed(3));
-}
-
-/**
- * Variance Trigger: Flags anomaly when requested > predicted * 1.05 (> 5% overrun)
- */
-export function calculateVariance(
-  requestedQuantity: number,
-  predictedQuantity: number
-): { variancePercentage: number; isAnomaly: boolean } {
-  if (predictedQuantity <= 0) {
+export function calculateVariance(requested: number, predicted: number): VarianceResult {
+  if (!predicted || predicted <= 0) {
     return { variancePercentage: 0, isAnomaly: false };
   }
-  const variancePercentage = Number(
-    (((requestedQuantity - predictedQuantity) / predictedQuantity) * 100).toFixed(2)
-  );
-  const isAnomaly = requestedQuantity > predictedQuantity * 1.05;
+  const variancePercentage = Number(((((requested - predicted) / predicted) * 100)).toFixed(2));
+  const isAnomaly = variancePercentage > 5;
   return { variancePercentage, isAnomaly };
 }
 
-/**
- * 3-Tier Approval Gates:
- * - Tier 1: < €2,500 (Purchasing Manager)
- * - Tier 2: €2,500 – €15,000 (Project Director)
- * - Tier 3: > €15,000 (Executive Board)
- */
-export function determineApprovalTier(estimatedTotalEur: number): ApprovalTier {
-  if (estimatedTotalEur < 2500) {
-    return 1;
+export function determineApprovalTier(arg1: number, arg2?: number): ApprovalTier {
+  let totalEur = arg1;
+  let overrun = arg2 ?? 0;
+  if (arg2 !== undefined && arg1 < 100 && arg2 >= 100) {
+    overrun = arg1;
+    totalEur = arg2;
   }
-  if (estimatedTotalEur <= 15000) {
-    return 2;
-  }
-  return 3;
+  if (overrun > 5 || totalEur >= 10000) return 3;
+  if (totalEur >= 2500) return 2;
+  return 1;
 }
 
-export function getTierDescriptor(tier: ApprovalTier): {
-  threshold: string;
-  role: CorporateRole;
+export interface TierDescriptor {
   title: string;
-} {
+  role: string;
+  threshold: string;
+  description: string;
+}
+
+export function getTierDescriptor(tier: ApprovalTier | number | undefined): TierDescriptor {
   switch (tier) {
-    case 1:
+    case 3:
       return {
-        threshold: '< €2,500',
-        role: 'PURCHASING_MGR',
-        title: 'Purchasing Manager Approval',
+        title: 'Executive Board Approval',
+        role: 'EXECUTIVE',
+        threshold: '> €10,000 or Overrun > +5%',
+        description: 'Requires Executive Board Authorization',
       };
     case 2:
       return {
-        threshold: '€2,500 – €15,000',
+        title: 'Project Director Approval',
         role: 'PROJECT_DIRECTOR',
-        title: 'Project Director Sign-Off',
+        threshold: '€2,500 – €10,000',
+        description: 'Requires Project Director Authorization',
       };
-    case 3:
+    default:
       return {
-        threshold: '> €15,000',
-        role: 'EXECUTIVE',
-        title: 'Executive / Board Authorization',
+        title: 'Purchasing Manager Standard',
+        role: 'PURCHASING_MGR',
+        threshold: '< €2,500',
+        description: 'Standard Site Procurement Authorization',
       };
   }
+}
+
+export interface PurchaseRequisition {
+  id?: string;
+  ticket_id: string;
+  requisition_number?: string;
+  project_id?: string;
+  block_id?: string;
+  block_name?: CaesarBlock | string;
+  block?: ConstructionBlock;
+  item_id?: string;
+  item_name?: string;
+  material?: MaterialItem;
+  foreman_id?: string;
+  foreman?: CorporateUser;
+  architectural_volume?: number;
+  predicted_volume?: number;
+  predicted_quantity: number;
+  requested_qty?: number;
+  requested_quantity: number;
+  unit?: string;
+  unit_rate_eur?: number;
+  total_estimated_eur?: number;
+  estimated_total_eur: number;
+  overrun_percentage?: number;
+  variance_percentage?: number;
+  approval_tier?: ApprovalTier;
+  status: RequisitionStatus | string;
+  justification?: string;
+  variance_justification?: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  [key: string]: unknown;
 }
