@@ -2,8 +2,8 @@
 
 **Repository**: `spfdemoapp`  
 **Domain Scope**: Afik Group (Caesar Projects) Construction Material Purchasing Sub-Ledger  
-**Active Baseline**: `v1.2.0-core-engine`  
-**Last Updated**: 2026-10-26  
+**Active Baseline**: `v2.1.0-account-partitioning`  
+**Last Updated**: 2026-10-29  
 
 ---
 
@@ -156,7 +156,7 @@ The approval workflow is determined by the total estimated requisition value in 
 - **3-Tier Approval Action Center**: Deployed [RequisitionApprovalDrawer.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionApprovalDrawer.tsx) supporting role authority checks (`FOREMAN`, `PURCHASING_MGR`, `PROJECT_DIRECTOR`, `EXECUTIVE`), blocked PO state enforcement for unauthorized tiers, and simulated cryptographic sign-offs.
 - **Supabase Cloud SQL Integration**: Configured graceful live data fetching for `material_catalog` and `construction_blocks` with resilient offline seed fallbacks.
 
-### `v2.0.0-caesar-ui` (Active)
+### `v2.0.0-caesar-ui`
 - **Design System Overhaul**: Deployed universal **Oswald** typography (`latin-ext`) with 3-tier typographic hierarchy and Caesar dual-mode tokens (Caesar Obsidian Dark `#05080f` and Slate Light `#f8fafc`).
 - **Tailwind v4 Dark Mode Safeguard**: Declared `@custom-variant dark (&:where(.dark, .dark *));` in [app/globals.css](file:///Volumes/Essensials/spfdemoapp/app/globals.css) ensuring clean `.dark` class overriding.
 - **Bilingual Localization Engine**: Deployed [lib/i18n.ts](file:///Volumes/Essensials/spfdemoapp/lib/i18n.ts) with complete TR/EN dictionaries, Turkic uppercase casing (`i -> İ`, `ı -> I`), and currency/number formatters with `tabular-nums`.
@@ -168,5 +168,19 @@ The approval workflow is determined by the total estimated requisition value in 
 - **Hydration Invariant & Zero-Mismatch Architecture**: Replaced client-only `localStorage` evaluation with React 19 `useSyncExternalStore` hooks (`useCaesarLanguage`, `useCaesarTheme`) in [lib/i18n.ts](file:///Volumes/Essensials/spfdemoapp/lib/i18n.ts) and [app/page.tsx](file:///Volumes/Essensials/spfdemoapp/app/page.tsx), guaranteeing identical SSR and initial client tree.
 - **Port 3000 Lifecycle Management**: Cleaned orphaned background daemons; port 3000 verified completely free.
 - **Tailwind v4 Theme Token Standardization**: Refactored all arbitrary hex color classes and deprecated gradient syntaxes (`bg-[#05080f]`, `bg-[#111827]`, `bg-[#090d16]`, `bg-[#1f2937]`, `border-[#1f2937]`, `text-[#9ca3af]`, `bg-[#facc15]`, `bg-gradient-to-r`) across all application components to canonical theme tokens (`bg-canvas-dark`, `bg-surface-dark`, `bg-elevation-dark`, `border-border-dark`, `text-subtext-dark`, `bg-accent-yellow`, `bg-linear-to-r`, `stroke-3`, `min-w-60`, `z-9999`).
+
+### `v2.1.0-account-partitioning` (Active)
+- **Corporate User Email Contract & Anchor Accounts**: Extended `CorporateUser` schema and anchored canonical identity mappings via `SEED_USERS` in [types/requisition.ts](file:///Volumes/Essensials/spfdemoapp/types/requisition.ts):
+  * `farhadmokhtari22@gmail.com` as `FOREMAN` (Farhad Mokhtari — Field Intake Authority).
+  * `test.approver@caesarprojects.com` as `EXECUTIVE` (Executive Board / Approver — Tier 3 Authority).
+  * `ayse.kaya@caesarprojects.com` as `PURCHASING_MGR` (Ayşe Kaya — Tier 1 Authority).
+  * `ahmet.demir@caesarprojects.com` as `PROJECT_DIRECTOR` (Ahmet Demir — Tier 2 Authority).
+- **User Identity Indicator in Header**: Updated [Header.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/Header.tsx) role switcher pill to display the active user's avatar, full name, role dropdown, and operating Google email address with live online status badge.
+- **Role-Tailored Viewport Partitioning**: Dynamically partitioned primary viewports in [app/page.tsx](file:///Volumes/Essensials/spfdemoapp/app/page.tsx):
+  * **FOREMAN**: Focuses on **Field Requisition Intake Form & Instant Baseline Calculator** (`predicted = volume * consumption_rate`), prominent `+5% Overrun Warning` guardrail enforcing technical justifications, and defaults sub-ledger filtering to `My Block Requisitions` (Farhad Mokhtari's field tickets).
+  * **PURCHASING_MGR & PROJECT_DIRECTOR**: Emphasizes the **Triage Queue** (defaulting to `PENDING_PURCHASING` or `PENDING_TIER2`), contracted supplier cost comparisons (`-4.0% Caesar framework advantage`), and field variance justification review.
+  * **EXECUTIVE**: Defaults to the **Macro Financial Telemetry View** (High-ticket CapEx tickets > €15k, company-wide committed budget burn vs €250,000 envelope, and blocked PO approvals monitor).
+- **Sub-Ledger Enhancements**: Updated [RequisitionTable.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionTable.tsx) with controlled role filters, "My Block Requisitions" toggle, supplier benchmarks, inline justification callouts, and high-ticket CapEx indicators.
+- **Purity & Validation Invariants**: Strict adherence to React 19 rules (pure render execution, isolated timestamp/ID generators outside render loop) passing 100% test criteria (`npx tsc --noEmit` & `npm run lint` -> Exit Code 0).
 
 

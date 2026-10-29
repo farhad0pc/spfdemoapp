@@ -54,6 +54,48 @@ export interface CorporateUser {
   department: string;
 }
 
+export const SEED_USERS: CorporateUser[] = [
+  {
+    user_id: 'user_foreman_01',
+    name: 'Farhad Mokhtari',
+    email: 'farhadmokhtari22@gmail.com',
+    role: 'FOREMAN',
+    department: 'Caesar Construction Operations',
+  },
+  {
+    user_id: 'user_purchasing_01',
+    name: 'Ayşe Kaya',
+    email: 'ayse.kaya@caesarprojects.com',
+    role: 'PURCHASING_MGR',
+    department: 'Procurement & Supply Chain',
+  },
+  {
+    user_id: 'user_director_01',
+    name: 'Ahmet Demir',
+    email: 'ahmet.demir@caesarprojects.com',
+    role: 'PROJECT_DIRECTOR',
+    department: 'Project Management & Engineering',
+  },
+  {
+    user_id: 'user_exec_01',
+    name: 'Executive Board / Approver',
+    email: 'test.approver@caesarprojects.com',
+    role: 'EXECUTIVE',
+    department: 'Executive Board & Investment',
+  },
+];
+
+export const SEED_USERS_MAP: Record<CorporateRole, CorporateUser> = {
+  FOREMAN: SEED_USERS[0],
+  PURCHASING_MGR: SEED_USERS[1],
+  PROJECT_DIRECTOR: SEED_USERS[2],
+  EXECUTIVE: SEED_USERS[3],
+};
+
+export function getSeedUser(role: CorporateRole): CorporateUser {
+  return SEED_USERS_MAP[role] || SEED_USERS[0];
+}
+
 export interface PurchaseRequisition {
   ticket_id: string;
   requisition_number: string;

@@ -16,7 +16,8 @@ import {
   calculateVariance,
   determineApprovalTier,
   getTierDescriptor,
-  CorporateRole
+  CorporateRole,
+  getSeedUser
 } from '@/types/requisition';
 import {
   Language,
@@ -157,13 +158,7 @@ export const RequisitionForm: React.FC<RequisitionFormProps> = ({
         updated_at: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
         material: selectedMaterial,
         block: selectedBlock,
-        foreman: {
-          user_id: 'user_foreman_01',
-          name: 'Ali Yılmaz (Saha Şefi)',
-          email: 'ali.yilmaz@afikgroup.com',
-          role: 'FOREMAN',
-          department: 'Caesar İnşaat Operasyon',
-        },
+        foreman: getSeedUser('FOREMAN'),
       };
 
       onSubmit(newRequisition);

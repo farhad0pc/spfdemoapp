@@ -13,13 +13,16 @@ import {
   Truck,
   LayoutGrid,
   List,
-  Flame
+  Flame,
+  UserCheck,
+  MessageSquareQuote
 } from 'lucide-react';
 import {
   PurchaseRequisition,
   RequisitionStatus,
   CaesarBlock,
-  ApprovalTier
+  ApprovalTier,
+  CorporateRole
 } from '@/types/requisition';
 import {
   Language,
@@ -37,6 +40,13 @@ interface RequisitionTableProps {
   blockFilter: 'all' | CaesarBlock;
   onBlockFilterChange: (b: 'all' | CaesarBlock) => void;
   searchQuery: string;
+  currentRole?: CorporateRole;
+  statusFilter?: 'all' | RequisitionStatus;
+  onStatusFilterChange?: (status: 'all' | RequisitionStatus) => void;
+  tierFilter?: 'all' | ApprovalTier;
+  onTierFilterChange?: (tier: 'all' | ApprovalTier) => void;
+  myRequisitionsOnly?: boolean;
+  onMyRequisitionsOnlyChange?: (val: boolean) => void;
 }
 
 export const RequisitionTable: React.FC<RequisitionTableProps> = ({
@@ -47,12 +57,29 @@ export const RequisitionTable: React.FC<RequisitionTableProps> = ({
   blockFilter,
   onBlockFilterChange,
   searchQuery,
+  currentRole = 'FOREMAN',
+  statusFilter: controlledStatusFilter,
+  onStatusFilterChange,
+  tierFilter: controlledTierFilter,
+  onTierFilterChange,
+  myRequisitionsOnly: controlledMyRequisitionsOnly,
+  onMyRequisitionsOnlyChange,
 }) => {
   const t = DICTIONARY[lang];
-  const [statusFilter, setStatusFilter] = useState<'all' | RequisitionStatus>('all');
-  const [tierFilter, setTierFilter] = useState<'all' | ApprovalTier>('all');
+  const [internalStatusFilter, setInternalStatusFilter] = useState<'all' | RequisitionStatus>('all');
+  const [internalTierFilter, setInternalTierFilter] = useState<'all' | ApprovalTier>('all');
+  const [internalMyRequisitionsOnly, setInternalMyRequisitionsOnly] = useState<boolean>(false);
   const [onlyAnomalies, setOnlyAnomalies] = useState(false);
   const [viewMode, setViewMode] = useState<'subledger' | 'matrix'>('subledger');
+
+  const statusFilter = controlledStatusFilter !== undefined ? controlledStatusFilter : internalStatusFilter;
+  const setStatusFilter = onStatusFilterChange || setInternalStatusFilter;
+
+  const tierFilter = controlledTierFilter !== undefined ? controlledTierFilter : internalTierFilter;
+  const setTierFilter = onTierFilterChange || setInternalTierFilter;
+
+  const myRequisitionsOnly = controlledMyRequisitionsOnly !== undefined ? controlledMyRequisitionsOnly : internalMyRequisitionsOnly;
+  const setMyRequisitionsOnly = onMyRequisitionsOnlyChange || setInternalMyRequisitionsOnly;
 
   const filteredRequisitions = requisitions.filter((req) => {
     const term = searchQuery.toLowerCase();
@@ -67,8 +94,11 @@ export const RequisitionTable: React.FC<RequisitionTableProps> = ({
     const matchesTier = tierFilter === 'all' || req.approval_tier === tierFilter;
     const isAnomaly = req.requested_quantity > req.predicted_quantity * 1.05;
     const matchesAnomaly = !onlyAnomalies || isAnomaly;
+    const matchesMyRequisitions = !myRequisitionsOnly ||
+      req.foreman?.email === 'farhadmokhtari22@gmail.com' ||
+      req.foreman_id === 'user_foreman_01';
 
-    return matchesSearch && matchesStatus && matchesBlock && matchesTier && matchesAnomaly;
+    return matchesSearch && matchesStatus && matchesBlock && matchesTier && matchesAnomaly && matchesMyRequisitions;
   });
 
   const getStatusBadge = (status: RequisitionStatus) => {
@@ -179,6 +209,20 @@ export const RequisitionTable: React.FC<RequisitionTableProps> = ({
 
         {/* View Mode Toggle & Filter Group */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* My Block Requisitions Toggle (prominently anchors Foreman) */}
+          <button
+            onClick={() => setMyRequisitionsOnly(!myRequisitionsOnly)}
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-all active:scale-95 ${
+              myRequisitionsOnly
+                ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20 ring-1 ring-amber-400'
+                : 'border border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-border-dark dark:text-slate-300'
+            }`}
+            title={t.partition.myBlockOnly}
+          >
+            <UserCheck className={`h-3.5 w-3.5 ${myRequisitionsOnly ? 'text-slate-950' : 'text-amber-500'}`} />
+            <span>{myRequisitionsOnly ? t.partition.myBlockOnly : t.partition.allBlockReqs}</span>
+          </button>
+
           {/* Anomaly Quick Filter Toggle */}
           <button
             onClick={() => setOnlyAnomalies(!onlyAnomalies)}
@@ -363,9 +407,19 @@ export const RequisitionTable: React.FC<RequisitionTableProps> = ({
                           <div className="font-semibold text-slate-900 dark:text-slate-100">
                             {lang === 'tr' ? req.material?.item_name_tr : req.material?.item_name_en}
                           </div>
-                          <div className="text-[11px] text-slate-500 dark:text-subtext-dark tabular-nums">
-                            {formatCurrency(req.material?.base_cost_eur || 0, lang)} / {req.material?.unit_of_measure}
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-subtext-dark tabular-nums">
+                            <span>{formatCurrency(req.material?.base_cost_eur || 0, lang)} / {req.material?.unit_of_measure}</span>
+                            {(currentRole === 'PURCHASING_MGR' || currentRole === 'PROJECT_DIRECTOR') && (
+                              <span className="rounded bg-emerald-500/10 px-1 py-0.2 text-[9px] font-bold text-emerald-600 dark:text-emerald-400">
+                                Ref: -4% Sözleşme
+                              </span>
+                            )}
                           </div>
+                          {req.foreman?.name && (
+                            <div className="mt-0.5 text-[10px] text-slate-400 dark:text-subtext-dark">
+                              Saha: {req.foreman.name}
+                            </div>
+                          )}
                         </td>
 
                         {/* Volume & Predicted */}
@@ -379,11 +433,11 @@ export const RequisitionTable: React.FC<RequisitionTableProps> = ({
                         </td>
 
                         {/* Requested & Variance Pill */}
-                        <td className="py-3 px-3 whitespace-nowrap tabular-nums">
-                          <div className="font-bold text-slate-900 dark:text-slate-50">
+                        <td className="py-3 px-3 tabular-nums">
+                          <div className="font-bold text-slate-900 dark:text-slate-50 whitespace-nowrap">
                             {formatNumber(req.requested_quantity, lang)} {req.material?.unit_of_measure}
                           </div>
-                          <div className="mt-0.5">
+                          <div className="mt-0.5 whitespace-nowrap">
                             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
                               isAnomaly
                                 ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
@@ -393,11 +447,26 @@ export const RequisitionTable: React.FC<RequisitionTableProps> = ({
                               {req.variance_percentage > 0 ? `+${req.variance_percentage}%` : `${req.variance_percentage}%`}
                             </span>
                           </div>
+                          {req.variance_justification && (
+                            <div className="mt-1 flex items-start gap-1 rounded bg-amber-500/10 p-1 text-[10px] text-amber-800 dark:text-amber-300 max-w-xs">
+                              <MessageSquareQuote className="h-3 w-3 shrink-0 mt-0.5 text-amber-500" />
+                              <span className="line-clamp-1 italic" title={req.variance_justification}>
+                                {req.variance_justification}
+                              </span>
+                            </div>
+                          )}
                         </td>
 
                         {/* Total Cost */}
-                        <td className="py-3 px-3 whitespace-nowrap font-bold text-slate-900 dark:text-amber-400 tabular-nums">
-                          {formatCurrency(req.estimated_total_eur, lang)}
+                        <td className="py-3 px-3 whitespace-nowrap tabular-nums">
+                          <div className="font-bold text-slate-900 dark:text-amber-400">
+                            {formatCurrency(req.estimated_total_eur, lang)}
+                          </div>
+                          {req.estimated_total_eur > 15000 && (
+                            <span className="inline-flex items-center rounded bg-amber-500/20 px-1.5 py-0.2 text-[9px] font-black text-amber-500 uppercase tracking-tight">
+                              CapEx &gt; €15k
+                            </span>
+                          )}
                         </td>
 
                         {/* Tier */}
@@ -468,6 +537,17 @@ export const RequisitionTable: React.FC<RequisitionTableProps> = ({
                     <div className="mt-2 text-xs font-bold text-slate-800 dark:text-slate-100">
                       {lang === 'tr' ? req.material?.item_name_tr : req.material?.item_name_en}
                     </div>
+                    {req.foreman?.name && (
+                      <div className="text-[10px] text-slate-400 dark:text-subtext-dark">
+                        Saha: {req.foreman.name}
+                      </div>
+                    )}
+                    {req.variance_justification && (
+                      <div className="mt-1.5 flex items-start gap-1 rounded bg-amber-500/10 p-1.5 text-[10px] text-amber-800 dark:text-amber-300">
+                        <MessageSquareQuote className="h-3 w-3 shrink-0 mt-0.5 text-amber-500" />
+                        <span className="italic">{req.variance_justification}</span>
+                      </div>
+                    )}
 
                     {/* 2-Column Metadata Grid */}
                     <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] border-t border-slate-200/80 dark:border-slate-800 pt-2.5">
