@@ -2,7 +2,7 @@
 
 **Repository**: `spfdemoapp`  
 **Domain Scope**: Afik Group (Caesar Projects) Construction Material Purchasing Sub-Ledger  
-**Active Baseline**: `v2.1.0-account-partitioning`  
+**Active Baseline**: `v2.3.0-realtime-subledger-sync`  
 **Last Updated**: 2026-10-29  
 
 ---
@@ -169,7 +169,7 @@ The approval workflow is determined by the total estimated requisition value in 
 - **Port 3000 Lifecycle Management**: Cleaned orphaned background daemons; port 3000 verified completely free.
 - **Tailwind v4 Theme Token Standardization**: Refactored all arbitrary hex color classes and deprecated gradient syntaxes (`bg-[#05080f]`, `bg-[#111827]`, `bg-[#090d16]`, `bg-[#1f2937]`, `border-[#1f2937]`, `text-[#9ca3af]`, `bg-[#facc15]`, `bg-gradient-to-r`) across all application components to canonical theme tokens (`bg-canvas-dark`, `bg-surface-dark`, `bg-elevation-dark`, `border-border-dark`, `text-subtext-dark`, `bg-accent-yellow`, `bg-linear-to-r`, `stroke-3`, `min-w-60`, `z-9999`).
 
-### `v2.1.0-account-partitioning` (Active)
+### `v2.1.0-account-partitioning`
 - **Corporate User Email Contract & Anchor Accounts**: Extended `CorporateUser` schema and anchored canonical identity mappings via `SEED_USERS` in [types/requisition.ts](file:///Volumes/Essensials/spfdemoapp/types/requisition.ts):
   * `farhadmokhtari22@gmail.com` as `FOREMAN` (Farhad Mokhtari — Field Intake Authority).
   * `test.approver@caesarprojects.com` as `EXECUTIVE` (Executive Board / Approver — Tier 3 Authority).
@@ -182,5 +182,19 @@ The approval workflow is determined by the total estimated requisition value in 
   * **EXECUTIVE**: Defaults to the **Macro Financial Telemetry View** (High-ticket CapEx tickets > €15k, company-wide committed budget burn vs €250,000 envelope, and blocked PO approvals monitor).
 - **Sub-Ledger Enhancements**: Updated [RequisitionTable.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionTable.tsx) with controlled role filters, "My Block Requisitions" toggle, supplier benchmarks, inline justification callouts, and high-ticket CapEx indicators.
 - **Purity & Validation Invariants**: Strict adherence to React 19 rules (pure render execution, isolated timestamp/ID generators outside render loop) passing 100% test criteria (`npx tsc --noEmit` & `npm run lint` -> Exit Code 0).
+
+### `v2.2.0-email-dispatch-engine`
+- **Cryptographic Action Token Engine**: Implemented URL-safe HMAC-SHA256 signature generator and verification utility in [lib/tokenService.ts](file:///Volumes/Essensials/spfdemoapp/lib/tokenService.ts) with constant-time equality validation (`crypto.timingSafeEqual`) and 72-hour expiration enforcement.
+- **Caesar Branded Email Template & Dispatch Engine**: Deployed [lib/emailService.ts](file:///Volumes/Essensials/spfdemoapp/lib/emailService.ts) with dual-mode dispatch: transactional email delivery and terminal simulator fallback displaying live clickable action links (`[ONAYLA / APPROVE]` and `[REDDET / REJECT]`).
+- **One-Click Cryptographic Approval Callback Endpoint**: Created [app/api/approve/route.ts](file:///Volumes/Essensials/spfdemoapp/app/api/approve/route.ts) validating tokens, updating database status using `supabaseAdmin`, recording immutable audit records, and rendering responsive Caesar Obsidian-themed confirmation screens.
+
+### `v2.3.0-realtime-subledger-sync` (Active)
+- **Supabase Realtime WebSocket Synchronization Loop**: Mounted `postgres_changes` channel subscription in [app/page.tsx](file:///Volumes/Essensials/spfdemoapp/app/page.tsx) listening to Change Data Capture (CDC) events (`INSERT`, `UPDATE`) on `purchase_requisitions`. Configured 10 events/sec throughput and resilient connection disposal (`supabase.removeChannel`).
+- **Dynamic Multi-Tier Telemetry Calculation**: Real-time mutations immediately recalculate executive macro cards (Committed EUR, €250k budget burn percentage, CapEx allocations > €15k, and blocked PO approvals) and block stats without requiring page reloads or full DOM refreshes.
+- **Visual Pulse & Live Row Highlighting**:
+  * Implemented active emerald pulse rings (`ring-2 ring-emerald-500/80 shadow-lg shadow-emerald-500/20 bg-emerald-500/10 transition-all duration-700 animate-pulse`) across updated/inserted table rows and mobile activity cards in [components/dashboard/RequisitionTable.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionTable.tsx), with 4-second auto-clearing highlight timer.
+- **RLS Bypass & Dual DB Fallback**: Configured `supabaseAdmin` in [lib/supabaseClient.ts](file:///Volumes/Essensials/spfdemoapp/lib/supabaseClient.ts) and [app/api/approve/route.ts](file:///Volumes/Essensials/spfdemoapp/app/api/approve/route.ts) leveraging `SUPABASE_SERVICE_ROLE_KEY` to guarantee server-side approval writes bypass RLS restrictions while gracefully falling back in offline mode.
+- **Bidirectional Synchronization**: Real-time push verified across one-click cryptographic email links (`/api/approve?token=...`), dashboard approval drawers, and field intake forms.
+- **Verification Criteria**: 100% test passage verified with `npx tsc --noEmit` (Exit 0) and `npm run lint` (Exit 0).
 
 
