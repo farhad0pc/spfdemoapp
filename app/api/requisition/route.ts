@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseClient';
 import { sendApprovalEmail } from '@/lib/emailService';
 
@@ -12,13 +13,16 @@ const slugToUuidMap: Record<string, string> = {
 const clampNumeric = (num: number, max = 9999999.99) =>
   Math.min(Math.max(Number(num) || 0, 0), max);
 
+const isValidUuid = (id: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const {
       ticket_id,
       block_id = 'b_zeno',
-      material_id = 'MAT-001',
+      material_id = null,
       architectural_volume = 0,
       predicted_quantity = 0,
       requested_quantity = 0,
@@ -29,12 +33,18 @@ export async function POST(request: NextRequest) {
       variance_pct = 0,
     } = body;
 
-    const resolvedBlockId = slugToUuidMap[block_id] || block_id;
+    // Ensure ticket_id is a valid UUID for PostgreSQL
+    const resolvedTicketId = ticket_id && isValidUuid(ticket_id)
+      ? ticket_id
+      : crypto.randomUUID();
+
+    const resolvedBlockId = slugToUuidMap[block_id] || (isValidUuid(block_id) ? block_id : null);
+    const resolvedMaterialId = material_id && isValidUuid(material_id) ? material_id : null;
 
     const insertPayload = {
-      ticket_id,
+      ticket_id: resolvedTicketId,
       block_id: resolvedBlockId,
-      material_id,
+      material_id: resolvedMaterialId,
       architectural_volume: clampNumeric(architectural_volume),
       predicted_quantity: clampNumeric(predicted_quantity),
       requested_quantity: clampNumeric(requested_quantity),
@@ -55,12 +65,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: dbError.message }, { status: 400 });
     }
 
-    // Trigger automated email dispatch if requisition requires approval (Tier 2 or Tier 3)
+    // Trigger automated email dispatch if requisition requires approval
     if (status !== 'APPROVED') {
       try {
+        const displayTicket = `REQ-${resolvedTicketId.slice(0, 8).toUpperCase()}`;
         await sendApprovalEmail({
-          ticketId: ticket_id,
-          materialName: material_id,
+          ticketId: resolvedTicketId,
+          materialName: body.material_name || body.material_id || 'C30/37 Concrete',
           block: block_id,
           quantity: Number(requested_quantity),
           totalEur: Number(estimated_total_eur),
@@ -68,7 +79,7 @@ export async function POST(request: NextRequest) {
           approverEmail: 'farhadmokhtari22@gmail.com',
           approverName: 'Farhad Mokhtari',
         });
-        console.log(`[API/REQUISITION] ✓ Approval email dispatched for ${ticket_id}`);
+        console.log(`[API/REQUISITION] ✓ Approval email dispatched for ${displayTicket} (${resolvedTicketId})`);
       } catch (mailError: unknown) {
         const errorMsg = mailError instanceof Error ? mailError.message : String(mailError);
         console.error('[API/REQUISITION] Email Dispatch Warning:', errorMsg);
