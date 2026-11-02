@@ -1,3 +1,4 @@
+import { formatTicketId } from "@/lib/formatUtils";
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyApprovalToken } from '@/lib/tokenService';
 import { supabaseAdmin } from '@/lib/supabaseClient';
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
     console.warn('[API/APPROVE] Supabase update fallback (offline mode):', err);
   }
 
-  console.log(`[APPROVAL ENGINE] ✓ Action "${action}" executed successfully for Ticket ${requisition_id} by ${approver_email}`);
+  console.log(`[APPROVAL ENGINE] ✓ Action "${action}" executed successfully for Ticket ${formatTicketId(requisition_id)} by ${approver_email}`);
 
   return new NextResponse(
     renderHtmlResponse({

@@ -1,5 +1,6 @@
-'use client';
+"use client";
 
+import { formatTicketId } from "@/lib/formatUtils";
 import React from 'react';
 import { PurchaseRequisition, UserRole, CaesarBlock } from '@/types/requisition';
 
@@ -139,7 +140,7 @@ export default function RequisitionTable({
               return (
                 <tr key={itemId} className={`transition-colors ${highlightClass}`}>
                   <td className="py-3 px-4 font-mono font-semibold text-amber-400">
-    {item.requisition_number || (item.ticket_id.startsWith("req_") ? item.ticket_id.toUpperCase() : "REQ-202610-" + item.ticket_id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase())}
+    {formatTicketId(item.ticket_id, item.requisition_number)}
   </td>
                   <td className="py-3 px-4 font-semibold text-white">{item.block_name || item.block_id}</td>
                   <td className="py-3 px-4">
@@ -186,7 +187,7 @@ export default function RequisitionTable({
           return (
             <div key={itemId} className={`p-3 rounded-lg ${highlightClass} space-y-2`}>
               <div className="flex items-center justify-between">
-                <span className="font-mono text-xs font-bold text-amber-400">{item.ticket_id}</span>
+                <span className="font-mono text-xs font-bold text-amber-400">{formatTicketId(item.ticket_id, item.requisition_number)}</span>
                 {getStatusBadge(item.status)}
               </div>
               <div className="flex items-center justify-between text-xs">
