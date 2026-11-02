@@ -32,7 +32,13 @@ export async function sendApprovalEmail(params: RequisitionNotificationParams) {
     approverName = 'Farhad Mokhtari',
   } = params;
 
-  const baseUrl = process.env.APP_BASE_URL || 'http://localhost:3000';
+  // Prioritize verified production domain, fallback to APP_BASE_URL or Vercel system headers
+  let baseUrl = 'https://spfdemoapp.vercel.app';
+  if (process.env.APP_BASE_URL && !process.env.APP_BASE_URL.includes('supabase.co')) {
+    baseUrl = process.env.APP_BASE_URL.replace(/\/+$/, '');
+  } else if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    baseUrl = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
 
   const approveToken = generateApprovalToken({
     requisition_id: ticketId,
