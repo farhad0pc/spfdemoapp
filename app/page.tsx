@@ -503,21 +503,27 @@ export default function Home() {
       // Guard against numeric overflow (Postgres NUMERIC precision limits)
       const clampNumeric = (num: number, max = 9999999.99) => Math.min(Math.max(Number(num) || 0, 0), max);
 
-      const { error } = await supabase.from("purchase_requisitions").insert({
-        ticket_id: newReq.ticket_id,
-        block_id: resolvedBlockId,
-        material_id: resolvedMaterialId,
-        architectural_volume: clampNumeric(newReq.architectural_volume || 0),
-        predicted_quantity: clampNumeric(newReq.predicted_quantity || 0),
-        requested_quantity: clampNumeric(newReq.requested_quantity || 0),
-        estimated_total_eur: clampNumeric(newReq.estimated_total_eur || 0),
-        approval_tier: Number(newReq.approval_tier || 1),
-        status: newReq.status,
-        variance_justification: newReq.variance_justification || newReq.justification || null
+      const response = await fetch("/api/requisition", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticket_id: newReq.ticket_id,
+          block_id: resolvedBlockId,
+          material_id: resolvedMaterialId,
+          architectural_volume: clampNumeric(newReq.architectural_volume || 0),
+          predicted_quantity: clampNumeric(newReq.predicted_quantity || 0),
+          requested_quantity: clampNumeric(newReq.requested_quantity || 0),
+          estimated_total_eur: clampNumeric(newReq.estimated_total_eur || 0),
+          approval_tier: Number(newReq.approval_tier || 1),
+          status: newReq.status,
+          variance_justification: newReq.variance_justification || newReq.justification || null,
+          variance_pct: newReq.variance_pct || 0
+        })
       });
 
-      if (error) {
-        console.error("[Supabase Insert Error]:", error.message);
+      if (!response.ok) {
+        const resJson = await response.json();
+        console.error("[API Requisition Insert Error]:", resJson.error);
       }
     } catch (err) {
       console.error("[Supabase Network Exception]:", err);
