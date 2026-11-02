@@ -225,6 +225,55 @@ function getFormattedTimeString(): string {
   return new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 }
 
+
+const blockNameMap: Record<string, string> = {
+  "66666666-6666-6666-6666-666666666660": "b_zeno",
+  "66666666-6666-6666-6666-666666666661": "b_phuket",
+  "66666666-6666-6666-6666-666666666662": "b_pattaya",
+  "66666666-6666-6666-6666-666666666663": "b_samui"
+};
+
+const materialNameMap: Record<string, string> = {
+  "MAT-001": "mat_concrete_c30",
+  "MAT-002": "mat_steel_b500c",
+  "MAT-003": "mat_bims_25",
+  "MAT-004": "mat_ceramic_60120",
+  "MAT-005": "mat_pprc_pipe_32"
+};
+
+function mapDbRowToRequisition(raw: Record<string, unknown>): PurchaseRequisition {
+  const rawBlockId = String(raw.block_id || "");
+  const rawMaterialId = String(raw.material_id || "");
+  const blockKey = blockNameMap[rawBlockId] || rawBlockId || "b_zeno";
+  const matKey = materialNameMap[rawMaterialId] || rawMaterialId || "mat_concrete_c30";
+  const reqQty = Number(raw.requested_quantity || 0);
+  const predQty = Number(raw.predicted_quantity || reqQty || 1);
+  const overrun = predQty > 0 ? Number((((reqQty - predQty) / predQty) * 100).toFixed(1)) : 0;
+
+  return {
+    id: String(raw.id || raw.ticket_id || Date.now()),
+    ticket_id: String(raw.ticket_id || `req_${Date.now()}`),
+    requisition_number: String(raw.requisition_number || ("REQ-202610-" + String(raw.ticket_id || Date.now()).replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase())),
+    block_name: blockKey,
+    block_id: rawBlockId || blockKey,
+    item_name: matKey,
+    material_id: rawMaterialId || matKey,
+    requested_qty: reqQty,
+    requested_quantity: reqQty,
+    predicted_quantity: predQty,
+    architectural_volume: Number(raw.architectural_volume || 0),
+    unit: "units",
+    total_estimated_eur: Number(raw.estimated_total_eur || 0),
+    estimated_total_eur: Number(raw.estimated_total_eur || 0),
+    overrun_percentage: overrun,
+    approval_tier: [1, 2, 3].includes(Number(raw.approval_tier)) ? (Number(raw.approval_tier) as 1 | 2 | 3) : 1,
+    status: (typeof raw.status === "string" ? raw.status : "PENDING_TIER2") as PurchaseRequisition["status"],
+    justification: String(raw.variance_justification || "Postgres record"),
+    variance_justification: String(raw.variance_justification || "Postgres record"),
+    created_at: String(raw.created_at || new Date().toISOString())
+  };
+}
+
 export default function Home() {
   const [lang, setLang] = useCaesarLanguage();
   const [theme, setTheme] = useCaesarTheme();
@@ -307,6 +356,8 @@ export default function Home() {
   // Supabase Data Polling with Fallback
   useEffect(() => {
     let active = true;
+    
+  
     const fetchSupabase = async () => {
       try {
         const { data: matData, error: matErr } = await supabase.from('material_catalog').select('*');
@@ -317,6 +368,20 @@ export default function Home() {
         const { data: blockData, error: blockErr } = await supabase.from('construction_blocks').select('*');
         if (active && !blockErr && blockData && blockData.length > 0) {
           setBlocks(blockData as ConstructionBlock[]);
+        }
+
+        const { data: reqData, error: reqErr } = await supabase
+          .from('purchase_requisitions')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (active && !reqErr && reqData && reqData.length > 0) {
+          const hydrated = (reqData as Record<string, unknown>[]).map(mapDbRowToRequisition);
+          // Database is authoritative; preserve any un-persisted mock fixtures without duplicating
+          setRequisitions((prev) => {
+            const dbIds = new Set(hydrated.map((h) => h.ticket_id));
+            const distinctPrev = prev.filter((p) => !dbIds.has(p.ticket_id) && !p.ticket_id.includes("-"));
+            return [...hydrated, ...distinctPrev];
+          });
         }
       } catch {
         // Fallback to seeds
@@ -337,20 +402,21 @@ export default function Home() {
         { event: '*', schema: 'public', table: 'purchase_requisitions' },
         (payload) => {
           if (payload.eventType === 'UPDATE' && payload.new) {
-            const updated = payload.new as Partial<PurchaseRequisition> & { id?: string; ticket_id?: string };
-            setRequisitions((prev) =>
-              prev.map((item) =>
-                item.id === updated.id || item.ticket_id === updated.ticket_id
-                  ? { ...item, ...updated }
-                  : item
-              )
-            );
-            setHighlightedTicketId(updated.id || updated.ticket_id || null);
+            const mapped = mapDbRowToRequisition(payload.new as Record<string, unknown>);
+            setRequisitions((prev) => {
+              const targetKey = mapped.ticket_id;
+              const exists = prev.some((r) => r.ticket_id === targetKey || r.id === targetKey);
+              if (exists) {
+                return prev.map((r) => (r.ticket_id === targetKey || r.id === targetKey ? { ...r, ...mapped } : r));
+              }
+              return [mapped, ...prev];
+            });
+            setHighlightedTicketId(mapped.ticket_id);
             setTimeout(() => setHighlightedTicketId(null), 4000);
           } else if (payload.eventType === 'INSERT' && payload.new) {
-            const inserted = payload.new as PurchaseRequisition & { id?: string; ticket_id?: string };
-            setRequisitions((prev) => [inserted, ...prev]);
-            setHighlightedTicketId(inserted.id || inserted.ticket_id || null);
+            const mapped = mapDbRowToRequisition(payload.new as Record<string, unknown>);
+            setRequisitions((prev) => [mapped, ...prev.filter((r) => r.ticket_id !== mapped.ticket_id)]);
+            setHighlightedTicketId(mapped.ticket_id);
             setTimeout(() => setHighlightedTicketId(null), 4000);
           }
         }
@@ -376,7 +442,7 @@ export default function Home() {
         : 'PENDING_TIER3';
 
     const newReq: PurchaseRequisition = {
-      ticket_id: generateQuickTicketId(),
+      ticket_id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : generateQuickTicketId(),
       requisition_number: generateQuickRequisitionNumber(),
       project_id: activeBlock.project_id,
       block_id: activeBlock.block_id,
@@ -408,8 +474,54 @@ export default function Home() {
   };
 
   // Requisition Handlers
-  const handleRequisitionSubmit = (newReq: PurchaseRequisition) => {
-    setRequisitions((prev) => [newReq, ...prev]);
+  const handleRequisitionSubmit = async (newReq: PurchaseRequisition) => {
+    // 1. Optimistic UI update
+    setRequisitions((prev) => [newReq, ...prev.filter((r) => r.ticket_id !== newReq.ticket_id && r.id !== newReq.id)]);
+
+    // 2. Persist to PostgreSQL via Supabase
+    try {
+      const slugToMaterialCodeMap: Record<string, string> = {
+        "mat_concrete_c30": "MAT-001",
+        "mat_steel_b500c": "MAT-002",
+        "mat_bims_25": "MAT-003",
+        "mat_ceramic_60120": "MAT-004",
+        "mat_pprc_pipe_32": "MAT-005"
+      };
+
+      const slugToUuidMap: Record<string, string> = {
+        "b_zeno": "66666666-6666-6666-6666-666666666660",
+        "b_phuket": "66666666-6666-6666-6666-666666666661",
+        "b_pattaya": "66666666-6666-6666-6666-666666666662",
+        "b_samui": "66666666-6666-6666-6666-666666666663"
+      };
+
+      const blockKey = newReq.block_id || "b_zeno";
+      const resolvedBlockId = slugToUuidMap[blockKey] || blockKey;
+      const rawMat = String(newReq.item_id || newReq.material_id || "MAT-001");
+      const resolvedMaterialId = slugToMaterialCodeMap[rawMat] || (rawMat.startsWith("MAT-") ? rawMat : "MAT-001");
+
+      // Guard against numeric overflow (Postgres NUMERIC precision limits)
+      const clampNumeric = (num: number, max = 9999999.99) => Math.min(Math.max(Number(num) || 0, 0), max);
+
+      const { error } = await supabase.from("purchase_requisitions").insert({
+        ticket_id: newReq.ticket_id,
+        block_id: resolvedBlockId,
+        material_id: resolvedMaterialId,
+        architectural_volume: clampNumeric(newReq.architectural_volume || 0),
+        predicted_quantity: clampNumeric(newReq.predicted_quantity || 0),
+        requested_quantity: clampNumeric(newReq.requested_quantity || 0),
+        estimated_total_eur: clampNumeric(newReq.estimated_total_eur || 0),
+        approval_tier: Number(newReq.approval_tier || 1),
+        status: newReq.status,
+        variance_justification: newReq.variance_justification || newReq.justification || null
+      });
+
+      if (error) {
+        console.error("[Supabase Insert Error]:", error.message);
+      }
+    } catch (err) {
+      console.error("[Supabase Network Exception]:", err);
+    }
   };
 
   const handleApprove = (ticketId: string) => {

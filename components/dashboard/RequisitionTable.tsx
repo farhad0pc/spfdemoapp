@@ -38,9 +38,13 @@ export default function RequisitionTable({
       !blockFilter || blockFilter === 'ALL' || blockFilter === 'all' || blockVal === blockFilter;
     const matchesSearch =
       !searchQuery ||
-      itemVal.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.requisition_number && item.requisition_number.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (item.ticket_id && item.ticket_id.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.justification && item.justification.toLowerCase().includes(searchQuery.toLowerCase()));
+      itemVal.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.item_name && item.item_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.block_name && item.block_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.justification && item.justification.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.variance_justification && item.variance_justification.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesBlock && matchesSearch;
   });
 
@@ -134,7 +138,9 @@ export default function RequisitionTable({
 
               return (
                 <tr key={itemId} className={`transition-colors ${highlightClass}`}>
-                  <td className="py-3 px-4 font-mono font-medium text-amber-400">{item.ticket_id}</td>
+                  <td className="py-3 px-4 font-mono font-semibold text-amber-400">
+    {item.requisition_number || (item.ticket_id.startsWith("req_") ? item.ticket_id.toUpperCase() : "REQ-202610-" + item.ticket_id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase())}
+  </td>
                   <td className="py-3 px-4 font-semibold text-white">{item.block_name || item.block_id}</td>
                   <td className="py-3 px-4">
                     <div className="text-white font-medium">{item.item_name || item.item_id}</div>
