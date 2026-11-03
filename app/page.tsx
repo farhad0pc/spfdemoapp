@@ -1,5 +1,6 @@
-'use client';
+"use client";
 
+import Footer from "@/components/dashboard/Footer";
 import RequisitionTable from '@/components/dashboard/RequisitionTable';
 
 import React, { useState, useEffect } from 'react';
@@ -621,7 +622,7 @@ export default function Home() {
       />
 
       {/* Main Container */}
-      <main className="mx-auto max-w-7xl px-4 py-6 md:px-8 space-y-6 pb-6">
+      <main className="mx-auto max-w-7xl px-4 py-6 md:px-8 space-y-6 pb-14 sm:pb-16">
         {/* HERO ACTION SECTION: Resort Identity + Ribbon + Search + Primary Modal Trigger */}
         <section
           aria-label="Caesar Resort Hero"
@@ -1132,6 +1133,8 @@ export default function Home() {
         onSubmit={handleRequisitionSubmit}
         lang={lang}
       />
+
+      <Footer lang={lang} />
 
       {/* REQUISITION & 3-TIER APPROVAL DRAWER */}
       <RequisitionApprovalDrawer
