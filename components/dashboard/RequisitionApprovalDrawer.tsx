@@ -57,9 +57,10 @@ export const RequisitionApprovalDrawer: React.FC<RequisitionApprovalDrawerProps>
   // PURCHASING_MGR: Tier 1
   // FOREMAN: None
   const hasAuthority = (() => {
-    if (currentRole === 'EXECUTIVE') return true;
-    if (currentRole === 'PROJECT_DIRECTOR') return (requisition.approval_tier ?? 1) <= 2;
-    if (currentRole === 'PURCHASING_MGR') return requisition.approval_tier === 1;
+    const roleKey = String(currentRole || "").toUpperCase();
+    if (roleKey === "EXECUTIVE" || roleKey === "EXECUTIVE_BOARD") return true;
+    if (roleKey === "PROJECT_DIRECTOR" || roleKey === "DIRECTOR") return (requisition.approval_tier ?? 1) <= 2;
+    if (roleKey === "PURCHASING_MGR" || roleKey === "PROCUREMENT_OFFICER") return requisition.approval_tier === 1;
     return false;
   })();
 
