@@ -510,6 +510,7 @@ export default function Home() {
           ticket_id: newReq.ticket_id,
           block_id: resolvedBlockId,
           material_id: resolvedMaterialId,
+          material_name: newReq.material ? (lang === "tr" ? newReq.material.item_name_tr : newReq.material.item_name_en) : (typeof activeMaterial !== "undefined" && activeMaterial ? (lang === "tr" ? activeMaterial.item_name_tr : activeMaterial.item_name_en) : "C30/37 Yapısal Hazır Beton"),
           architectural_volume: clampNumeric(newReq.architectural_volume || 0),
           predicted_quantity: clampNumeric(newReq.predicted_quantity || 0),
           requested_quantity: clampNumeric(newReq.requested_quantity || 0),
@@ -517,7 +518,7 @@ export default function Home() {
           approval_tier: Number(newReq.approval_tier || 1),
           status: newReq.status,
           variance_justification: newReq.variance_justification || newReq.justification || null,
-          variance_pct: newReq.variance_pct || 0
+          variance_pct: Number(newReq.variance_percentage ?? newReq.variance_pct ?? 0)
         })
       });
 
