@@ -621,7 +621,7 @@ export default function Home() {
       />
 
       {/* Main Container */}
-      <main className="mx-auto max-w-7xl px-4 py-6 md:px-8 space-y-6 pb-24 md:pb-28">
+      <main className="mx-auto max-w-7xl px-4 py-6 md:px-8 space-y-6 pb-6">
         {/* HERO ACTION SECTION: Resort Identity + Ribbon + Search + Primary Modal Trigger */}
         <section
           aria-label="Caesar Resort Hero"
