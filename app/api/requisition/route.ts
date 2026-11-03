@@ -3,18 +3,26 @@ import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseClient';
 import { sendApprovalEmail } from '@/lib/emailService';
 
-const slugToUuidMap: Record<string, string> = {
+const clampNumeric = (num: number, max = 9999999.99) =>
+  Math.min(Math.max(Number(num) || 0, 0), max);
+
+const isValidUuid = (id: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+
+const blockSlugToUuid: Record<string, string> = {
   "b_zeno": "66666666-6666-6666-6666-666666666660",
   "b_phuket": "66666666-6666-6666-6666-666666666661",
   "b_pattaya": "66666666-6666-6666-6666-666666666662",
   "b_samui": "66666666-6666-6666-6666-666666666663",
 };
 
-const clampNumeric = (num: number, max = 9999999.99) =>
-  Math.min(Math.max(Number(num) || 0, 0), max);
-
-const isValidUuid = (id: string) =>
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+const materialSlugToCode: Record<string, string> = {
+  "mat_concrete_c30": "MAT-001",
+  "mat_steel_b500c": "MAT-002",
+  "mat_bims_25": "MAT-003",
+  "mat_ceramic_60120": "MAT-004",
+  "mat_pprc_pipe_32": "MAT-005",
+};
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,8 +46,9 @@ export async function POST(request: NextRequest) {
       ? ticket_id
       : crypto.randomUUID();
 
-    const resolvedBlockId = slugToUuidMap[block_id] || (isValidUuid(block_id) ? block_id : null);
-    const resolvedMaterialId = material_id && isValidUuid(material_id) ? material_id : null;
+    const resolvedBlockId = blockSlugToUuid[block_id] || (isValidUuid(block_id) ? block_id : "66666666-6666-6666-6666-666666666660");
+    const rawMat = String(material_id || "");
+    const resolvedMaterialId = materialSlugToCode[rawMat] || (rawMat.startsWith("MAT-") ? rawMat : "MAT-001");
 
     const insertPayload = {
       ticket_id: resolvedTicketId,

@@ -501,8 +501,7 @@ export default function Home() {
 
   // Requisition Handlers
   const handleRequisitionSubmit = async (newReq: PurchaseRequisition) => {
-    // 1. Optimistic UI update
-    setRequisitions((prev) => [newReq, ...prev.filter((r) => r.ticket_id !== newReq.ticket_id && r.id !== newReq.id)]);
+    // Rely exclusively on Supabase Realtime CDC to prevent phantom duplicates
 
     // 2. Persist to PostgreSQL via Supabase
     try {
