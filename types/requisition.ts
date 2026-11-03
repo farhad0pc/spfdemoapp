@@ -58,31 +58,31 @@ export interface CorporateUser {
 export const SEED_USERS: CorporateUser[] = [
   {
     user_id: 'user_foreman_01',
-    name: 'Farhad Mokhtari',
-    email: 'farhadmokhtari22@gmail.com',
+    name: 'Site Foreman',
+    email: 'caesarconstructionsystems@gmail.com',
     role: 'FOREMAN',
-    department: 'Site Engineering',
-  },
-  {
-    user_id: 'user_purchasing_01',
-    name: 'Purchasing Manager',
-    email: 'purchasing@caesar.com',
-    role: 'PURCHASING_MGR',
-    department: 'Procurement',
+    department: 'Site Operations',
   },
   {
     user_id: 'user_director_01',
-    name: 'Project Director',
-    email: 'director@caesar.com',
+    name: 'Engineer',
+    email: 'farhad.mokhtari@afikgroup.com',
     role: 'PROJECT_DIRECTOR',
-    department: 'Executive Operations',
+    department: 'Project Engineering',
   },
   {
     user_id: 'user_executive_01',
-    name: 'Executive Approver',
-    email: 'cr.system.approver@gmail.com',
+    name: 'Farhad Mokhtari',
+    email: 'farhadmokhtari22@gmail.com',
     role: 'EXECUTIVE',
-    department: 'Board of Directors',
+    department: 'Executive Board',
+  },
+  {
+    user_id: 'user_purchasing_01',
+    name: 'Procurement Officer',
+    email: 'farhadmokhtari22@gmail.com',
+    role: 'PURCHASING_MGR',
+    department: 'Procurement',
   },
 ];
 

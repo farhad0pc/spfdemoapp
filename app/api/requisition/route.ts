@@ -70,21 +70,34 @@ export async function POST(request: NextRequest) {
       try {
         const displayTicket = `REQ-${resolvedTicketId.slice(0, 8).toUpperCase()}`;
         
-    // Tier-based approver mapping
-    const tier = Number(approval_tier);
+    // Server-enforced financial governance tiering
+    const totalEur = Number(estimated_total_eur || 0);
+    const variance = Number(variance_pct || 0);
+
+    let effectiveTier = 1;
+    if (totalEur > 15000) {
+      effectiveTier = 3;
+    } else if (totalEur >= 2500 || variance > 5.0) {
+      effectiveTier = 2;
+    } else {
+      effectiveTier = 1;
+    }
+
     let approverEmail = "farhadmokhtari22@gmail.com";
     let approverName = "Farhad Mokhtari";
 
-    if (tier === 1) {
+    if (effectiveTier === 1) {
       approverEmail = "caesarconstructionsystems@gmail.com";
       approverName = "Site Foreman";
-    } else if (tier === 2) {
+    } else if (effectiveTier === 2) {
       approverEmail = "farhad.mokhtari@afikgroup.com";
       approverName = "Engineer";
     } else {
       approverEmail = "farhadmokhtari22@gmail.com";
       approverName = "Farhad Mokhtari";
     }
+
+    console.log(`[ROUTING] Total: €${totalEur} | Variance: ${variance}% => Tier ${effectiveTier} -> ${approverEmail}`);
 
         await sendApprovalEmail({
           ticketId: resolvedTicketId,
