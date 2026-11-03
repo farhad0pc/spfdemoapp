@@ -70,16 +70,16 @@ export const Header: React.FC<HeaderProps> = ({
                   aria-label={t.activeRole}
                 >
                   <option value="SITE_FOREMAN" className="bg-canvas-dark text-slate-100">
-                    {lang === 'tr' ? 'Şantiye Şefi' : 'Site Foreman'}
-                  </option>
-                  <option value="PROJECT_DIRECTOR" className="bg-canvas-dark text-slate-100">
-                    {lang === 'tr' ? 'Proje Direktörü' : 'Project Director'}
-                  </option>
-                  <option value="EXECUTIVE_BOARD" className="bg-canvas-dark text-slate-100">
-                    {lang === 'tr' ? 'Yönetim Kurulu' : 'Executive Board'}
+                    1. {lang === "tr" ? "Şantiye Şefi (Kademe 1)" : "Site Foreman (Tier 1)"}
                   </option>
                   <option value="PROCUREMENT_OFFICER" className="bg-canvas-dark text-slate-100">
-                    {lang === 'tr' ? 'Satınalma Sorumlusu' : 'Procurement Officer'}
+                    2. {lang === "tr" ? "Satınalma Sorumlusu (İnceleme)" : "Procurement Officer (Clearance)"}
+                  </option>
+                  <option value="PROJECT_DIRECTOR" className="bg-canvas-dark text-slate-100">
+                    3. {lang === "tr" ? "Proje Direktörü (Kademe 2)" : "Project Director (Tier 2)"}
+                  </option>
+                  <option value="EXECUTIVE_BOARD" className="bg-canvas-dark text-slate-100">
+                    4. {lang === "tr" ? "Yönetim Kurulu (Kademe 3)" : "Executive Board (Tier 3)"}
                   </option>
                 </select>
               </div>

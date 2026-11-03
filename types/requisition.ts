@@ -87,8 +87,20 @@ export const SEED_USERS: CorporateUser[] = [
 ];
 
 export function getSeedUser(role: CorporateRole | string): CorporateUser {
-  const user = SEED_USERS.find((u) => u.role === role);
-  return user || SEED_USERS[0];
+  const normalized = String(role).toUpperCase();
+  if (normalized === "SITE_FOREMAN" || normalized === "FOREMAN") {
+    return SEED_USERS.find((u) => u.role === "FOREMAN") || SEED_USERS[0];
+  }
+  if (normalized === "PROCUREMENT_OFFICER" || normalized === "PURCHASING_MGR") {
+    return SEED_USERS.find((u) => u.role === "PURCHASING_MGR") || SEED_USERS[3] || SEED_USERS[0];
+  }
+  if (normalized === "PROJECT_DIRECTOR" || normalized === "DIRECTOR") {
+    return SEED_USERS.find((u) => u.role === "PROJECT_DIRECTOR") || SEED_USERS[1] || SEED_USERS[0];
+  }
+  if (normalized === "EXECUTIVE_BOARD" || normalized === "EXECUTIVE") {
+    return SEED_USERS.find((u) => u.role === "EXECUTIVE") || SEED_USERS[2] || SEED_USERS[0];
+  }
+  return SEED_USERS.find((u) => u.role === role) || SEED_USERS[0];
 }
 
 export function calculatePredictedQuantity(architecturalVolume: number, consumptionRate: number): number {

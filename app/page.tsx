@@ -317,20 +317,22 @@ export default function Home() {
   // Role Partitioning Switcher
   const handleRoleChange = (newRole: CorporateRole) => {
     setCurrentRole(newRole);
-    if (newRole === 'FOREMAN') {
-      setStatusFilter('all');
-      setTierFilter('all');
+    const roleKey = String(newRole).toUpperCase();
+
+    if (roleKey === "FOREMAN" || roleKey === "SITE_FOREMAN") {
+      setStatusFilter("all");
+      setTierFilter("all");
       setMyRequisitionsOnly(true);
-    } else if (newRole === 'PURCHASING_MGR') {
-      setStatusFilter('PENDING_PURCHASING');
-      setTierFilter('all');
+    } else if (roleKey === "PURCHASING_MGR" || roleKey === "PROCUREMENT_OFFICER") {
+      setStatusFilter("PENDING_PURCHASING");
+      setTierFilter("all");
       setMyRequisitionsOnly(false);
-    } else if (newRole === 'PROJECT_DIRECTOR') {
-      setStatusFilter('PENDING_TIER2');
-      setTierFilter('all');
+    } else if (roleKey === "PROJECT_DIRECTOR" || roleKey === "DIRECTOR") {
+      setStatusFilter("PENDING_TIER2");
+      setTierFilter("all");
       setMyRequisitionsOnly(false);
-    } else if (newRole === 'EXECUTIVE') {
-      setStatusFilter('all');
+    } else if (roleKey === "EXECUTIVE" || roleKey === "EXECUTIVE_BOARD") {
+      setStatusFilter("all");
       setTierFilter(3);
       setMyRequisitionsOnly(false);
     }
