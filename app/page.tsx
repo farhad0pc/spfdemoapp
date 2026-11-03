@@ -245,7 +245,19 @@ function mapDbRowToRequisition(raw: Record<string, unknown>): PurchaseRequisitio
   const rawBlockId = String(raw.block_id || "");
   const rawMaterialId = String(raw.material_id || "");
   const blockKey = blockNameMap[rawBlockId] || rawBlockId || "b_zeno";
-  const matKey = materialNameMap[rawMaterialId] || rawMaterialId || "mat_concrete_c30";
+  const friendlyMatMap: Record<string, string> = {
+    "MAT-001": "C30/37 Yapısal Beton",
+    "MAT-002": "B500C Donatı Çeliği",
+    "MAT-003": "Bims Blok Duvar (25cm)",
+    "MAT-004": "Porselen Seramik (60x120)",
+    "MAT-005": "PPRC Sıhhi Tesisat Borusu",
+    "mat_concrete_c30": "C30/37 Yapısal Beton",
+    "mat_steel_b500c": "B500C Donatı Çeliği",
+    "mat_bims_25": "Bims Blok Duvar (25cm)",
+    "mat_ceramic_60120": "Porselen Seramik (60x120)",
+    "mat_pprc_pipe_32": "PPRC Sıhhi Tesisat Borusu"
+  };
+  const matKey = friendlyMatMap[rawMaterialId] || materialNameMap[rawMaterialId] || rawMaterialId || "C30/37 Yapısal Beton";
   const reqQty = Number(raw.requested_quantity || 0);
   const predQty = Number(raw.predicted_quantity || reqQty || 1);
   const overrun = predQty > 0 ? Number((((reqQty - predQty) / predQty) * 100).toFixed(1)) : 0;
@@ -268,8 +280,8 @@ function mapDbRowToRequisition(raw: Record<string, unknown>): PurchaseRequisitio
     overrun_percentage: overrun,
     approval_tier: [1, 2, 3].includes(Number(raw.approval_tier)) ? (Number(raw.approval_tier) as 1 | 2 | 3) : 1,
     status: (typeof raw.status === "string" ? raw.status : "PENDING_TIER2") as PurchaseRequisition["status"],
-    justification: String(raw.variance_justification || "Postgres record"),
-    variance_justification: String(raw.variance_justification || "Postgres record"),
+    justification: raw.variance_justification ? String(raw.variance_justification) : "",
+    variance_justification: raw.variance_justification ? String(raw.variance_justification) : "",
     created_at: String(raw.created_at || new Date().toISOString())
   };
 }
@@ -415,7 +427,21 @@ export default function Home() {
             setTimeout(() => setHighlightedTicketId(null), 4000);
           } else if (payload.eventType === 'INSERT' && payload.new) {
             const mapped = mapDbRowToRequisition(payload.new as Record<string, unknown>);
-            setRequisitions((prev) => [mapped, ...prev.filter((r) => r.ticket_id !== mapped.ticket_id)]);
+            setRequisitions((prev) => {
+              // Deduplicate: match exact ticket_id OR match pending optimistic ticket by block, qty & total
+              const existsExact = prev.some((r) => r.ticket_id === mapped.ticket_id || r.id === mapped.ticket_id);
+              if (existsExact) {
+                return prev.map((r) => (r.ticket_id === mapped.ticket_id || r.id === mapped.ticket_id) ? { ...r, ...mapped } : r);
+              }
+              const filtered = prev.filter((r) => {
+                const isOptimisticDuplicate =
+                  (r.block_id === mapped.block_id || r.block_name === mapped.block_name) &&
+                  Number(r.requested_quantity || r.requested_qty) === Number(mapped.requested_quantity) &&
+                  Math.abs(Number(r.estimated_total_eur || r.total_estimated_eur) - Number(mapped.estimated_total_eur)) < 0.01;
+                return !isOptimisticDuplicate;
+              });
+              return [mapped, ...filtered];
+            });
             setHighlightedTicketId(mapped.ticket_id);
             setTimeout(() => setHighlightedTicketId(null), 4000);
           }
@@ -503,6 +529,7 @@ export default function Home() {
       // Guard against numeric overflow (Postgres NUMERIC precision limits)
       const clampNumeric = (num: number, max = 9999999.99) => Math.min(Math.max(Number(num) || 0, 0), max);
 
+      const clientGeneratedId = newReq.ticket_id;
       const response = await fetch("/api/requisition", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -522,7 +549,13 @@ export default function Home() {
         })
       });
 
-      if (!response.ok) {
+      if (response.ok) {
+        const resJson = await response.json();
+        if (resJson.data && resJson.data.ticket_id && resJson.data.ticket_id !== clientGeneratedId) {
+          // Reconcile optimistic ID with database authoritative UUID
+          setRequisitions((prev) => prev.map((r) => r.ticket_id === clientGeneratedId ? { ...r, ticket_id: resJson.data.ticket_id, id: resJson.data.ticket_id } : r));
+        }
+      } else {
         const resJson = await response.json();
         console.error("[API Requisition Insert Error]:", resJson.error);
       }
