@@ -69,6 +69,23 @@ export async function POST(request: NextRequest) {
     if (status !== 'APPROVED') {
       try {
         const displayTicket = `REQ-${resolvedTicketId.slice(0, 8).toUpperCase()}`;
+        
+    // Tier-based approver mapping
+    const tier = Number(approval_tier);
+    let approverEmail = "farhadmokhtari22@gmail.com";
+    let approverName = "Farhad Mokhtari";
+
+    if (tier === 1) {
+      approverEmail = "caesarconstructionsystems@gmail.com";
+      approverName = "Site Foreman";
+    } else if (tier === 2) {
+      approverEmail = "farhad.mokhtari@afikgroup.com";
+      approverName = "Engineer";
+    } else {
+      approverEmail = "farhadmokhtari22@gmail.com";
+      approverName = "Farhad Mokhtari";
+    }
+
         await sendApprovalEmail({
           ticketId: resolvedTicketId,
           materialName: body.material_name || body.material_id || 'C30/37 Concrete',
@@ -76,8 +93,8 @@ export async function POST(request: NextRequest) {
           quantity: Number(requested_quantity),
           totalEur: Number(estimated_total_eur),
           overrunPct: Number(variance_pct || 0),
-          approverEmail: 'farhadmokhtari22@gmail.com',
-          approverName: 'Farhad Mokhtari',
+          approverEmail,
+          approverName,
         });
         console.log(`[API/REQUISITION] ✓ Approval email dispatched for ${displayTicket} (${resolvedTicketId})`);
       } catch (mailError: unknown) {
