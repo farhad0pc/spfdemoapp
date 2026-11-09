@@ -12,17 +12,14 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
   const [phase, setPhase] = useState<'ingress' | 'fusion' | 'morph' | 'exit' | 'done'>('ingress');
 
   useEffect(() => {
-    // Phase 1 -> 2: Collision & flare trigger at 1.0s
-    const t1 = setTimeout(() => setPhase('fusion'), 1000);
-    // Phase 2 -> 3: Morph to blue glass AI badge at 1.8s
-    const t2 = setTimeout(() => setPhase('morph'), 1800);
-    // Phase 3 -> 4: Fade-out transition begins at 2.7s
-    const t3 = setTimeout(() => setPhase('exit'), 2700);
-    // Phase 4 -> Done: Complete and unmount overlay at 3.0s
+    // Extended duration for cinematic presence: 3.8 total seconds
+    const t1 = setTimeout(() => setPhase('fusion'), 1200);
+    const t2 = setTimeout(() => setPhase('morph'), 2400);
+    const t3 = setTimeout(() => setPhase('exit'), 3500);
     const t4 = setTimeout(() => {
       setPhase('done');
       if (onComplete) onComplete();
-    }, 3050);
+    }, 3900);
 
     return () => {
       clearTimeout(t1);
@@ -38,52 +35,52 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
 
   return (
     <div
-      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#070b12] transition-all duration-300 ease-out select-none ${
+      className={`fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#070b12] transition-all duration-500 ease-out select-none ${
         phase === 'exit' ? 'opacity-0 scale-105 pointer-events-none' : 'opacity-100 scale-100'
       }`}
     >
       {/* Ambient background light field */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.15)_0%,rgba(7,11,18,0.95)_70%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.2)_0%,rgba(7,11,18,0.98)_75%)]" />
 
-      {/* Center Stage Animation Cluster */}
-      <div className="relative flex flex-col items-center justify-center z-10">
+      {/* Center Stage Animation Cluster (Scaled to 500px minimum width/height stage) */}
+      <div className="relative flex flex-col items-center justify-center z-10 w-[500px] h-[500px]">
         
         {/* Converging Elements Container */}
-        <div className="relative flex items-center justify-center h-28 w-72">
+        <div className="relative flex items-center justify-center h-48 w-full max-w-[500px]">
           
-          {/* Caesar Emblem (Glides from Left) */}
+          {/* Caesar Emblem (Glides from Left - 120px Size) */}
           <div
-            className={`absolute transition-all duration-1000 cubic-bezier(0.16,1,0.3,1) ${
+            className={`absolute transition-all duration-1200 cubic-bezier(0.16,1,0.3,1) ${
               phase === 'ingress'
-                ? '-translate-x-24 opacity-0 scale-75'
+                ? '-translate-x-48 opacity-0 scale-50'
                 : phase === 'fusion'
-                ? 'translate-x-0 opacity-90 scale-95'
-                : 'translate-x-0 opacity-20 scale-90 blur-xs'
+                ? 'translate-x-[-80px] opacity-100 scale-100'
+                : 'translate-x-[-100px] opacity-25 scale-90 blur-xs'
             }`}
           >
             <Image
               src="https://res.cloudinary.com/iczztnnz/image/upload/v1793015175/CAESAR_EMBLEM_NO_TEXT.png"
               alt="Caesar Projects Emblem"
-              width={72}
-              height={72}
+              width={140}
+              height={140}
               priority
-              className="h-16 w-auto object-contain drop-shadow-[0_0_20px_rgba(245,158,11,0.5)]"
+              className="h-32 w-auto object-contain drop-shadow-[0_0_35px_rgba(245,158,11,0.6)]"
             />
           </div>
 
-          {/* AI Glowing Artifact (Glides from Right) */}
+          {/* AI Glowing Artifact (Glides from Right - 120px Size) */}
           <div
-            className={`absolute transition-all duration-1000 cubic-bezier(0.16,1,0.3,1) ${
+            className={`absolute transition-all duration-1200 cubic-bezier(0.16,1,0.3,1) ${
               phase === 'ingress'
-                ? 'translate-x-24 opacity-0 scale-75'
+                ? 'translate-x-48 opacity-0 scale-50'
                 : phase === 'fusion'
-                ? 'translate-x-0 opacity-100 scale-100'
-                : 'translate-x-0 opacity-20 scale-90 blur-xs'
+                ? 'translate-x-[80px] opacity-100 scale-100'
+                : 'translate-x-[100px] opacity-25 scale-90 blur-xs'
             }`}
           >
-            <div className="relative flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-tr from-cyan-500 via-sky-400 to-indigo-500 p-0.5 shadow-[0_0_35px_rgba(14,165,233,0.7)]">
-              <div className="h-full w-full rounded-2xl bg-[#090d16] flex items-center justify-center">
-                <svg className="w-8 h-8 text-cyan-400 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
+            <div className="relative flex items-center justify-center h-32 w-32 rounded-3xl bg-gradient-to-tr from-cyan-500 via-sky-400 to-indigo-500 p-1 shadow-[0_0_50px_rgba(14,165,233,0.8)]">
+              <div className="h-full w-full rounded-3xl bg-[#090d16] flex items-center justify-center">
+                <svg className="w-16 h-16 text-cyan-400 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 2L14.4 7.6L20 10L14.4 12.4L12 18L9.6 12.4L4 10L9.6 7.6L12 2Z" />
                 </svg>
               </div>
@@ -92,21 +89,21 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
 
           {/* Fusion Flare Spark */}
           <div
-            className={`absolute h-28 w-28 rounded-full bg-cyan-400/40 blur-2xl transition-all duration-700 ${
+            className={`absolute h-64 w-64 rounded-full bg-cyan-400/50 blur-3xl transition-all duration-800 ${
               phase === 'fusion' || phase === 'morph' ? 'scale-150 opacity-100' : 'scale-50 opacity-0'
             }`}
           />
 
           {/* Morphed Frosted Glass Blue AI Crest */}
           <div
-            className={`absolute flex items-center justify-center gap-2.5 px-6 py-2.5 rounded-2xl border border-cyan-400/50 bg-cyan-950/40 backdrop-blur-md shadow-[0_0_40px_rgba(6,182,212,0.45)] transition-all duration-700 ${
+            className={`absolute flex items-center justify-center gap-3 px-8 py-4 rounded-3xl border border-cyan-400/60 bg-cyan-950/60 backdrop-blur-xl shadow-[0_0_60px_rgba(6,182,212,0.6)] transition-all duration-800 ${
               phase === 'morph' || phase === 'exit'
                 ? 'opacity-100 scale-100 translate-y-0'
-                : 'opacity-0 scale-75 translate-y-2 pointer-events-none'
+                : 'opacity-0 scale-75 translate-y-4 pointer-events-none'
             }`}
           >
-            <span className="text-xl">✨</span>
-            <span className="text-sm font-black tracking-widest uppercase bg-gradient-to-r from-cyan-300 via-sky-200 to-indigo-300 bg-clip-text text-transparent">
+            <span className="text-3xl">✨</span>
+            <span className="text-xl sm:text-2xl font-black tracking-widest uppercase bg-gradient-to-r from-cyan-300 via-sky-200 to-indigo-300 bg-clip-text text-transparent">
               CAESAR AI
             </span>
           </div>
@@ -115,19 +112,19 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
 
         {/* Telemetry Status Line */}
         <div
-          className={`mt-4 flex flex-col items-center gap-1.5 transition-all duration-700 ${
+          className={`mt-8 flex flex-col items-center gap-2 transition-all duration-800 ${
             phase === 'morph' || phase === 'exit'
               ? 'opacity-100 translate-y-0'
-              : 'opacity-0 translate-y-3'
+              : 'opacity-0 translate-y-4'
           }`}
         >
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
-            <span className="text-xs font-mono font-bold tracking-widest uppercase text-cyan-300">
+          <div className="flex items-center gap-2.5">
+            <span className="h-3 w-3 rounded-full bg-cyan-400 animate-ping" />
+            <span className="text-sm font-mono font-bold tracking-widest uppercase text-cyan-300">
               {isTR ? 'CAESAR YAPAY ZEKA MOTORU AKTİF' : 'CAESAR AI ENGINE ACTIVE'}
             </span>
           </div>
-          <p className="text-[10px] tracking-wider font-mono text-slate-400">
+          <p className="text-xs tracking-wider font-mono text-slate-400 mt-1">
             {isTR ? 'Tahmine Dayalı Malzeme ve İhale Alt-Defteri v2.1.0' : 'Predictive Sub-Ledger & Material Control v2.1.0'}
           </p>
         </div>
