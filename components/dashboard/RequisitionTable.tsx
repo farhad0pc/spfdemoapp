@@ -5,6 +5,8 @@ import React from 'react';
 import { PurchaseRequisition, UserRole, CaesarBlock } from '@/types/requisition';
 
 export interface RequisitionTableProps {
+  onExecutiveDelete?: (ticketId: string) => void;
+  onExecutiveEdit?: (ticketId: string, updated: { requested_quantity?: number; block_name?: string; justification?: string }) => void;
   requisitions: PurchaseRequisition[];
   currentRole?: UserRole;
   lang?: string;
@@ -19,6 +21,9 @@ export interface RequisitionTableProps {
 }
 
 export default function RequisitionTable({
+  onExecutiveDelete,
+  onExecutiveEdit,
+  currentRole = "FOREMAN",
   requisitions = [],
   lang = 'EN',
   blockFilter = 'ALL',
@@ -29,7 +34,11 @@ export default function RequisitionTable({
   onSelectTicket,
   highlightedTicketId,
 }: RequisitionTableProps) {
-  const isTR = lang?.toUpperCase() === 'TR';
+  const isTR = lang?.toUpperCase() === "TR";
+  const isExecutive = currentRole === "EXECUTIVE";
+  const [editingItem, setEditingItem] = React.useState<PurchaseRequisition | null>(null);
+  const [editQty, setEditQty] = React.useState<number>(0);
+  const [editBlock, setEditBlock] = React.useState<string>("");
   const handleSelect = onSelectTicket || onSelectRequisition || (() => {});
 
   const filteredRequisitions = requisitions.filter((item) => {
@@ -205,18 +214,126 @@ export default function RequisitionTable({
                   {item.justification}
                 </div>
               )}
-              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+              
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
                 <button
                   onClick={() => handleSelect(item)}
                   className="px-3 py-1 rounded bg-slate-100 dark:bg-white/10 text-slate-900 dark:text-white text-xs"
                 >
-                  {isTR ? 'İncele' : 'Inspect'}
+                  {isTR ? "İncele" : "Inspect"}
                 </button>
+                {isExecutive && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setEditingItem(item);
+                        setEditQty(item.requested_quantity || 0);
+                        setEditBlock(item.block_name || item.block_id || "ZENO");
+                      }}
+                      className="px-2.5 py-1 rounded bg-amber-500/10 text-amber-500 text-xs font-semibold border border-amber-500/20"
+                    >
+                      {isTR ? "Düzenle" : "Edit"}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(isTR ? "Bu talebi silmek istediğinizden emin misiniz?" : "Delete this requisition?")) {
+                          if (onExecutiveDelete) onExecutiveDelete(item.ticket_id);
+                        }
+                      }}
+                      className="px-2.5 py-1 rounded bg-rose-500/10 text-rose-500 text-xs font-semibold border border-rose-500/20"
+                    >
+                      {isTR ? "Sil" : "Void"}
+                    </button>
+                  </>
+                )}
               </div>
+
             </div>
           );
         })}
       </div>
+    
+      {/* Executive Quick Edit Modal */}
+      {editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-amber-500/40 bg-white dark:bg-[#0c111d] p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-amber-500">
+                {isTR ? "Yönetim Kurulu Talebi Düzenleme" : "Executive Requisition Revision"}
+              </h3>
+              <button
+                onClick={() => setEditingItem(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="text-xs space-y-1">
+              <div className="text-slate-500 dark:text-slate-400 font-light">
+                {isTR ? "Talep No:" : "Ticket ID:"} <span className="font-bold text-amber-500">{editingItem.ticket_id}</span>
+              </div>
+              <div className="text-slate-900 dark:text-white font-medium">
+                {editingItem.item_name || editingItem.item_id}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                  {isTR ? "Revize Talep Miktarı" : "Revised Requested Quantity"}
+                </label>
+                <input
+                  type="number"
+                  value={editQty}
+                  onChange={(e) => setEditQty(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-black/30 px-3 py-2 text-xs font-bold text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">
+                  {isTR ? "Şantiye Bloğu" : "Construction Block"}
+                </label>
+                <select
+                  value={editBlock}
+                  onChange={(e) => setEditBlock(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-black/30 px-3 py-2 text-xs font-bold text-slate-900 dark:text-white"
+                >
+                  <option value="ZENO">ZENO</option>
+                  <option value="PHUKET">PHUKET</option>
+                  <option value="PATTAYA">PATTAYA</option>
+                  <option value="KOH SAMUI">KOH SAMUI</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+              <button
+                onClick={() => setEditingItem(null)}
+                className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-white/10 text-xs font-semibold text-slate-700 dark:text-slate-300"
+              >
+                {isTR ? "Vazgeç" : "Cancel"}
+              </button>
+              <button
+                onClick={() => {
+                  if (onExecutiveEdit && editingItem) {
+                    onExecutiveEdit(editingItem.ticket_id, {
+                      requested_quantity: editQty,
+                      block_name: editBlock,
+                    });
+                  }
+                  setEditingItem(null);
+                }}
+                className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-xs font-bold text-slate-950 uppercase tracking-wider"
+              >
+                {isTR ? "Değişiklikleri Kaydet" : "Save Revisions"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

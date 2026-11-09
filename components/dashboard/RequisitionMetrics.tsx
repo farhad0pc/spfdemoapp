@@ -8,12 +8,10 @@ import { Language, DICTIONARY, formatCurrency, formatNumber, toLocaleUpper } fro
 interface RequisitionMetricsProps {
   requisitions: PurchaseRequisition[];
   lang: Language;
+  currentRole?: string;
 }
 
-export const RequisitionMetrics: React.FC<RequisitionMetricsProps> = ({
-  requisitions,
-  lang,
-}) => {
+export const RequisitionMetrics: React.FC<RequisitionMetricsProps> = ({ requisitions, lang, currentRole }) => {
   const t = DICTIONARY[lang];
   const totalCount = requisitions.length;
 
@@ -39,8 +37,101 @@ export const RequisitionMetrics: React.FC<RequisitionMetricsProps> = ({
     tier3: requisitions.filter((r) => r.approval_tier === 3).length,
   };
 
+  const isExecutive = currentRole === "EXECUTIVE";
+  const isTR = lang === "tr";
+
+  // Executive Metrics Computations
+  const approvedReqs = requisitions.filter((r) => r.status === "APPROVED");
+  const rejectedReqs = requisitions.filter((r) => r.status === "REJECTED");
+  const pendingTier3Reqs = requisitions.filter(
+    (r) => r.status === "PENDING_TIER3" || (r.status?.startsWith("PENDING") && (r.estimated_total_eur || r.total_estimated_eur || 0) >= 15000)
+  );
+  const anomalyReqs = requisitions.filter(
+    (r) => (r.requested_quantity || 0) > (r.predicted_quantity || 0) * 1.05
+  );
+
+  const approvedEur = approvedReqs.reduce((acc, r) => acc + (r.estimated_total_eur || r.total_estimated_eur || 0), 0);
+  const rejectedEur = rejectedReqs.reduce((acc, r) => acc + (r.estimated_total_eur || r.total_estimated_eur || 0), 0);
+  const pendingTier3Eur = pendingTier3Reqs.reduce((acc, r) => acc + (r.estimated_total_eur || r.total_estimated_eur || 0), 0);
+  const anomalyEur = anomalyReqs.reduce((acc, r) => acc + (r.estimated_total_eur || r.total_estimated_eur || 0), 0);
+
+  const rejectionRate = totalCount > 0 ? ((rejectedReqs.length / totalCount) * 100).toFixed(1) : "0.0";
+
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+
+      {/* EXCLUSIVE EXECUTIVE MERIT & GOVERNANCE STRIP */}
+      {isExecutive && (
+        <div className="col-span-1 md:col-span-3 rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-purple-500/10 to-amber-500/5 p-5 shadow-lg backdrop-blur-md">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 mb-4 border-b border-amber-500/20 gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-3 w-3 rounded-full bg-amber-400 animate-pulse" />
+              <h2 className="text-base font-bold uppercase tracking-wider text-amber-500 dark:text-amber-400">
+                {isTR ? "Yönetim Kurulu Yetkili Denetim Masası" : "Executive Board Governance & Fiduciary Telemetry"}
+              </h2>
+            </div>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-600 dark:text-amber-300 border border-amber-500/30 uppercase tracking-wider">
+              {isTR ? "Yetki Seviyesi: Seviye 3 (Nihai Onay)" : "Authority Level: Tier 3 (Final Ratification)"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Approved Capital */}
+            <div className="p-3.5 rounded-xl bg-white/70 dark:bg-[#0c121e]/80 border border-emerald-500/30">
+              <span className="block text-[11px] font-semibold uppercase text-emerald-600 dark:text-emerald-400 tracking-wider">
+                {isTR ? "Onaylanan Sermaye" : "Approved Capital"}
+              </span>
+              <div className="text-2xl font-bold text-slate-900 dark:text-white mt-1">
+                €{approvedEur.toLocaleString()}
+              </div>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-light mt-0.5 block">
+                {approvedReqs.length} {isTR ? "talep onaylandı" : "tickets approved"}
+              </span>
+            </div>
+
+            {/* Preserved Capital / Rejected */}
+            <div className="p-3.5 rounded-xl bg-white/70 dark:bg-[#0c121e]/80 border border-rose-500/30">
+              <span className="block text-[11px] font-semibold uppercase text-rose-600 dark:text-rose-400 tracking-wider">
+                {isTR ? "Korunan Sermaye (Red)" : "Preserved Capital (Rejected)"}
+              </span>
+              <div className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1">
+                €{rejectedEur.toLocaleString()}
+              </div>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-light mt-0.5 block">
+                {rejectedReqs.length} {isTR ? "talep" : "tickets"} ({rejectionRate}% {isTR ? "red oranı" : "rejection rate"})
+              </span>
+            </div>
+
+            {/* Tier 3 Pending Queue */}
+            <div className="p-3.5 rounded-xl bg-white/70 dark:bg-[#0c121e]/80 border border-purple-500/30">
+              <span className="block text-[11px] font-semibold uppercase text-purple-600 dark:text-purple-400 tracking-wider">
+                {isTR ? "Yönetim Onayı Bekleyen" : "Pending Board Ratification"}
+              </span>
+              <div className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">
+                €{pendingTier3Eur.toLocaleString()}
+              </div>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-light mt-0.5 block">
+                {pendingTier3Reqs.length} {isTR ? "talep doğrudan imza bekliyor" : "tickets requiring board sign-off"}
+              </span>
+            </div>
+
+            {/* Anomaly / Overrun Exposure */}
+            <div className="p-3.5 rounded-xl bg-white/70 dark:bg-[#0c121e]/80 border border-amber-500/30">
+              <span className="block text-[11px] font-semibold uppercase text-amber-600 dark:text-amber-400 tracking-wider">
+                {isTR ? "Sapmalı / Riskli Talep Riski" : "Overrun Anomaly Exposure"}
+              </span>
+              <div className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">
+                €{anomalyEur.toLocaleString()}
+              </div>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 font-light mt-0.5 block">
+                {anomalyReqs.length} {isTR ? "talepte metraj aşımı (>+%5)" : "tickets exceeding intake standard"}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Card 1: Requisition Velocity & Block Distribution */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs transition hover:shadow-md dark:border-border-dark dark:bg-elevation-dark">
         <div className="flex items-center justify-between">

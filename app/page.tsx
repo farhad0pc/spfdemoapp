@@ -589,6 +589,43 @@ export default function Home() {
     );
   };
 
+  // Executive Direct Administration Handlers
+  const handleExecutiveDelete = (ticketId: string) => {
+    if (currentRole !== "EXECUTIVE") return;
+    setRequisitions((prev) => prev.filter((r) => r.ticket_id !== ticketId));
+    if (selectedRequisition?.ticket_id === ticketId) {
+      setSelectedRequisition(null);
+    }
+  };
+
+  const handleExecutiveEdit = (
+    ticketId: string,
+    updatedData: { requested_quantity?: number; block_name?: string; justification?: string }
+  ) => {
+    if (currentRole !== "EXECUTIVE") return;
+    const timeStr = getFormattedTimeString();
+    setRequisitions((prev) =>
+      prev.map((r) => {
+        if (r.ticket_id !== ticketId) return r;
+        const newQty = updatedData.requested_quantity !== undefined ? updatedData.requested_quantity : r.requested_quantity;
+        const rawUnitPrice = r.unit_price_eur || (r.estimated_total_eur && r.requested_quantity ? Number(r.estimated_total_eur) / Number(r.requested_quantity) : 0);
+        const unitPrice = Number(rawUnitPrice) || 0;
+        const newTotalEur = Math.round(Number(newQty) * unitPrice);
+        return {
+          ...r,
+          requested_quantity: newQty,
+          block_name: updatedData.block_name || r.block_name,
+          block_id: updatedData.block_name || r.block_id,
+          justification: updatedData.justification !== undefined ? updatedData.justification : r.justification,
+          estimated_total_eur: newTotalEur,
+          total_estimated_eur: newTotalEur,
+          updated_at: timeStr,
+        };
+      })
+    );
+  };
+
+
   // Role Partitioning Telemetry Aggregates
   const triageRoleStatus: RequisitionStatus = currentRole === 'PURCHASING_MGR' ? 'PENDING_PURCHASING' : 'PENDING_TIER2';
   const triageRequisitions = requisitions.filter((r) => r.status === triageRoleStatus);
@@ -678,7 +715,7 @@ export default function Home() {
       {/* 2. OVERVIEW TELEMETRY GRID (Immediately follows Hero) */}
       {/* 3-CARD OVERVIEW TELEMETRY (Requisition Metrics) */}
         <section aria-label="Executive Overview">
-          <RequisitionMetrics requisitions={requisitions} lang={lang} />
+          <RequisitionMetrics requisitions={requisitions} lang={lang} currentRole={currentRole} />
         </section>
 
         {/* DUAL VIEW CONTROLLER (Square Matrix vs Full Sub-Ledger & Mobile Cards) */}
@@ -694,6 +731,8 @@ export default function Home() {
             onBlockFilterChange={(b) => setBlockFilter(b as CaesarBlock | 'all')}
             searchQuery={searchQuery}
             currentRole={currentRole}
+            onExecutiveDelete={handleExecutiveDelete}
+            onExecutiveEdit={handleExecutiveEdit}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
             tierFilter={tierFilter}
