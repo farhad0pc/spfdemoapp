@@ -647,54 +647,27 @@ export default function Home() {
           </div>
 
           {/* Secondary Action Row: Intake Calculator & Material Catalog */}
-          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+          <div className="flex flex-wrap items-center justify-center gap-4 pt-3">
+            {/* Intake Calculator (Cyan Glass Aesthetic) */}
             <button
+              type="button"
               onClick={() => setIsIntakeModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 dark:border-amber-500/30 bg-slate-50 dark:bg-canvas-dark hover:border-amber-500 px-4 py-2 text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-xs"
+              className="w-64 py-3.5 px-6 inline-flex items-center justify-center gap-3 rounded-xl border border-cyan-500/40 bg-cyan-950/40 hover:bg-cyan-900/60 hover:border-cyan-400 active:scale-95 text-cyan-300 font-bold text-sm uppercase tracking-wider shadow-lg shadow-cyan-950/40 transition-all cursor-pointer backdrop-blur-md"
             >
-              <span>📐</span>
-              <span>{lang === "tr" ? "Metraj & Katsayı Hesaplayıcı" : "Intake & Baseline Calculator"}</span>
+              <span className="text-lg leading-none">📐</span>
+              <span>{lang === "tr" ? "Metraj & Katsayı Hesaplayıcı" : "Intake Calculator"}</span>
             </button>
+
+            {/* Material Catalog (Emerald Glass Aesthetic) */}
             <button
+              type="button"
               onClick={() => setIsCatalogModalOpen(true)}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 dark:border-amber-500/30 bg-slate-50 dark:bg-canvas-dark hover:border-amber-500 px-4 py-2 text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-xs"
+              className="w-64 py-3.5 px-6 inline-flex items-center justify-center gap-3 rounded-xl border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/60 hover:border-emerald-400 active:scale-95 text-emerald-300 font-bold text-sm uppercase tracking-wider shadow-lg shadow-emerald-950/40 transition-all cursor-pointer backdrop-blur-md"
             >
-              <span>📦</span>
-              <span>{lang === "tr" ? "Malzeme Kataloğu" : "View Material Catalog"}</span>
+              <span className="text-lg leading-none">📦</span>
+              <span>{lang === "tr" ? "Malzeme Kataloğu" : "Material Catalog"}</span>
             </button>
           </div>
-
-          {/* Bottom Utility Strip: Block Filter Chips (Left) & Search (Right) */}
-          <div className="w-full pt-4 border-t border-slate-200/80 dark:border-border-dark flex flex-col md:flex-row items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <button
-                onClick={() => setBlockFilter("all")}
-                className={"px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all " + (blockFilter === "all" ? "bg-amber-500 text-slate-950 font-black shadow-xs" : "bg-slate-100 dark:bg-canvas-dark text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-border-dark hover:border-amber-500/40")}
-              >
-                {lang === "tr" ? "TÜMÜ" : "ALL"}
-              </button>
-              {(["b_zeno", "b_phuket", "b_pattaya", "b_samui"] as unknown as CaesarBlock[]).map((blk) => (
-                <button
-                  key={blk}
-                  onClick={() => setBlockFilter(blk)}
-                  className={"px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all " + (blockFilter === blk ? "bg-amber-500 text-slate-950 font-black shadow-xs" : "bg-slate-100 dark:bg-canvas-dark text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-border-dark hover:border-amber-500/40")}
-                >
-                  {blk.replace("b_", "").toUpperCase()}
-                </button>
-              ))}
-            </div>
-
-            <div className="w-full md:w-72">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={lang === "tr" ? "Talep ID, malzeme veya blok ara..." : "Search ticket ID, material, or block..."}
-                className="w-full rounded-xl border border-slate-300 dark:border-border-dark bg-slate-50 dark:bg-canvas-dark px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-amber-500/40"
-              />
-            </div>
-          </div>
-
         </div>
       </section>
 
