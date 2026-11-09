@@ -45,13 +45,13 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#05080f] select-none overflow-hidden transition-transform duration-800 ease-in-out ${
+      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#05080f] select-none overflow-hidden transition-transform duration-800 ease-in-out ${
         isWiping ? '-translate-y-full' : 'translate-y-0'
       }`}
-      style={{ willChange: 'transform' }}
+      style={{ willChange: 'transform', backgroundColor: '#05080f' }}
     >
-      {/* Background ambient field */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(14,165,233,0.18)_0%,rgba(5,8,15,1)_80%)] pointer-events-none" />
+      {/* Fully opaque solid base layer */}
+      <div className="absolute inset-0 bg-[#05080f] pointer-events-none" />
 
       {/* Main 1000px Stage Container */}
       <div className="relative z-10 flex flex-col items-center justify-center w-full min-h-[1000px] max-w-5xl px-4 overflow-visible">
@@ -59,7 +59,7 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
         {/* Convergence & Morphing Zone */}
         <div className="relative flex items-center justify-center w-full h-[520px] overflow-visible">
           
-          {/* Caesar Emblem Group (Left -> Center) */}
+          {/* Caesar Emblem Group */}
           <div
             className={`absolute flex items-center justify-center overflow-visible transition-all duration-300 ease-out ${
               isMorphComplete ? 'opacity-0 scale-50' : 'opacity-100 scale-100'
@@ -69,9 +69,7 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
               willChange: 'transform',
             }}
           >
-            {/* Unconstrained 360-Degree Radial Glow (No Square Clipping) */}
             <div className="absolute -inset-24 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.45)_0%,rgba(245,158,11,0.15)_45%,transparent_75%)] blur-3xl pointer-events-none" />
-            
             <Image
               src="https://res.cloudinary.com/iczztnnz/image/upload/v1793015175/CAESAR_EMBLEM_NO_TEXT.png"
               alt="Caesar Projects"
@@ -82,7 +80,7 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
             />
           </div>
 
-          {/* Google Gemini AI 4-Tipped Star Group (Right -> Center) */}
+          {/* Google Gemini AI Star Group */}
           <div
             className={`absolute flex items-center justify-center overflow-visible transition-all duration-300 ease-out ${
               isMorphComplete ? 'opacity-0 scale-50' : 'opacity-100 scale-100'
@@ -92,15 +90,9 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
               willChange: 'transform',
             }}
           >
-            {/* Unconstrained 360-Degree AI Glow Halo */}
             <div className="absolute -inset-24 rounded-full bg-[radial-gradient(circle,rgba(66,133,244,0.45)_0%,rgba(156,39,176,0.25)_45%,transparent_75%)] blur-3xl pointer-events-none" />
-            
             <div className="relative z-10 flex items-center justify-center filter drop-shadow-[0_0_20px_rgba(66,133,244,0.4)]">
-              <svg
-                className="w-56 h-56 sm:w-72 sm:h-72 animate-pulse overflow-visible"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
+              <svg className="w-56 h-56 sm:w-72 sm:h-72 animate-pulse overflow-visible" viewBox="0 0 24 24" fill="none">
                 <path
                   d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z"
                   fill="url(#gemini_splash_star_clean)"
@@ -117,9 +109,9 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
             </div>
           </div>
 
-          {/* Morph Transformation Badge: CAESAR AI ENGINE */}
+          {/* Morph Transformation Badge */}
           <div
-            className={`absolute z-20 flex items-center gap-4 px-12 py-6 rounded-2xl border border-cyan-400/80 bg-cyan-950/90 shadow-[0_0_80px_rgba(6,182,212,0.8)] backdrop-blur-2xl transition-all duration-600 ease-out ${
+            className={`absolute z-20 flex items-center gap-4 px-12 py-6 rounded-2xl border border-cyan-400/85 bg-cyan-950/95 shadow-[0_0_90px_rgba(6,182,212,0.9)] backdrop-blur-2xl transition-all duration-600 ease-out ${
               isMorphComplete
                 ? 'opacity-100 scale-100 translate-y-0'
                 : 'opacity-0 scale-75 translate-y-8 pointer-events-none'
@@ -133,7 +125,7 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
 
         </div>
 
-        {/* 3-Second Loading Bar */}
+        {/* Loading Bar */}
         <div className="w-80 sm:w-96 mt-4 flex flex-col items-center gap-2.5">
           <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden border border-slate-700/80 shadow-inner">
             <div

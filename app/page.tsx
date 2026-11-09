@@ -604,7 +604,7 @@ export default function Home() {
   const blockedTotalEur = blockedRequisitions.reduce((acc, curr) => acc + curr.estimated_total_eur, 0);
 
   return (
-    <div className="min-h-screen bg-canvas-dark text-slate-100 dark:bg-canvas-dark dark:text-slate-100 transition-colors">
+    <div className="min-h-screen bg-slate-100 dark:bg-[#070b12] text-slate-900 dark:text-slate-100 transition-colors">
       {/* Anchored Header with User Identity Indicator */}
       <Header
         currentRole={currentRole}
@@ -616,7 +616,7 @@ export default function Home() {
       <main className="mx-auto max-w-7xl px-4 py-6 md:px-8 space-y-6 pb-14 sm:pb-16">
       {showSplash && <SplashAnimation lang={lang} onComplete={() => setShowSplash(false)} />}
       {/* 1. HERO FILTER & CENTRAL COMMAND BANNER */}
-      <section className="rounded-2xl border border-amber-500/25 bg-white/80 dark:bg-elevation-dark/95 backdrop-blur-md p-4 sm:p-6 shadow-sm transition-colors">
+      <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0d131f] p-5 sm:p-6 transition-colors">
         <div className="flex flex-col items-center text-center space-y-4">
           
           {/* Project Scope Badge */}
@@ -652,7 +652,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setIsIntakeModalOpen(true)}
-              className="w-64 py-3.5 px-6 inline-flex items-center justify-center gap-3 rounded-xl border border-cyan-500/40 bg-cyan-950/40 hover:bg-cyan-900/60 hover:border-cyan-400 active:scale-95 text-cyan-300 font-bold text-sm uppercase tracking-wider shadow-lg shadow-cyan-950/40 transition-all cursor-pointer backdrop-blur-md"
+              className="w-64 py-3.5 px-6 inline-flex items-center justify-center gap-3 rounded-xl border border-cyan-600 dark:border-cyan-500/40 bg-cyan-50 dark:bg-cyan-950/60 hover:bg-cyan-100 dark:hover:bg-cyan-900/60 text-cyan-900 dark:text-cyan-300 font-bold text-sm uppercase tracking-wider transition-all cursor-pointer"
             >
               <span className="text-lg leading-none">📐</span>
               <span>{lang === "tr" ? "Metraj & Katsayı Hesaplayıcı" : "Intake Calculator"}</span>
@@ -662,7 +662,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setIsCatalogModalOpen(true)}
-              className="w-64 py-3.5 px-6 inline-flex items-center justify-center gap-3 rounded-xl border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/60 hover:border-emerald-400 active:scale-95 text-emerald-300 font-bold text-sm uppercase tracking-wider shadow-lg shadow-emerald-950/40 transition-all cursor-pointer backdrop-blur-md"
+              className="w-64 py-3.5 px-6 inline-flex items-center justify-center gap-3 rounded-xl border border-emerald-600 dark:border-emerald-500/40 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-900 dark:text-emerald-300 font-bold text-sm uppercase tracking-wider transition-all cursor-pointer"
             >
               <span className="text-lg leading-none">📦</span>
               <span>{lang === "tr" ? "Malzeme Kataloğu" : "Material Catalog"}</span>
