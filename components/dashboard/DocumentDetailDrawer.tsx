@@ -167,7 +167,7 @@ export const DocumentDetailDrawer: React.FC<DocumentDetailDrawerProps> = ({
                   <span className="text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
                     Document AI OCR Excerpt
                   </span>
-                  <pre className="mt-2 text-[11px] whitespace-pre-wrap font-mono text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900 p-3 rounded-lg">
+                  <pre className="mt-2 text-[11px] whitespace-pre-wrap font-light tracking-wide text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-900 p-3 rounded-lg">
                     {document.rawTextSnippet}
                   </pre>
                 </div>
@@ -226,7 +226,7 @@ export const DocumentDetailDrawer: React.FC<DocumentDetailDrawerProps> = ({
                   <span>{copied ? 'Copied' : 'Copy JSON'}</span>
                 </button>
               </div>
-              <pre className="max-h-96 overflow-auto rounded-xl bg-zinc-900 p-4 text-xs font-mono text-zinc-100">
+              <pre className="max-h-96 overflow-auto rounded-xl bg-zinc-900 p-4 text-xs font-light tracking-wide text-zinc-100">
                 {JSON.stringify(document, null, 2)}
               </pre>
             </div>

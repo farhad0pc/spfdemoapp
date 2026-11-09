@@ -2,7 +2,9 @@
 import SplashAnimation from "@/components/dashboard/SplashAnimation";
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import Footer from "@/components/dashboard/Footer";
-import RequisitionTable from '@/components/dashboard/RequisitionTable';
+import RequisitionTable from "@/components/dashboard/RequisitionTable";
+import { IntakeCalculatorModal } from "@/components/dashboard/IntakeCalculatorModal";
+import { MaterialCatalogModal } from "@/components/dashboard/MaterialCatalogModal";
 
 import React, { useState, useEffect } from 'react';
 
@@ -605,6 +607,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-[#070b12] text-slate-900 dark:text-slate-100 transition-colors">
+      {/* 0. Full-Screen Root Splash Animation */}
+      {showSplash && <SplashAnimation lang={lang} onComplete={() => setShowSplash(false)} />}
       {/* Anchored Header with User Identity Indicator */}
       <Header
         currentRole={currentRole}
@@ -614,7 +618,7 @@ export default function Home() {
 
       {/* Main Container */}
       <main className="mx-auto max-w-7xl px-4 py-6 md:px-8 space-y-6 pb-14 sm:pb-16">
-      {showSplash && <SplashAnimation lang={lang} onComplete={() => setShowSplash(false)} />}
+      
       {/* 1. HERO FILTER & CENTRAL COMMAND BANNER */}
       <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0d131f] p-5 sm:p-6 transition-colors">
         <div className="flex flex-col items-center text-center space-y-4">
@@ -698,7 +702,42 @@ export default function Home() {
             onMyRequisitionsOnlyChange={setMyRequisitionsOnly}
           />
         </section>
-      </main>
+      
+      {/* Secondary Action Modals */}
+      <IntakeCalculatorModal
+        isOpen={isIntakeModalOpen}
+        onClose={() => setIsIntakeModalOpen(false)}
+        blocks={blocks}
+        materials={materials}
+        intakeBlockId={intakeBlockId}
+        setIntakeBlockId={setIntakeBlockId}
+        intakeItemId={intakeItemId}
+        setIntakeItemId={setIntakeItemId}
+        intakeVolume={intakeVolume}
+        setIntakeVolume={setIntakeVolume}
+        intakeRequested={intakeRequested}
+        setIntakeRequested={setIntakeRequested}
+        intakeJustification={intakeJustification}
+        setIntakeJustification={setIntakeJustification}
+        intakePredicted={intakePredicted}
+        intakeVariance={intakeVariance}
+        intakeIsAnomaly={intakeIsAnomaly}
+        intakeTier={intakeTier}
+        intakeTotalEur={intakeTotalEur}
+        onSubmit={() => {
+          handleQuickIntakeSubmit({ preventDefault: () => {} } as React.FormEvent);
+          setIsIntakeModalOpen(false);
+        }}
+        lang={lang}
+      />
+
+      <MaterialCatalogModal
+        isOpen={isCatalogModalOpen}
+        onClose={() => setIsCatalogModalOpen(false)}
+        materials={materials}
+        lang={lang}
+      />
+    </main>
 
       {/* SMART REQUISITION FORM (Slide-over Modal Drawer) */}
       <RequisitionForm

@@ -83,7 +83,7 @@ export const MaterialCatalogModal: React.FC<MaterialCatalogModalProps> = ({
                 <th className="py-2.5 px-3 text-right">{isTR ? 'Tüketim Katsayısı' : 'Consumption Rate'}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-border-dark/60 font-mono">
+            <tbody className="divide-y divide-slate-100 dark:divide-border-dark/60 font-light tracking-wide">
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-400 font-sans">
@@ -93,7 +93,7 @@ export const MaterialCatalogModal: React.FC<MaterialCatalogModalProps> = ({
               ) : (
                 filtered.map((item) => (
                   <tr key={item.item_id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors font-sans">
-                    <td className="py-3 px-3 font-mono font-bold text-amber-600 dark:text-amber-400">
+                    <td className="py-3 px-3 font-bold tracking-wide text-amber-600 dark:text-amber-400">
                       {item.item_id}
                     </td>
                     <td className="py-3 px-3 font-medium text-slate-900 dark:text-slate-100">
@@ -107,10 +107,10 @@ export const MaterialCatalogModal: React.FC<MaterialCatalogModalProps> = ({
                     <td className="py-3 px-3 text-center text-slate-600 dark:text-subtext-dark">
                       {item.unit_of_measure}
                     </td>
-                    <td className="py-3 px-3 text-right font-mono font-semibold text-slate-900 dark:text-slate-100">
+                    <td className="py-3 px-3 text-right font-semibold tracking-wide text-slate-900 dark:text-slate-100">
                       €{Number(item.base_cost_eur).toFixed(2)}
                     </td>
-                    <td className="py-3 px-3 text-right font-mono text-slate-600 dark:text-subtext-dark">
+                    <td className="py-3 px-3 text-right font-light tracking-wide text-slate-600 dark:text-subtext-dark">
                       {item.consumption_rate} {item.consumption_metric || ''}
                     </td>
                   </tr>

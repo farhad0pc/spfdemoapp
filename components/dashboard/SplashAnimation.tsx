@@ -45,21 +45,21 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
 
   return (
     <div
-      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#05080f] select-none overflow-hidden transition-transform duration-800 ease-in-out ${
+      className={`fixed inset-0 z-[999999] flex flex-col items-center justify-center bg-[#05080f] select-none overflow-hidden transition-transform duration-800 ease-in-out ${
         isWiping ? '-translate-y-full' : 'translate-y-0'
       }`}
       style={{ willChange: 'transform', backgroundColor: '#05080f' }}
     >
-      {/* Fully opaque solid base layer */}
+      {/* 100% Solid Base Layer to guarantee no bleed */}
       <div className="absolute inset-0 bg-[#05080f] pointer-events-none" />
 
-      {/* Main 1000px Stage Container */}
+      {/* Main Stage Container */}
       <div className="relative z-10 flex flex-col items-center justify-center w-full min-h-[1000px] max-w-5xl px-4 overflow-visible">
         
         {/* Convergence & Morphing Zone */}
         <div className="relative flex items-center justify-center w-full h-[520px] overflow-visible">
           
-          {/* Caesar Emblem Group */}
+          {/* Caesar Emblem (Left -> Center) */}
           <div
             className={`absolute flex items-center justify-center overflow-visible transition-all duration-300 ease-out ${
               isMorphComplete ? 'opacity-0 scale-50' : 'opacity-100 scale-100'
@@ -69,6 +69,7 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
               willChange: 'transform',
             }}
           >
+            {/* Unconstrained 360-Degree Radial Glow */}
             <div className="absolute -inset-24 rounded-full bg-[radial-gradient(circle,rgba(245,158,11,0.45)_0%,rgba(245,158,11,0.15)_45%,transparent_75%)] blur-3xl pointer-events-none" />
             <Image
               src="https://res.cloudinary.com/iczztnnz/image/upload/v1793015175/CAESAR_EMBLEM_NO_TEXT.png"
@@ -80,7 +81,7 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
             />
           </div>
 
-          {/* Google Gemini AI Star Group */}
+          {/* Google Gemini AI 4-Tipped Star (Right -> Center, No Box) */}
           <div
             className={`absolute flex items-center justify-center overflow-visible transition-all duration-300 ease-out ${
               isMorphComplete ? 'opacity-0 scale-50' : 'opacity-100 scale-100'
@@ -90,6 +91,7 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
               willChange: 'transform',
             }}
           >
+            {/* Unconstrained 360-Degree AI Glow */}
             <div className="absolute -inset-24 rounded-full bg-[radial-gradient(circle,rgba(66,133,244,0.45)_0%,rgba(156,39,176,0.25)_45%,transparent_75%)] blur-3xl pointer-events-none" />
             <div className="relative z-10 flex items-center justify-center filter drop-shadow-[0_0_20px_rgba(66,133,244,0.4)]">
               <svg className="w-56 h-56 sm:w-72 sm:h-72 animate-pulse overflow-visible" viewBox="0 0 24 24" fill="none">
@@ -125,7 +127,7 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
 
         </div>
 
-        {/* Loading Bar */}
+        {/* 3-Second Loading Bar */}
         <div className="w-80 sm:w-96 mt-4 flex flex-col items-center gap-2.5">
           <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden border border-slate-700/80 shadow-inner">
             <div
@@ -133,7 +135,7 @@ export const SplashAnimation: React.FC<SplashAnimationProps> = ({ lang, onComple
               style={{ width: `${progress}%` }}
             />
           </div>
-          <div className="flex items-center justify-between w-full text-xs font-mono font-bold uppercase tracking-wider text-slate-400">
+          <div className="flex items-center justify-between w-full text-xs font-bold tracking-wide uppercase tracking-wider text-slate-400">
             <span>{isTR ? 'BAŞLATILIYOR...' : 'INITIALIZING SYSTEM...'}</span>
             <span>{Math.round(progress)}%</span>
           </div>

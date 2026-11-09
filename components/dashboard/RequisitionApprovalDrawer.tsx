@@ -177,7 +177,7 @@ export const RequisitionApprovalDrawer: React.FC<RequisitionApprovalDrawerProps>
               </span>
             </div>
 
-            <div className="mt-2.5 rounded-lg bg-slate-100 p-3 font-mono text-[11px] text-slate-800 dark:bg-black/60 dark:text-slate-300">
+            <div className="mt-2.5 rounded-lg bg-slate-100 p-3 font-light tracking-wide text-[11px] text-slate-800 dark:bg-black/60 dark:text-slate-300">
               <p>predicted = {requisition.architectural_volume} m³ &times; {requisition.material?.consumption_rate} = {requisition.predicted_quantity} {requisition.material?.unit_of_measure}</p>
               <p className="mt-1">requested = {requisition.requested_quantity} {requisition.material?.unit_of_measure}</p>
             </div>

@@ -12,7 +12,7 @@ export const Footer: React.FC<FooterProps> = ({ lang }) => {
       <div className="mx-auto flex max-w-7xl items-center justify-between text-[11px] text-slate-500 dark:text-subtext-dark">
         {/* Left: Version Tag & Live Engine */}
         <div className="flex items-center gap-2">
-          <span className="font-mono font-semibold text-slate-700 dark:text-amber-400/90 tracking-wider">
+          <span className="font-semibold tracking-wide text-slate-700 dark:text-amber-400/90 tracking-wider">
             CAESAR SPF v2.1.0
           </span>
           <span className="text-slate-400 dark:text-slate-600">•</span>

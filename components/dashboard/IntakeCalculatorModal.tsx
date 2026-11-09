@@ -119,7 +119,7 @@ export const IntakeCalculatorModal: React.FC<IntakeCalculatorModalProps> = ({
               <label className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-subtext-dark">
                 {isTR ? '2. Katalog Malzeme Seçimi' : '2. Catalog Material Selection'}
               </label>
-              <span className="text-[11px] font-mono font-semibold text-amber-600 dark:text-amber-400">
+              <span className="text-[11px] font-semibold tracking-wide text-amber-600 dark:text-amber-400">
                 {isTR ? 'Katsayı: ' : 'Factor: '}{activeMaterial.consumption_rate} {activeMaterial.consumption_metric || ''}
               </span>
             </div>
@@ -148,7 +148,7 @@ export const IntakeCalculatorModal: React.FC<IntakeCalculatorModalProps> = ({
                 min="1"
                 value={intakeVolume}
                 onChange={(e) => setIntakeVolume(Math.max(1, Number(e.target.value) || 0))}
-                className="w-full rounded-lg border border-slate-200 dark:border-border-dark bg-white dark:bg-elevation-dark px-3 py-2 text-sm font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-amber-500/40"
+                className="w-full rounded-lg border border-slate-200 dark:border-border-dark bg-white dark:bg-elevation-dark px-3 py-2 text-sm font-bold tracking-wide text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-amber-500/40"
               />
               <span className="block mt-1 text-[10px] text-slate-400">{isTR ? 'Statik proje verisi' : 'Static project unit'}</span>
             </div>
@@ -158,10 +158,10 @@ export const IntakeCalculatorModal: React.FC<IntakeCalculatorModalProps> = ({
               <span className="block text-[10px] font-bold uppercase tracking-wide text-indigo-600 dark:text-indigo-400 mb-1">
                 {isTR ? 'Hesaplanan Baz Değer' : 'Engineering Baseline'}
               </span>
-              <div className="text-lg font-mono font-black text-indigo-700 dark:text-indigo-300">
+              <div className="text-lg font-bold tracking-wide text-indigo-700 dark:text-indigo-300">
                 {intakePredicted.toFixed(1)} {activeMaterial.unit_of_measure}
               </div>
-              <span className="block mt-1 text-[10px] text-indigo-500 dark:text-indigo-400 font-mono">
+              <span className="block mt-1 text-[10px] text-indigo-500 dark:text-indigo-400 font-light tracking-wide">
                 {intakeVolume} × {activeMaterial.consumption_rate}
               </span>
             </div>
@@ -172,7 +172,7 @@ export const IntakeCalculatorModal: React.FC<IntakeCalculatorModalProps> = ({
                 <label className="text-[11px] font-bold uppercase tracking-wide text-slate-600 dark:text-subtext-dark">
                   {isTR ? 'Talep Miktarı' : 'Requested Qty'}
                 </label>
-                <span className={`text-[11px] font-mono font-bold ${intakeIsAnomaly ? 'text-rose-500' : 'text-emerald-500'}`}>
+                <span className={`text-[11px] font-bold tracking-wide ${intakeIsAnomaly ? 'text-rose-500' : 'text-emerald-500'}`}>
                   {intakeVariance >= 0 ? `+${intakeVariance.toFixed(1)}%` : `${intakeVariance.toFixed(1)}%`}
                 </span>
               </div>
@@ -181,7 +181,7 @@ export const IntakeCalculatorModal: React.FC<IntakeCalculatorModalProps> = ({
                 min="1"
                 value={intakeRequested}
                 onChange={(e) => setIntakeRequested(Math.max(1, Number(e.target.value) || 0))}
-                className="w-full rounded-lg border border-slate-200 dark:border-border-dark bg-white dark:bg-elevation-dark px-3 py-2 text-sm font-mono font-bold text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-amber-500/40"
+                className="w-full rounded-lg border border-slate-200 dark:border-border-dark bg-white dark:bg-elevation-dark px-3 py-2 text-sm font-bold tracking-wide text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-amber-500/40"
               />
               <span className="block mt-1 text-[10px] text-slate-400">{activeMaterial.unit_of_measure}</span>
             </div>
@@ -203,7 +203,7 @@ export const IntakeCalculatorModal: React.FC<IntakeCalculatorModalProps> = ({
                   : (isTR ? 'Mühendislik Limitleri Dahilinde (<= +%5)' : 'Within Tolerance (<= +5%)')}
               </span>
             </div>
-            <span className="font-mono text-[11px]">
+            <span className="font-light tracking-wide text-[11px]">
               {intakeVariance >= 0 ? `+${intakeVariance.toFixed(2)}%` : `${intakeVariance.toFixed(2)}%`}
             </span>
           </div>
@@ -230,7 +230,7 @@ export const IntakeCalculatorModal: React.FC<IntakeCalculatorModalProps> = ({
               <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 {isTR ? 'Tahmini Sipariş Tutarı' : 'Estimated Total'}
               </span>
-              <span className="text-xl font-black font-mono text-amber-600 dark:text-amber-400">
+              <span className="text-xl font-black font-light tracking-wide text-amber-600 dark:text-amber-400">
                 €{intakeTotalEur.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
@@ -238,7 +238,7 @@ export const IntakeCalculatorModal: React.FC<IntakeCalculatorModalProps> = ({
               <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
                 {isTR ? 'Yetki Kademesi' : 'Approval Tier'}
               </span>
-              <span className="inline-block rounded-md bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-400 font-mono">
+              <span className="inline-block rounded-md bg-amber-500/15 border border-amber-500/30 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-400 font-light tracking-wide">
                 {isTR ? `Kademe ${intakeTier}` : `Tier ${intakeTier}`}
               </span>
             </div>
