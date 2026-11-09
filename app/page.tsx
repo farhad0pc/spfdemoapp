@@ -1,20 +1,11 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import Footer from "@/components/dashboard/Footer";
 import RequisitionTable from '@/components/dashboard/RequisitionTable';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus,
-  Building,
-  Sparkles,
-  AlertTriangle,
-  Calculator,
-  CheckCircle2,
-  Clock,
-  ShieldAlert,
-  Coins,
-  TrendingUp,
-  Layers } from 'lucide-react';
+
 import { Header } from '@/components/dashboard/Header';
 import { RequisitionMetrics } from '@/components/dashboard/RequisitionMetrics';
 import { RequisitionForm } from '@/components/dashboard/RequisitionForm';
@@ -36,9 +27,6 @@ import {
 } from '@/types/requisition';
 import {
   DICTIONARY,
-  toLocaleUpper,
-  formatCurrency,
-  formatNumber,
   useCaesarLanguage,
   useCaesarTheme
 } from '@/lib/i18n';
@@ -302,6 +290,9 @@ export default function Home() {
   const [selectedRequisition, setSelectedRequisition] = useState<PurchaseRequisition | null>(null);
   const [highlightedTicketId, setHighlightedTicketId] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
+  const [isIntakeModalOpen, setIsIntakeModalOpen] = useState<boolean>(false);
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
+  const [showSplash, setShowSplash] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [blockFilter, setBlockFilter] = useState<'all' | CaesarBlock>('all');
 
@@ -623,479 +614,91 @@ export default function Home() {
 
       {/* Main Container */}
       <main className="mx-auto max-w-7xl px-4 py-6 md:px-8 space-y-6 pb-14 sm:pb-16">
-        {/* HERO ACTION SECTION: Resort Identity + Ribbon + Search + Primary Modal Trigger */}
-        <section
-          aria-label="Caesar Resort Hero"
-          className="relative overflow-hidden rounded-2xl border border-amber-600/40 bg-linear-to-r from-amber-500/15 via-amber-600/10 to-yellow-600/15 p-5 md:p-6 backdrop-blur-md shadow-xl"
-        >
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            {/* Site Ribbon & Subtitle */}
-            <div>
-              <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-400 border border-amber-500/40">
-                <Sparkles className="h-3 w-3" />
-                <span>{t.siteRibbon}</span>
-              </div>
-              <h2 className="mt-2 text-xl md:text-2xl lg:text-[26px] font-bold uppercase tracking-wider text-white">
-                {toLocaleUpper(t.appTitle, lang)}
-              </h2>
-            </div>
-
-            {/* Primary Action Button */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setIsFormOpen(true)}
-                className="inline-flex items-center gap-2 rounded-xl bg-accent-yellow px-5 py-3 text-xs md:text-sm font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-amber-500/30 transition-all hover:bg-amber-400 active:scale-95"
-              >
-                <Plus className="h-4 w-4 stroke-3" />
-                <span>{t.newRequisition}</span>
-              </button>
-            </div>
+      {/* 1. HERO FILTER & CENTRAL COMMAND BANNER */}
+      <section className="rounded-2xl border border-amber-500/25 bg-white/80 dark:bg-elevation-dark/95 backdrop-blur-md p-4 sm:p-6 shadow-sm transition-colors">
+        <div className="flex flex-col items-center text-center space-y-4">
+          
+          {/* Project Scope Badge */}
+          <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-widest">
+            <span>✨</span>
+            <span>{lang === "tr" ? "CAESAR RESORT & SPA — ETAP 7 & 8" : "CAESAR RESORT & SPA — PHASES 7 & 8"}</span>
           </div>
 
-          {/* Block Filter Pills & Search Input Row */}
-          <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-amber-500/20">
-            {/* Block Pills */}
-            <div className="flex flex-wrap items-center gap-1.5">
+          {/* Subtitle Stack */}
+          <div>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black uppercase tracking-wider text-slate-900 dark:text-amber-400">
+              {lang === "tr" ? "CAESAR SATINALMA VE HAKEDİŞ DEFTERİ" : "CAESAR PURCHASING LEDGER"}
+            </h1>
+            <p className="text-xs sm:text-sm font-medium text-slate-500 dark:text-subtext-dark mt-1">
+              {lang === "tr" ? "Statik Metraj ve Gerçek Zamanlı Alt-Defter Kontrol Merkezi" : "Predictive Material Intake & Realtime Sub-Ledger Command"}
+            </p>
+          </div>
+
+          {/* Primary CTA (Centered, 20% larger with visual dominance) */}
+          <div className="pt-2">
+            <button
+              onClick={() => setIsFormOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black px-8 py-3.5 text-base sm:text-lg uppercase tracking-wider shadow-xl shadow-amber-500/30 transition-all cursor-pointer"
+            >
+              <span className="text-xl leading-none">+</span>
+              <span>{lang === "tr" ? "YENİ TALEP OLUŞTUR" : "NEW REQUISITION"}</span>
+            </button>
+          </div>
+
+          {/* Secondary Action Row: Intake Calculator & Material Catalog */}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+            <button
+              onClick={() => setIsIntakeModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 dark:border-amber-500/30 bg-slate-50 dark:bg-canvas-dark hover:border-amber-500 px-4 py-2 text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-xs"
+            >
+              <span>📐</span>
+              <span>{lang === "tr" ? "Metraj & Katsayı Hesaplayıcı" : "Intake & Baseline Calculator"}</span>
+            </button>
+            <button
+              onClick={() => setIsCatalogModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 dark:border-amber-500/30 bg-slate-50 dark:bg-canvas-dark hover:border-amber-500 px-4 py-2 text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 transition-all cursor-pointer shadow-xs"
+            >
+              <span>📦</span>
+              <span>{lang === "tr" ? "Malzeme Kataloğu" : "View Material Catalog"}</span>
+            </button>
+          </div>
+
+          {/* Bottom Utility Strip: Block Filter Chips (Left) & Search (Right) */}
+          <div className="w-full pt-4 border-t border-slate-200/80 dark:border-border-dark flex flex-col md:flex-row items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <button
-                onClick={() => setBlockFilter('all')}
-                className={`rounded-lg px-3 py-1.5 text-xs font-bold uppercase transition-all ${
-                  blockFilter === 'all'
-                    ? 'bg-amber-500 text-slate-950 shadow-md'
-                    : 'bg-elevation-dark/80 text-slate-300 hover:bg-border-dark border border-slate-700/60'
-                }`}
+                onClick={() => setBlockFilter("all")}
+                className={"px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all " + (blockFilter === "all" ? "bg-amber-500 text-slate-950 font-black shadow-xs" : "bg-slate-100 dark:bg-canvas-dark text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-border-dark hover:border-amber-500/40")}
               >
-                {t.allBlocks}
+                {lang === "tr" ? "TÜMÜ" : "ALL"}
               </button>
-              {(['ZENO', 'PHUKET', 'PATTAYA', 'KOH SAMUI'] as CaesarBlock[]).map((b) => (
+              {(["b_zeno", "b_phuket", "b_pattaya", "b_samui"] as unknown as CaesarBlock[]).map((blk) => (
                 <button
-                  key={b}
-                  onClick={() => setBlockFilter(b)}
-                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-bold uppercase transition-all ${
-                    blockFilter === b
-                      ? 'bg-amber-500 text-slate-950 shadow-md'
-                      : 'bg-elevation-dark/80 text-slate-300 hover:bg-border-dark border border-slate-700/60'
-                  }`}
+                  key={blk}
+                  onClick={() => setBlockFilter(blk)}
+                  className={"px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all " + (blockFilter === blk ? "bg-amber-500 text-slate-950 font-black shadow-xs" : "bg-slate-100 dark:bg-canvas-dark text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-border-dark hover:border-amber-500/40")}
                 >
-                  <Building className="h-3 w-3 opacity-60" />
-                  <span>{b}</span>
+                  {blk.replace("b_", "").toUpperCase()}
                 </button>
               ))}
             </div>
 
-            {/* Search Input */}
-            <div className="relative min-w-60">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <div className="w-full md:w-72">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t.searchPlaceholder}
-                className="w-full rounded-xl border border-slate-700/80 bg-surface-dark/80 py-2 pl-9 pr-3 text-xs font-medium text-slate-100 placeholder-slate-400 focus:border-amber-500 focus:outline-hidden"
+                placeholder={lang === "tr" ? "Talep ID, malzeme veya blok ara..." : "Search ticket ID, material, or block..."}
+                className="w-full rounded-xl border border-slate-300 dark:border-border-dark bg-slate-50 dark:bg-canvas-dark px-3 py-2 text-xs text-slate-900 dark:text-slate-100 focus:outline-hidden focus:ring-2 focus:ring-amber-500/40"
               />
             </div>
           </div>
-        </section>
 
-        {/* ROLE-TAILORED PRIMARY VIEWPORT PARTITION */}
+        </div>
+      </section>
 
-        {/* 1. FOREMAN VIEWPORT: REQUISITION INTAKE FOCUS CARD & INSTANT BASELINE CALCULATOR */}
-        {currentRole === 'FOREMAN' && (
-          <section aria-label="Foreman Requisition Intake Focus" className="rounded-2xl border border-amber-500/40 bg-surface-dark/95 p-5 md:p-6 shadow-xl backdrop-blur-md">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-700/60">
-              <div>
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-400 border border-amber-500/40">
-                  <Calculator className="h-3.5 w-3.5" />
-                  <span>{t.partition.foremanBadge}</span>
-                </div>
-                <h3 className="mt-1.5 text-lg md:text-xl font-bold uppercase tracking-wider text-white">
-                  {t.partition.foremanTitle}
-                </h3>
-                <p className="text-xs text-slate-400">
-                  {t.partition.foremanSub}
-                </p>
-              </div>
-
-              {intakeSuccessMsg && (
-                <div className="rounded-xl border border-emerald-500/50 bg-emerald-500/15 px-3 py-2 text-xs font-bold text-emerald-400 flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 shrink-0" />
-                  <span>{intakeSuccessMsg}</span>
-                </div>
-              )}
-            </div>
-
-            <form onSubmit={handleQuickIntakeSubmit} className="mt-5 space-y-4">
-              {/* Row 1: Block Selector & Material Selector */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Block Selector */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                    {t.form.blockSelect}
-                  </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {blocks.map((blk) => (
-                      <button
-                        type="button"
-                        key={blk.block_id}
-                        onClick={() => setIntakeBlockId(blk.block_id)}
-                        className={`rounded-xl p-2.5 text-center text-xs font-bold transition ${
-                          intakeBlockId === blk.block_id
-                            ? 'bg-amber-500 text-slate-950 shadow-md font-black'
-                            : 'bg-elevation-dark border border-slate-700/80 text-slate-300 hover:border-amber-500/50'
-                        }`}
-                      >
-                        <Building className="h-3.5 w-3.5 mx-auto mb-1 opacity-70" />
-                        <div>{blk.block_name}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Material Selector */}
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-1.5">
-                    {t.form.materialSelect}
-                  </label>
-                  <select
-                    value={intakeItemId}
-                    onChange={(e) => setIntakeItemId(e.target.value)}
-                    className="w-full rounded-xl border border-slate-700 bg-elevation-dark p-2.5 text-xs font-semibold text-slate-100 focus:border-amber-500 focus:outline-hidden"
-                  >
-                    {materials.map((mat) => (
-                      <option key={mat.item_id} value={mat.item_id} className="bg-surface-dark text-slate-100">
-                        {lang === 'tr' ? mat.item_name_tr : mat.item_name_en} ({formatCurrency(mat.base_cost_eur, lang)} / {mat.unit_of_measure})
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mt-1.5 text-[11px] text-slate-400">
-                    Katsayı / Consumption Factor: <span className="font-bold text-amber-400">{activeMaterial.consumption_rate} {activeMaterial.unit_of_measure}</span> ({activeMaterial.consumption_metric})
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 2: Instant Baseline Calculations & Input Controls */}
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                {/* Volume Input */}
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
-                    {t.form.volumeInput}
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={intakeVolume}
-                    onChange={(e) => setIntakeVolume(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-700 bg-elevation-dark px-3 py-2 text-sm font-bold text-slate-100 focus:border-amber-500 focus:outline-hidden tabular-nums"
-                  />
-                  <div className="mt-1 text-[10px] text-slate-400">
-                    Statik mimari metraj birimi (m³)
-                  </div>
-                </div>
-
-                {/* Algorithmic Baseline Formula Callout */}
-                <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 p-3 text-center">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">
-                    {t.form.predictedQty}
-                  </div>
-                  <div className="mt-1 text-lg font-black text-indigo-400 tabular-nums">
-                    {formatNumber(intakePredicted, lang)} {activeMaterial.unit_of_measure}
-                  </div>
-                  <div className="mt-0.5 text-[10px] text-indigo-300/80 font-mono">
-                    {intakeVolume} m³ × {activeMaterial.consumption_rate}
-                  </div>
-                </div>
-
-                {/* Requested Quantity Input */}
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
-                    {t.form.requestedQty}
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={intakeRequested}
-                    onChange={(e) => setIntakeRequested(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-700 bg-elevation-dark px-3 py-2 text-sm font-bold text-slate-100 focus:border-amber-500 focus:outline-hidden tabular-nums"
-                  />
-                  <div className="mt-1 flex items-center justify-between text-[11px]">
-                    <span className="text-slate-400">{t.form.varianceBadge}:</span>
-                    <span className={`font-black ${intakeIsAnomaly ? 'text-rose-400' : 'text-emerald-400'}`}>
-                      {intakeVariance > 0 ? `+${intakeVariance}%` : `${intakeVariance}%`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* OVERRUN CHECK: > +5% Prominent Warning Indicator */}
-              {intakeIsAnomaly ? (
-                <div className="rounded-xl border border-rose-500/60 bg-rose-500/10 p-4 text-rose-200 shadow-lg shadow-rose-950/20">
-                  <div className="flex items-center gap-2 font-bold text-rose-400 text-sm">
-                    <AlertTriangle className="h-5 w-5 shrink-0 animate-bounce text-amber-400" />
-                    <span>{t.partition.overrunAlertTitle}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-rose-200/90 leading-relaxed">
-                    {t.partition.overrunAlertDesc}
-                  </p>
-                  <div className="mt-3">
-                    <label className="text-[11px] font-bold text-amber-300 uppercase block mb-1">
-                      {t.form.justificationPlaceholder.slice(0, 36)}... (Min. 10 Karakter) *
-                    </label>
-                    <textarea
-                      value={intakeJustification}
-                      onChange={(e) => setIntakeJustification(e.target.value)}
-                      placeholder={t.form.justificationPlaceholder}
-                      rows={2}
-                      className="w-full rounded-lg border border-rose-500/40 bg-surface-dark p-2.5 text-xs text-slate-100 placeholder-slate-400 focus:border-amber-500 focus:outline-hidden"
-                    />
-                    {intakeJustification.trim().length > 0 && intakeJustification.trim().length < 10 && (
-                      <span className="mt-1 text-[10px] text-rose-400 block font-semibold">
-                        {t.form.justificationMinNotice} ({intakeJustification.trim().length}/10)
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-3 text-emerald-300 flex items-center justify-between text-xs font-bold">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                    <span>{t.form.toleranceOk} ({intakeVariance > 0 ? `+${intakeVariance}%` : `${intakeVariance}%`})</span>
-                  </div>
-                  <span className="text-[11px] text-emerald-400/80 font-normal">
-                    Mühendislik katsayısı limitleri dahilinde
-                  </span>
-                </div>
-              )}
-
-              {/* Action & Cost Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-3 border-t border-slate-700/60">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">
-                      {t.form.estimatedCost}
-                    </span>
-                    <span className="text-xl font-black text-amber-400 tabular-nums">
-                      {formatCurrency(intakeTotalEur, lang)}
-                    </span>
-                  </div>
-                  <div className="border-l border-slate-700 pl-3">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block">
-                      {t.form.tierBadge}
-                    </span>
-                    <span className="text-xs font-bold text-slate-200">
-                      Tier {intakeTier} &bull; {intakeTierDescriptor.title}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setIsFormOpen(true)}
-                    className="rounded-xl border border-slate-700 bg-elevation-dark px-4 py-2.5 text-xs font-bold text-slate-300 hover:bg-border-dark cursor-pointer"
-                  >
-                    {lang === 'tr' ? 'Detaylı Modalı Aç' : 'Open Detailed Form'}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={intakeVolume <= 0 || intakeRequested <= 0 || (intakeIsAnomaly && intakeJustification.trim().length < 10)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-accent-yellow px-5 py-2.5 text-xs md:text-sm font-black uppercase tracking-wider text-slate-950 shadow-lg shadow-amber-500/20 transition hover:bg-amber-400 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    <CheckCircle2 className="h-4 w-4 stroke-3" />
-                    <span>{t.partition.quickSubmitBtn}</span>
-                  </button>
-                </div>
-              </div>
-            </form>
-          </section>
-        )}
-
-        {/* 2. PURCHASING_MGR & PROJECT_DIRECTOR VIEWPORT: TRIAGE QUEUE FOCUS CARD */}
-        {(currentRole === 'PURCHASING_MGR' || currentRole === 'PROJECT_DIRECTOR') && (
-          <section aria-label="Triage Queue Focus" className="rounded-2xl border border-amber-500/40 bg-surface-dark/95 p-5 md:p-6 shadow-xl backdrop-blur-md">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-700/60">
-              <div>
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-blue-400 border border-blue-500/40">
-                  <Clock className="h-3.5 w-3.5" />
-                  <span>{t.partition.triageBadge}</span>
-                </div>
-                <h3 className="mt-1.5 text-lg md:text-xl font-bold uppercase tracking-wider text-white">
-                  {currentRole === 'PURCHASING_MGR'
-                    ? (lang === 'tr' ? 'Satınalma Müdürü Onay & Triyaj Kuyruğu (Tier 1)' : 'Purchasing Manager Triage Queue (Tier 1)')
-                    : (lang === 'tr' ? 'Proje Direktörü Onay & Denetim Kuyruğu (Tier 2)' : 'Project Director Sign-Off Queue (Tier 2)')}
-                </h3>
-                <p className="text-xs text-slate-400">
-                  {t.partition.triageSub}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-400">
-                  {triageRequisitions.length} {lang === 'tr' ? 'Talep İncelenmeyi Bekliyor' : 'Tickets Pending Review'}
-                </span>
-              </div>
-            </div>
-
-            {/* 3 Triage Metric Chips */}
-            <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-              <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4">
-                <span className="text-[10px] font-bold uppercase text-blue-400 block">
-                  {lang === 'tr' ? 'Bekleyen Talep Sayısı' : 'Pending Review Count'}
-                </span>
-                <div className="mt-1 text-2xl font-black text-white tabular-nums">
-                  {triageRequisitions.length}
-                </div>
-                <span className="text-[11px] text-slate-400">
-                  {currentRole === 'PURCHASING_MGR' ? 'Tier 1 (< €2.5k)' : 'Tier 2 (€2.5k - €15k)'}
-                </span>
-              </div>
-
-              <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                <span className="text-[10px] font-bold uppercase text-amber-400 block">
-                  {lang === 'tr' ? 'İncelenen Toplam Hacim' : 'Pending Monetary Volume'}
-                </span>
-                <div className="mt-1 text-2xl font-black text-amber-400 tabular-nums">
-                  {formatCurrency(triageTotalEur, lang)}
-                </div>
-                <span className="text-[11px] text-slate-400">
-                  {lang === 'tr' ? 'Yetki limitiniz dahilinde' : 'Within authority envelope'}
-                </span>
-              </div>
-
-              <div className="rounded-xl border border-rose-500/30 bg-rose-500/5 p-4">
-                <span className="text-[10px] font-bold uppercase text-rose-400 block">
-                  {lang === 'tr' ? 'Sapma Gerekçeli Talepler' : 'Overruns With Justification'}
-                </span>
-                <div className="mt-1 text-2xl font-black text-rose-400 tabular-nums">
-                  {triageAnomalies.length}
-                </div>
-                <span className="text-[11px] text-slate-400">
-                  {lang === 'tr' ? 'Teknik inceleme şartı' : 'Mandatory technical audit'}
-                </span>
-              </div>
-            </div>
-
-            {/* Supplier Cost Comparison Banner */}
-            <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-emerald-200">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <Coins className="h-4 w-4 text-emerald-400 shrink-0" />
-                  <span className="font-bold text-emerald-300 uppercase tracking-wide">
-                    {t.partition.supplierIndexTitle}: {t.partition.savingsAdvantage} (-4.0% Piyasa Altı)
-                  </span>
-                </div>
-                <span className="text-emerald-400/90 font-medium">
-                  {lang === 'tr' ? 'Caesar çerçeve tedarikçi sözleşmesi aktif • Birim fiyatlar garantilidir' : 'Caesar Master Supplier Agreement active • Contracted rates locked'}
-                </span>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* 3. EXECUTIVE VIEWPORT: MACRO FINANCIAL TELEMETRY VIEW */}
-        {currentRole === 'EXECUTIVE' && (
-          <section aria-label="Executive Macro Telemetry Focus" className="rounded-2xl border border-amber-500/40 bg-surface-dark/95 p-5 md:p-6 shadow-xl backdrop-blur-md">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-700/60">
-              <div>
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-amber-400 border border-amber-500/40">
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  <span>{t.partition.macroBadge}</span>
-                </div>
-                <h3 className="mt-1.5 text-lg md:text-xl font-bold uppercase tracking-wider text-white">
-                  {t.partition.macroTitle}
-                </h3>
-                <p className="text-xs text-slate-400">
-                  {t.partition.macroSub}
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-bold text-amber-400">
-                  {t.partition.highCapexTitle}: {capexRequisitions.length} {lang === 'tr' ? 'Büyük Sipariş' : 'Major Orders'}
-                </span>
-              </div>
-            </div>
-
-            {/* 3 High-Impact Macro Financial Telemetry Cards */}
-            <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Card 1: High-ticket CapEx tickets > €15k */}
-              <div className="rounded-xl border border-amber-500/30 bg-elevation-dark p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-                    {t.partition.highCapexTitle}
-                  </span>
-                  <div className="rounded-lg bg-amber-500/10 p-1.5 text-amber-400">
-                    <Coins className="h-4 w-4" />
-                  </div>
-                </div>
-                <div className="mt-2 text-2xl md:text-3xl font-black text-white tabular-nums">
-                  {formatCurrency(capexTotalEur, lang)}
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  {t.partition.highCapexDesc}
-                </p>
-                <div className="mt-3 pt-2 border-t border-slate-700/60 text-[10px] font-bold text-amber-400 uppercase">
-                  {capexRequisitions.length} {lang === 'tr' ? 'adet Tier 3 siparişi' : 'Tier 3 purchase orders'}
-                </div>
-              </div>
-
-              {/* Card 2: Company-wide committed budget burn */}
-              <div className="rounded-xl border border-indigo-500/30 bg-elevation-dark p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-400">
-                    {t.partition.budgetBurnTitle}
-                  </span>
-                  <div className="rounded-lg bg-indigo-500/10 p-1.5 text-indigo-400">
-                    <Layers className="h-4 w-4" />
-                  </div>
-                </div>
-                <div className="mt-2 text-2xl md:text-3xl font-black text-indigo-300 tabular-nums">
-                  {formatCurrency(totalCommittedEur, lang)}
-                </div>
-                <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400 tabular-nums">
-                  <span>{t.partition.budgetEnvelope}</span>
-                  <span className="font-bold text-indigo-400">%{budgetBurnPercent}</span>
-                </div>
-                {/* Burn Progress Bar */}
-                <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-slate-800">
-                  <div
-                    className="h-full rounded-full bg-linear-to-r from-indigo-500 to-amber-500 transition-all duration-500"
-                    style={{ width: `${budgetBurnPercent}%` }}
-                  />
-                </div>
-                <div className="mt-2 text-[10px] text-slate-400">
-                  {t.partition.budgetRemaining}: <span className="font-bold text-emerald-400">{formatCurrency(capexBudgetLimit - totalCommittedEur, lang)}</span>
-                </div>
-              </div>
-
-              {/* Card 3: Blocked PO approvals */}
-              <div className="rounded-xl border border-rose-500/30 bg-elevation-dark p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-rose-400">
-                    {t.partition.blockedPOsTitle}
-                  </span>
-                  <div className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400">
-                    <ShieldAlert className="h-4 w-4" />
-                  </div>
-                </div>
-                <div className="mt-2 text-2xl md:text-3xl font-black text-rose-400 tabular-nums">
-                  {formatCurrency(blockedTotalEur, lang)}
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">
-                  {t.partition.blockedPOsDesc}
-                </p>
-                <div className="mt-3 pt-2 border-t border-slate-700/60 flex items-center justify-between text-[10px] font-bold">
-                  <span className="text-rose-400 uppercase">
-                    {blockedRequisitions.length} {lang === 'tr' ? 'bekletilen sipariş' : 'orders on hold'}
-                  </span>
-                  <span className="rounded bg-rose-500/20 px-1.5 py-0.5 text-rose-400">
-                    {lang === 'tr' ? 'PO İmzası Şart' : 'Sign-Off Needed'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* 3-CARD OVERVIEW TELEMETRY (Requisition Metrics) */}
+      {/* 2. OVERVIEW TELEMETRY GRID (Immediately follows Hero) */}
+      {/* 3-CARD OVERVIEW TELEMETRY (Requisition Metrics) */}
         <section aria-label="Executive Overview">
           <RequisitionMetrics requisitions={requisitions} lang={lang} />
         </section>
