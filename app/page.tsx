@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
-
+import SplashAnimation from "@/components/dashboard/SplashAnimation";
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import Footer from "@/components/dashboard/Footer";
 import RequisitionTable from '@/components/dashboard/RequisitionTable';
 
@@ -614,6 +614,7 @@ export default function Home() {
 
       {/* Main Container */}
       <main className="mx-auto max-w-7xl px-4 py-6 md:px-8 space-y-6 pb-14 sm:pb-16">
+      {showSplash && <SplashAnimation lang={lang} onComplete={() => setShowSplash(false)} />}
       {/* 1. HERO FILTER & CENTRAL COMMAND BANNER */}
       <section className="rounded-2xl border border-amber-500/25 bg-white/80 dark:bg-elevation-dark/95 backdrop-blur-md p-4 sm:p-6 shadow-sm transition-colors">
         <div className="flex flex-col items-center text-center space-y-4">
