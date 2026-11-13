@@ -1,200 +1,134 @@
-# Project Context & Living Architectural Ledger
-
-**Repository**: `spfdemoapp`  
-**Domain Scope**: Afik Group (Caesar Projects) Construction Material Purchasing Sub-Ledger  
-**Active Baseline**: `v2.3.0-realtime-subledger-sync`  
-**Last Updated**: 2026-10-29  
-
----
-
-## 1. System Vision & Architecture
-
-The **Afik Group Construction Material Purchasing Sub-Ledger** is an enterprise-grade material requisition, predictive volume verification, and multi-tier governance platform designed for high-density luxury residential developments (specifically Caesar Resort & Spa).
-
-### Core Technology Stack
-- **Frontend / Application Framework**: Next.js (App Router) + React 19 + TypeScript (Strict Mode)
-- **Styling & UI Design**: Tailwind CSS v4 + Lucide React + Glassmorphism aesthetic tokens
-- **Persistence & Cloud Database**: Supabase Cloud PostgreSQL with Row-Level Security (RLS)
-- **Document Processing**: Google Cloud Document AI (Receipt, Invoice, and Delivery Note OCR)
-- **Cognitive & Analytical Synthesis**: Vertex AI / Google GenAI Gemini 2.0 (Multimodal anomaly justification analysis and automated compliance verification)
-
-```mermaid
-graph TD
-    UI["Next.js App Router (Requisition Portal)"] --> Supabase["Supabase PostgreSQL (5 Core Sub-Ledger Tables)"]
-    UI --> DocAI["Google Cloud Document AI (Waybills & Invoices)"]
-    UI --> Gemini["Vertex AI Gemini 2.0 (Variance Reasoning)"]
-
-    subgraph Governance & Logic Engine
-        Vol["Architectural Volume (m³)"] --> Pred["Predicted Quantity Engine"]
-        Pred --> VarCheck{"Variance Check (> 5% Threshold)"}
-        VarCheck -- Anomaly Detected --> Just["Mandatory Justification Gate"]
-        VarCheck -- Within Tolerance --> Tier["3-Tier Approval Routing"]
-        Just --> Tier
-    end
-```
+# Caesar Purchasing Sub-Ledger & Procurement Ecosystem — Project Context
+**Version:** v2.5.0 (Phase B Evolution)  
+**Last Updated:** 2026-11-11  
+**Lead Systems Architect:** Farhad Mokhtari  
+**Stack:** Next.js 15 (App Router), React 19, Tailwind CSS v4, Supabase (PostgreSQL 15)  
+**Status:** Compilation Clean (Exit Code 0: 0 errors, 0 warnings) — Paused at Milestone 2.5.0  
 
 ---
 
-## 2. Master Data Entities & Database Schema Definitions
+## 1. Executive Summary & Operational Scope
 
-The platform anchors directly to five primary Supabase PostgreSQL relational tables:
+The **Caesar Purchasing Sub-Ledger & Procurement Ecosystem** is an enterprise procurement, predictive intake calculation, and fiduciary governance platform designed for Caesar Group / Afik Group construction operations.
 
-### 1. `material_catalog`
-Stores master specifications, pricing, and structural consumption formulas:
-- `item_id` (`UUID`, Primary Key)
-- `item_name_tr` (`VARCHAR`, Turkish catalog name, e.g., *C30 Hazır Beton*)
-- `item_name_en` (`VARCHAR`, English catalog name, e.g., *C30 Ready-Mix Concrete*)
-- `unit_of_measure` (`VARCHAR`, e.g., `m3`, `ton`, `m2`, `pcs`)
-- `category` (`VARCHAR`, e.g., `CONCRETE`, `STEEL`, `MASONRY`, `FINISHES`, `PLUMBING`, `ELECTRICAL`)
-- `base_cost_eur` (`NUMERIC(12,2)`, Contracted unit price in EUR)
-- `consumption_rate` (`NUMERIC(10,4)`, Standard engineering consumption factor per volume metric)
-- `consumption_metric` (`VARCHAR`, Formula descriptor, e.g., *m3 of reinforced frame*)
-
-### 2. `projects` & `construction_blocks`
-Hierarchical construction site mapping for Caesar Projects:
-- Projects: **Caesar Resort & Spa**
-- Construction Blocks:
-  - `ZENO` (High-rise residential block)
-  - `PHUKET` (Resort villa & residential cluster)
-  - `PATTAYA` (Mid-rise luxury apartments)
-  - `KOH SAMUI` (Commercial & amenities complex)
-
-### 3. `corporate_users`
-Role-based access hierarchy governing operational and financial authorities:
-- `user_id` (`UUID`, Primary Key)
-- `name` (`VARCHAR`)
-- `email` (`VARCHAR`)
-- `role` (`ENUM`):
-  - `FOREMAN`: Site level; initiates purchase requisitions based on architectural progress.
-  - `PURCHASING_MGR`: Commercial review; verifies vendor pricing and availability (Tier 1).
-  - `PROJECT_DIRECTOR`: Technical and operational audit; approves high-value requisitions (Tier 2).
-  - `EXECUTIVE`: Board level; final financial sign-off for critical volume outlays (Tier 3).
-
-### 4. `purchase_requisitions`
-The central transaction table recording material requests:
-- `ticket_id` (`UUID`, Primary Key)
-- `requisition_number` (`VARCHAR`, Format: `REQ-YYYYMM-XXXX`)
-- `project_id` (`UUID`, Foreign Key &rarr; `projects.id`)
-- `block_id` (`UUID`, Foreign Key &rarr; `construction_blocks.id`)
-- `item_id` (`UUID`, Foreign Key &rarr; `material_catalog.item_id`)
-- `foreman_id` (`UUID`, Foreign Key &rarr; `corporate_users.user_id`)
-- `architectural_volume` (`NUMERIC(12,3)`, Active construction volume in unit metric)
-- `predicted_quantity` (`NUMERIC(12,3)`, Algorithmic baseline)
-- `requested_quantity` (`NUMERIC(12,3)`, Field requested quantity)
-- `variance_percentage` (`NUMERIC(6,2)`, Delta vs. predicted)
-- `variance_justification` (`TEXT`, Mandatory when variance &gt; +5%)
-- `estimated_total_eur` (`NUMERIC(14,2)`, `requested_quantity * base_cost_eur`)
-- `approval_tier` (`INT`, `1`, `2`, or `3`)
-- `status` (`ENUM`):
-  - `PENDING_PURCHASING`
-  - `PENDING_TIER2`
-  - `PENDING_TIER3`
-  - `APPROVED`
-  - `ORDER_PLACED`
-  - `DELIVERED`
-  - `REJECTED`
-
-### 5. `requisition_approvals`
-Immutable audit log tracking every decision step:
-- `approval_id` (`UUID`, Primary Key)
-- `ticket_id` (`UUID`, Foreign Key &rarr; `purchase_requisitions.ticket_id`)
-- `approver_id` (`UUID`, Foreign Key &rarr; `corporate_users.user_id`)
-- `approver_role` (`VARCHAR`)
-- `action` (`ENUM`: `APPROVED`, `REJECTED`, `ESCALATED`)
-- `tier` (`INT`)
-- `comments` (`TEXT`)
-- `timestamp` (`TIMESTAMPTZ`)
+### Scope Boundaries & Anti-Collision Mandate
+- **Purchasing System (This Repository):** Governs construction material requisitions, predictive volume/consumption calculations, supplier quotation containment, purchasing sub-ledgers, warehouse inventory handovers, and executive capital exposure.
+  - Tables: public.inventory_catalog, public.purchase_requisitions, public.requisition_approvals, public.corporate_users.
+  - Identifier Taxonomy: REQ-[YYYYMM]-[HEX].
+- **Daily Reporting System (Distinct Platform):** Governs daily construction progress, labor headcount shifts, heavy machinery hours, and quality control punch-lists (master_logs, tasks_log, etc.). Schema, table names, and ticket IDs are strictly partitioned to prevent context bleeding.
 
 ---
 
-## 3. Business Logic Invariants & Predictive Equations
+## 2. Operational Triad & Workspace Hygiene Protocols
 
-### A. Baseline Prediction Formula
-$$\text{predicted\_quantity} = \text{architectural\_volume} \times \text{consumption\_rate}$$
+Development is governed by a strict operational protocol across three actors: Farhad (Lead Architect) <-> Gemini (System Architect) <-> Antigravity IDE (Execution Agent).
 
-### B. Variance Anomaly Trigger
-$$\text{Variance \%} = \left(\frac{\text{requested\_quantity} - \text{predicted\_quantity}}{\text{predicted\_quantity}}\right) \times 100$$
-- If $\text{requested\_quantity} > \text{predicted\_quantity} \times 1.05$ (exceeds 5% tolerance):
-  1. The UI flags the ticket with an amber **Variance Anomaly** badge.
-  2. The submission form enforces a mandatory, validated `variance_justification` (e.g., ground condition settling, structural reinforcement revision, spillage allowance).
-  3. Vertex AI Gemini analyzes the justification text against past site incident logs for plausibility.
+### Operational Modes
+- **MODE A: Terminal-First Workspace Execution (Default for Surgical Work):** Used for 1-3 known files, compiler fixes, and deterministic DDL scripts. Executed via single-quoted Zsh heredocs ending in the mandatory verification gate.
+- **MODE B: Antigravity IDE Agent Handoff Protocol (Complex / Multi-File Work):** Used for tasks spanning 4+ files, deep AST refactorings, or exploratory diagnostics. Enclosed strictly within a single, uninterrupted four-backtick block with zero outer chatter.
 
-### C. 3-Tier Approval Routing Hierarchy
-The approval workflow is determined by the total estimated requisition value in EUR:
-
-| Tier | Monetary Value Threshold | Required Approver | Governance Scope |
-| :---: | :---: | :---: | :--- |
-| **Tier 1** | $< \text{€}2,500$ | `PURCHASING_MGR` | Standard stock refills, consumables, minor structural items |
-| **Tier 2** | $\text{€}2,500 \text{ to } \text{€}15,000$ | `PROJECT_DIRECTOR` | Significant structural batches (concrete pours, rebar batches) |
-| **Tier 3** | $> \text{€}15,000$ | `EXECUTIVE` | Major contract milestones, bulk procurement orders |
+### Workspace Hygiene Invariants
+1. **Zero Markdown on Disk:** Physical markdown (.md) files are strictly prohibited on disk with the sole exception of PROJECT_CONTEXT.md. All diagnostic audits, review walkthroughs, and proposals must be output exclusively as interactive UI Artifact panels in the Antigravity chat or managed in external cloud documentation.
+2. **Mandatory Verification Gate:** Every workspace modification must conclude with:
+   find . -maxdepth 2 -type f -name "*.md" ! -iname "project_context.md" ! -path "*/node_modules/*" -delete && find . -name "._*" -delete && npx tsc --noEmit && npm run lint
+   Must achieve Exit Code 0 (0 errors, 0 warnings).
 
 ---
 
-## 4. Chronological Changelog & Evolution Ledger
+## 3. Relational Database Architecture (Supabase PostgreSQL 15)
 
-### `v1.0.0-init` (2026-10-26)
-- Initial repository setup bootstrapped with Next.js App Router and Tailwind CSS v4.
-- Integration of `@supabase/supabase-js`, `@google-cloud/documentai`, `@google/genai`, and `lucide-react`.
-- Baseline environment configuration and verification in `.env.local`.
-- Initial headless compilation pass (`npx tsc --noEmit` -> Exit 0).
+### A. public.inventory_catalog (24-Column Yapitasi Taxonomy)
+Houses standardized material definitions, unit metrics, reference base costs, and engineered consumption coefficients:
+- item_id (UUID, Primary Key)
+- legacy_code (TEXT, Yapitasi resource reference code)
+- item_name_tr (TEXT, Authoritative Turkish nomenclature)
+- item_name_en (TEXT, English nomenclature)
+- specification (TEXT, Technical grade, dimension, formulation)
+- category & subcategory (TEXT, Hierarchical trade classification)
+- resource_type_code (TEXT: M Materials, L Labor, E Equipment, S Subcontractor)
+- parent_item_id (UUID, Foreign key self-reference for parent-child grouping)
+- unit_of_measure (TEXT, Standard unit: kg, m2, m3, pcs, ton, etc.)
+- base_cost_eur (NUMERIC(12,2), Standardized unit price reference)
+- price_basis, price_region, price_source, price_as_of_date (Pricing telemetry)
+- consumption_rate (NUMERIC(10,4), Engineering usage multiplier per target unit)
+- consumption_metric (TEXT, Calculation formula unit: kg_per_m3, m2_per_m2, etc.)
+- consumption_basis, consumption_source, consumption_as_of_date (Consumption telemetry)
+- record_status (TEXT: draft, active, inactive)
+- review_status (TEXT: pending, pending_specs, approved)
+- source_record_id & notes (TEXT)
 
-### `v1.1.0-dashboard` (2026-10-26)
-- Scaffolding of luxury dark/light dashboard presentation components.
-- Implementation of KPI overview, document ingestion dropzone, processing pipeline, and drawer viewer.
-- Lint and type cleanup: AppleDouble `._*` resource fork exclusion in `eslint.config.mjs`, zero TypeScript and ESLint errors.
+### B. public.purchase_requisitions (The Requisition Sub-Ledger)
+Houses operational requisitions, technical calculations, vendor quotes, and lifecycle status:
+- id (UUID, Primary Key)
+- ticket_id (TEXT UNIQUE, REQ-YYYYMM-HEX)
+- location_block_id (TEXT, Construction project block/floor reference)
+- requesting_party_uuid (UUID, Foreign Key -> corporate_users.id)
+- handover_recipient_role (RoleTier, default PURCHASING_AGENT)
+- catalog_item_id (UUID, Foreign Key -> inventory_catalog.item_id)
+- custom_technical_specs (JSONB, Technical notes, brand constraints, supplier metadata, overrun flags)
+- tech_approved_budget_eur (NUMERIC(12,2), Locked budget ceiling calculated by Technical Office)
+- purchasing_actual_quota_eur (NUMERIC(12,2), Actual supplier quotation negotiated by Purchasing)
+- live_status (TicketStatus: DRAFTING, TECH_REVIEW, PURCHASING_SOURCING, EXECUTIVE_RATIFICATION, APPROVED, REJECTED)
+- created_at, updated_at (TIMESTAMPTZ)
 
-### `v1.2.0-core-engine` (2026-10-26)
-- Realigned application domain from generic finance to **Afik Group (Caesar Projects) Construction Material Purchasing Sub-Ledger**.
-- Formalized five core Supabase relational schemas in [PROJECT_CONTEXT.md](file:///Volumes/Essensials/spfdemoapp/PROJECT_CONTEXT.md).
-- Scaffolded strict TypeScript interfaces and predictive domain algorithms in [types/requisition.ts](file:///Volumes/Essensials/spfdemoapp/types/requisition.ts).
-- Enforced 5% variance anomaly justification gate and 3-tier monetary approval routing hierarchy.
+### C. public.requisition_approvals (Immutable Audit Ledger)
+Audit trail tracking state transitions, actor signatures, and payload snapshots:
+- id (UUID, Primary Key)
+- requisition_id (UUID, Foreign Key -> purchase_requisitions.id)
+- actor_uuid (UUID, Foreign Key -> corporate_users.id)
+- action (TEXT, Audit event tag: BUDGET_LOCKED, SUPPLIER_QUOTA_FINALIZED, BATCH_APPROVED, etc.)
+- old_payload & new_payload (JSONB, State snapshots before and after action)
+- created_at (TIMESTAMPTZ)
 
-### `v1.2.1-ui-binding` (2026-10-26)
-- **UI Sub-Ledger Integration**: Bound [app/page.tsx](file:///Volumes/Essensials/spfdemoapp/app/page.tsx) and dashboard components to [types/requisition.ts](file:///Volumes/Essensials/spfdemoapp/types/requisition.ts).
-- **Smart Requisition Form**: Deployed [RequisitionForm.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionForm.tsx) featuring Caesar block selection (ZENO, PHUKET, PATTAYA, KOH SAMUI), bilingual TR/EN material catalog selector, live architectural volume calculation, and mandatory variance justification for >5% overruns.
-- **Requisition Sub-Ledger Table**: Deployed [RequisitionTable.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionTable.tsx) with search, multi-tier filtering, variance status pills, and ticket inspection.
-- **3-Tier Approval Action Center**: Deployed [RequisitionApprovalDrawer.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionApprovalDrawer.tsx) supporting role authority checks (`FOREMAN`, `PURCHASING_MGR`, `PROJECT_DIRECTOR`, `EXECUTIVE`), blocked PO state enforcement for unauthorized tiers, and simulated cryptographic sign-offs.
-- **Supabase Cloud SQL Integration**: Configured graceful live data fetching for `material_catalog` and `construction_blocks` with resilient offline seed fallbacks.
+### D. public.corporate_users
+Stores authenticated users mapped to the 4-tier RBAC matrix (id, name, email, role).
 
-### `v2.0.0-caesar-ui`
-- **Design System Overhaul**: Deployed universal **Oswald** typography (`latin-ext`) with 3-tier typographic hierarchy and Caesar dual-mode tokens (Caesar Obsidian Dark `#05080f` and Slate Light `#f8fafc`).
-- **Tailwind v4 Dark Mode Safeguard**: Declared `@custom-variant dark (&:where(.dark, .dark *));` in [app/globals.css](file:///Volumes/Essensials/spfdemoapp/app/globals.css) ensuring clean `.dark` class overriding.
-- **Bilingual Localization Engine**: Deployed [lib/i18n.ts](file:///Volumes/Essensials/spfdemoapp/lib/i18n.ts) with complete TR/EN dictionaries, Turkic uppercase casing (`i -> İ`, `ı -> I`), and currency/number formatters with `tabular-nums`.
-- **Anchored Header**: Redesigned [Header.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/Header.tsx) featuring the official Caesar Emblem (`CAESAR_EMBLEM_NO_TEXT.png`), double-decker title stack, and clean role switcher. Permanently removed Supabase status container and manual refresh.
-- **Hero Action Section & 3-Card Telemetry**: Canonically styled Resort hero banner with site ribbon (`CAESAR RESORT & SPA — PHASES 7 & 8`), block filters, search bar, and primary modal trigger (`+ YENİ MALZEME TALEBİ` / `+ NEW REQUISITION`). 3-card telemetry grid for velocity, variance, and financial commitment.
-- **Dual View Controller & Mobile Cards**: [RequisitionTable.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionTable.tsx) now toggles between **Block Matrix View** (interactive cards for ZENO, PHUKET, PATTAYA, KOH SAMUI) and **Sub-Ledger View** (high-density desktop table vs tailored mobile vertical cards).
-- **Persistent Utility Stack & Mobile FAB**: Deployed [FloatingActions.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/FloatingActions.tsx) with bottom-left Language/Theme buttons and bottom-right mobile quick requisition FAB.
-- **IDE Tailwind v4 Custom At-Rule Recognition**: Created [.vscode/css-custom-data.json](file:///Volumes/Essensials/spfdemoapp/.vscode/css-custom-data.json) and updated [.vscode/settings.json](file:///Volumes/Essensials/spfdemoapp/.vscode/settings.json) to declare Tailwind v4 directives (`@theme`, `@custom-variant`, `@utility`, `@variant`, `@source`, `@plugin`) and suppressed unknown at-rule warnings.
-- **Hydration Invariant & Zero-Mismatch Architecture**: Replaced client-only `localStorage` evaluation with React 19 `useSyncExternalStore` hooks (`useCaesarLanguage`, `useCaesarTheme`) in [lib/i18n.ts](file:///Volumes/Essensials/spfdemoapp/lib/i18n.ts) and [app/page.tsx](file:///Volumes/Essensials/spfdemoapp/app/page.tsx), guaranteeing identical SSR and initial client tree.
-- **Port 3000 Lifecycle Management**: Cleaned orphaned background daemons; port 3000 verified completely free.
-- **Tailwind v4 Theme Token Standardization**: Refactored all arbitrary hex color classes and deprecated gradient syntaxes (`bg-[#05080f]`, `bg-[#111827]`, `bg-[#090d16]`, `bg-[#1f2937]`, `border-[#1f2937]`, `text-[#9ca3af]`, `bg-[#facc15]`, `bg-gradient-to-r`) across all application components to canonical theme tokens (`bg-canvas-dark`, `bg-surface-dark`, `bg-elevation-dark`, `border-border-dark`, `text-subtext-dark`, `bg-accent-yellow`, `bg-linear-to-r`, `stroke-3`, `min-w-60`, `z-9999`).
+---
 
-### `v2.1.0-account-partitioning`
-- **Corporate User Email Contract & Anchor Accounts**: Extended `CorporateUser` schema and anchored canonical identity mappings via `SEED_USERS` in [types/requisition.ts](file:///Volumes/Essensials/spfdemoapp/types/requisition.ts):
-  * `farhadmokhtari22@gmail.com` as `FOREMAN` (Farhad Mokhtari — Field Intake Authority).
-  * `test.approver@caesarprojects.com` as `EXECUTIVE` (Executive Board / Approver — Tier 3 Authority).
-  * `ayse.kaya@caesarprojects.com` as `PURCHASING_MGR` (Ayşe Kaya — Tier 1 Authority).
-  * `ahmet.demir@caesarprojects.com` as `PROJECT_DIRECTOR` (Ahmet Demir — Tier 2 Authority).
-- **User Identity Indicator in Header**: Updated [Header.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/Header.tsx) role switcher pill to display the active user's avatar, full name, role dropdown, and operating Google email address with live online status badge.
-- **Role-Tailored Viewport Partitioning**: Dynamically partitioned primary viewports in [app/page.tsx](file:///Volumes/Essensials/spfdemoapp/app/page.tsx):
-  * **FOREMAN**: Focuses on **Field Requisition Intake Form & Instant Baseline Calculator** (`predicted = volume * consumption_rate`), prominent `+5% Overrun Warning` guardrail enforcing technical justifications, and defaults sub-ledger filtering to `My Block Requisitions` (Farhad Mokhtari's field tickets).
-  * **PURCHASING_MGR & PROJECT_DIRECTOR**: Emphasizes the **Triage Queue** (defaulting to `PENDING_PURCHASING` or `PENDING_TIER2`), contracted supplier cost comparisons (`-4.0% Caesar framework advantage`), and field variance justification review.
-  * **EXECUTIVE**: Defaults to the **Macro Financial Telemetry View** (High-ticket CapEx tickets > €15k, company-wide committed budget burn vs €250,000 envelope, and blocked PO approvals monitor).
-- **Sub-Ledger Enhancements**: Updated [RequisitionTable.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionTable.tsx) with controlled role filters, "My Block Requisitions" toggle, supplier benchmarks, inline justification callouts, and high-ticket CapEx indicators.
-- **Purity & Validation Invariants**: Strict adherence to React 19 rules (pure render execution, isolated timestamp/ID generators outside render loop) passing 100% test criteria (`npx tsc --noEmit` & `npm run lint` -> Exit Code 0).
+## 4. Role-Based Access Control (4-Tier Governance)
 
-### `v2.2.0-email-dispatch-engine`
-- **Cryptographic Action Token Engine**: Implemented URL-safe HMAC-SHA256 signature generator and verification utility in [lib/tokenService.ts](file:///Volumes/Essensials/spfdemoapp/lib/tokenService.ts) with constant-time equality validation (`crypto.timingSafeEqual`) and 72-hour expiration enforcement.
-- **Caesar Branded Email Template & Dispatch Engine**: Deployed [lib/emailService.ts](file:///Volumes/Essensials/spfdemoapp/lib/emailService.ts) with dual-mode dispatch: transactional email delivery and terminal simulator fallback displaying live clickable action links (`[ONAYLA / APPROVE]` and `[REDDET / REJECT]`).
-- **One-Click Cryptographic Approval Callback Endpoint**: Created [app/api/approve/route.ts](file:///Volumes/Essensials/spfdemoapp/app/api/approve/route.ts) validating tokens, updating database status using `supabaseAdmin`, recording immutable audit records, and rendering responsive Caesar Obsidian-themed confirmation screens.
+- TECH_OFFICE_USER: Site Engineer / Architect. Intake calculation, volume modeling, technical and brand specifications. Creates in DRAFTING.
+- TECH_OFFICE_MANAGER: Technical Office Manager. Technical audit, tolerance verification, budget ceiling locking, commercial handover. DRAFTING -> PURCHASING_SOURCING.
+- PURCHASING_AGENT: Procurement Officer. Vendor RFQs, commercial terms, supplier quota logging, internal overrun containment. PURCHASING_SOURCING -> APPROVED or EXECUTIVE_RATIFICATION.
+- EXECUTIVE: Board Director. Fiduciary capital oversight, anomaly evaluation, batch ratification, overrides, cancellations. EXECUTIVE_RATIFICATION -> APPROVED or REJECTED.
 
-### `v2.3.0-realtime-subledger-sync` (Active)
-- **Supabase Realtime WebSocket Synchronization Loop**: Mounted `postgres_changes` channel subscription in [app/page.tsx](file:///Volumes/Essensials/spfdemoapp/app/page.tsx) listening to Change Data Capture (CDC) events (`INSERT`, `UPDATE`) on `purchase_requisitions`. Configured 10 events/sec throughput and resilient connection disposal (`supabase.removeChannel`).
-- **Dynamic Multi-Tier Telemetry Calculation**: Real-time mutations immediately recalculate executive macro cards (Committed EUR, €250k budget burn percentage, CapEx allocations > €15k, and blocked PO approvals) and block stats without requiring page reloads or full DOM refreshes.
-- **Visual Pulse & Live Row Highlighting**:
-  * Implemented active emerald pulse rings (`ring-2 ring-emerald-500/80 shadow-lg shadow-emerald-500/20 bg-emerald-500/10 transition-all duration-700 animate-pulse`) across updated/inserted table rows and mobile activity cards in [components/dashboard/RequisitionTable.tsx](file:///Volumes/Essensials/spfdemoapp/components/dashboard/RequisitionTable.tsx), with 4-second auto-clearing highlight timer.
-- **RLS Bypass & Dual DB Fallback**: Configured `supabaseAdmin` in [lib/supabaseClient.ts](file:///Volumes/Essensials/spfdemoapp/lib/supabaseClient.ts) and [app/api/approve/route.ts](file:///Volumes/Essensials/spfdemoapp/app/api/approve/route.ts) leveraging `SUPABASE_SERVICE_ROLE_KEY` to guarantee server-side approval writes bypass RLS restrictions while gracefully falling back in offline mode.
-- **Bidirectional Synchronization**: Real-time push verified across one-click cryptographic email links (`/api/approve?token=...`), dashboard approval drawers, and field intake forms.
-- **Verification Criteria**: 100% test passage verified with `npx tsc --noEmit` (Exit 0) and `npm run lint` (Exit 0).
+---
 
+## 5. Core Architectural Invariants & Business Logic
 
+1. Predictive Calculation Engine: Material quantities and budget ceilings calculated programmatically: Calculated Qty = Target Volume * consumption_rate; Tech Approved Budget = Calculated Qty * base_cost_eur.
+2. The No-Backloop Policy: Requisitions handed over to Purchasing never bounce back to Technical Office due to price variances. Overruns are flagged internally (quota_overrun = true) and managed inside Purchasing or escalated to Executive if >15,000 EUR.
+3. Executive Telemetry: Gated to EXECUTIVE role. Computes Approved Capital, Preserved Capital, Pending Board Ratification, and Overrun Anomaly Exposure.
+4. Batch Operations: Multi-select checkboxes allow atomic batch approvals/rejections with full audit logging.
+5. Realtime CDC Sync: Subscribed to PostgreSQL changes via supabase.channel(schema-db-changes) for multi-window live updates.
+6. Typography & Styling: Oswald font universally enforced (bold for IDs/headers/badges, light for numbers/descriptions). Light-mode default with dark-mode adaptability. Caesar emblem hosted on Cloudinary.
+7. Bilingual Localization: Full pass-through dictionary (tr / en) across all workspace views and sliding history drawers.
+
+---
+
+## 6. Frontend Component Architecture & Directory Map
+
+caesar-purchasing-app/
+├── app/
+│   ├── layout.tsx              # Root HTML shell, Oswald font binding
+│   └── page.tsx                # Master controller: role simulator, Supabase CDC hydration
+├── components/
+│   ├── CorporateHeader.tsx     # Brand banner, Caesar emblem, active role switcher, Realtime pulse
+│   ├── StickyControlsFAB.tsx   # Fixed bottom-right action buttons (TR/EN toggle, Light/Dark theme)
+│   ├── TechnicalIntakeModule.tsx # Full-screen Drive-style predictive volume & budget intake engine
+│   ├── RequisitionWorkspace.tsx # Sub-ledger table, batch controls, search/filter, Asana sliding drawer
+│   └── ExecutiveTelemetryStrip.tsx # Board-level fiduciary KPI metrics strip (Executive only)
+├── types/
+│   └── requisition.ts          # Phase B schema interfaces
+├── lib/
+│   └── supabaseClient.ts       # Initialized Supabase client instance
+└── components_archive_v2_4_0/  # Quarantined legacy v2.4.0 components
+
+---
+
+## 7. Current System State & Roadmap (Paused Status)
+
+The system compiles with 0 errors and 0 warnings under tsc and eslint. Active development is currently frozen at Milestone 2.5.0 pending three planned extensions:
+- Step A (Portfolio Integration): Integrating definitive Caesar Project & Location relational schema (portfolio_projects, portfolio_blocks, portfolio_levels) into Supabase.
+- Step B (Catalog Parameter Refresh): Ingesting authoritative, verified consumption rate coefficients and base EUR unit costs across the 151 catalog materials via SQL UPSERT.
+- Step C (Dedicated Depo / Inventory Management): Architecting public.depot_inventory and public.depot_stock_movements for warehouse stock checks and depot dispatch requests.
