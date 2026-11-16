@@ -1,12 +1,20 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { PurchaseRequisition, RoleTier, RequisitionApprovalLog } from '@/types/requisition';
+import { 
+  PurchaseRequisition, 
+  RoleTier, 
+  RequisitionApprovalLog,
+  PortfolioProject,
+  PortfolioBuilding
+} from '@/types/requisition';
 import ExecutiveTelemetryStrip from '@/components/ExecutiveTelemetryStrip';
 
 interface RequisitionWorkspaceProps {
   requisitions: PurchaseRequisition[];
+  portfolioProjects?: PortfolioProject[];
+  portfolioBuildings?: PortfolioBuilding[];
   currentRole: RoleTier;
   lang: 'tr' | 'en';
   onOpenIntakeEngine: () => void;
@@ -24,6 +32,8 @@ interface RequisitionWorkspaceProps {
 
 export default function RequisitionWorkspace({
   requisitions,
+  portfolioProjects = [],
+  portfolioBuildings = [],
   currentRole,
   lang,
   onOpenIntakeEngine,
@@ -47,7 +57,7 @@ export default function RequisitionWorkspace({
     title: lang === 'tr' ? 'Satın Alma ve Talep Yönetim Masası' : 'Procurement & Requisition Sub-Ledger',
     subTitle: lang === 'tr' ? 'Caesar Purchasing Sub-Ledger • Phase B Canlı Takip Paneli' : 'Caesar Purchasing Sub-Ledger • Phase B Real-time Control Center',
     btnNewReq: lang === 'tr' ? '+ Yeni Malzeme Talebi Hesapla' : '+ Calculate New Requisition',
-    searchPlaceholder: lang === 'tr' ? 'Talep No, Blok veya Malzeme Ara...' : 'Search Ticket ID, Block or Material...',
+    searchPlaceholder: lang === 'tr' ? 'Talep No, Proje, Blok veya Malzeme Ara...' : 'Search Ticket ID, Project, Block or Material...',
     allStatuses: lang === 'tr' ? 'Tüm Durumlar' : 'All Statuses',
     totalRecords: lang === 'tr' ? 'kayıt listeleniyor' : 'records found',
     thTicket: lang === 'tr' ? 'Talep No' : 'Ticket ID',
@@ -68,6 +78,20 @@ export default function RequisitionWorkspace({
     batchCancel: lang === 'tr' ? 'İptal' : 'Clear',
   };
 
+  // Build O(1) Portfolio Lookup Map
+  const buildingLookup = useMemo(() => {
+    const bMap = new Map<string, { building: PortfolioBuilding; project?: PortfolioProject }>();
+    const pMap = new Map<string, PortfolioProject>();
+    portfolioProjects.forEach((p) => pMap.set(p.project_id, p));
+    portfolioBuildings.forEach((b) => {
+      bMap.set(b.building_id, {
+        building: b,
+        project: pMap.get(b.project_id),
+      });
+    });
+    return bMap;
+  }, [portfolioProjects, portfolioBuildings]);
+
   const normalizeLocaleText = (text: string, currentLang: 'tr' | 'en'): string => {
     if (!text) return '';
     return currentLang === 'tr' ? text.toLocaleLowerCase('tr-TR') : text.toLowerCase();
@@ -80,14 +104,22 @@ export default function RequisitionWorkspace({
       ? (req.catalog_item?.item_name_tr || '')
       : (req.catalog_item?.item_name_en || req.catalog_item?.item_name_tr || '');
 
+    const resolved = buildingLookup.get(req.location_block_id);
+    const projectName = resolved?.project?.project_name || '';
+    const buildingName = resolved?.building?.building_name || '';
+
     const normalizedTicketId = normalizeLocaleText(req.ticket_id, lang);
     const normalizedBlock = normalizeLocaleText(req.location_block_id, lang);
     const normalizedName = normalizeLocaleText(rawItemName, lang);
+    const normalizedProj = normalizeLocaleText(projectName, lang);
+    const normalizedBld = normalizeLocaleText(buildingName, lang);
 
     const matchesText =
       normalizedTicketId.includes(normalizedFilter) ||
       normalizedBlock.includes(normalizedFilter) ||
-      normalizedName.includes(normalizedFilter);
+      normalizedName.includes(normalizedFilter) ||
+      normalizedProj.includes(normalizedFilter) ||
+      normalizedBld.includes(normalizedFilter);
 
     const matchesStatus = statusFilter === 'ALL' || req.live_status === statusFilter;
     return matchesText && matchesStatus;
@@ -188,7 +220,7 @@ export default function RequisitionWorkspace({
           {(currentRole === 'TECH_OFFICE_USER' || currentRole === 'TECH_OFFICE_MANAGER') && (
             <button
               onClick={onOpenIntakeEngine}
-              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg shadow-xs transition-colors"
+              className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg shadow-xs transition-colors cursor-pointer"
             >
               <span>{t.btnNewReq}</span>
             </button>
@@ -215,14 +247,14 @@ export default function RequisitionWorkspace({
                 <button
                   onClick={() => handleExecuteBatch('APPROVED')}
                   disabled={actionLoading}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition-colors"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                 >
                   {t.batchApprove}
                 </button>
                 <button
                   onClick={() => handleExecuteBatch('REJECTED')}
                   disabled={actionLoading}
-                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition-colors"
+                  className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                 >
                   {t.batchReject}
                 </button>
@@ -230,7 +262,7 @@ export default function RequisitionWorkspace({
             )}
             <button
               onClick={() => setSelectedIds([])}
-              className="text-slate-400 hover:text-white text-xs font-light px-2"
+              className="text-slate-400 hover:text-white text-xs font-light px-2 cursor-pointer"
             >
               {t.batchCancel}
             </button>
@@ -238,6 +270,7 @@ export default function RequisitionWorkspace({
         </div>
       )}
 
+      {/* Search & Filter Bar */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs mb-6 flex flex-col md:flex-row gap-4 justify-between items-center">
         <div className="flex items-center space-x-3 w-full md:w-auto">
           <input
@@ -245,7 +278,7 @@ export default function RequisitionWorkspace({
             placeholder={t.searchPlaceholder}
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
-            className="text-xs font-light px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white w-full md:w-72 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="text-xs font-light px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white w-full md:w-80 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           />
           <select
             value={statusFilter}
@@ -267,6 +300,7 @@ export default function RequisitionWorkspace({
         </div>
       </div>
 
+      {/* Requisition Sub-Ledger Table */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
@@ -302,6 +336,8 @@ export default function RequisitionWorkspace({
                     ticket.purchasing_actual_quota_eur !== null &&
                     ticket.purchasing_actual_quota_eur > ticket.tech_approved_budget_eur;
 
+                  const resolved = buildingLookup.get(ticket.location_block_id);
+
                   return (
                     <tr key={ticket.id} className="hover:bg-slate-50/75 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="py-3 px-4 text-center">
@@ -312,13 +348,36 @@ export default function RequisitionWorkspace({
                           className="rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500"
                         />
                       </td>
-                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">{ticket.ticket_id}</td>
-                      <td className="py-3 px-4">{ticket.location_block_id}</td>
+                      <td className="py-3 px-4 font-bold text-slate-900 dark:text-white font-mono">{ticket.ticket_id}</td>
+                      <td className="py-3 px-4">
+                        {resolved ? (
+                          <div>
+                            <span className="font-bold text-slate-900 dark:text-white block">
+                              {resolved.project?.project_name ? `${resolved.project.project_name} • ` : ''}
+                              {resolved.building.building_name}
+                            </span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="font-mono text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200/60 dark:border-blue-900/60 font-bold">
+                                {ticket.location_block_id}
+                              </span>
+                              {resolved.building.building_type && (
+                                <span className="text-[10px] text-slate-400 font-light truncate max-w-[140px]">
+                                  {resolved.building.building_type}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="font-bold text-slate-900 dark:text-white block">
+                            {ticket.location_block_id}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 px-4">
                         <span className="font-bold text-slate-900 dark:text-white block">
                           {lang === 'tr' ? (ticket.catalog_item?.item_name_tr || '—') : (ticket.catalog_item?.item_name_en || ticket.catalog_item?.item_name_tr || '—')}
                         </span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-[10px] text-slate-400 font-light">
                           {ticket.catalog_item?.category}
                         </span>
                       </td>
@@ -332,7 +391,7 @@ export default function RequisitionWorkspace({
                             {isOverrun && <span className="block text-[10px] text-red-500 font-light">{t.overrunBadge}</span>}
                           </span>
                         ) : (
-                          <span className="text-slate-400 italic">{t.awaitingQuote}</span>
+                          <span className="text-slate-400 italic font-light">{t.awaitingQuote}</span>
                         )}
                       </td>
                       <td className="py-3 px-4">
@@ -345,14 +404,14 @@ export default function RequisitionWorkspace({
                           <button
                             onClick={() => handleTechApproval(ticket.id)}
                             disabled={actionLoading}
-                            className="px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 rounded-md transition-colors border border-emerald-200 dark:border-emerald-800"
+                            className="px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 rounded-md transition-colors border border-emerald-200 dark:border-emerald-800 cursor-pointer"
                           >
                             {t.btnApproveBudget}
                           </button>
                         )}
                         <button
                           onClick={() => handleSelectTicket(ticket)}
-                          className="px-3 py-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 rounded-md transition-colors border border-blue-200 dark:border-blue-900"
+                          className="px-3 py-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 rounded-md transition-colors border border-blue-200 dark:border-blue-900 cursor-pointer"
                         >
                           {t.btnInspect}
                         </button>
@@ -366,26 +425,65 @@ export default function RequisitionWorkspace({
         </div>
       </div>
 
+      {/* Sliding History Drawer */}
       {selectedTicket && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex justify-end z-999999">
           <div className="w-full max-w-lg bg-white dark:bg-slate-900 h-full shadow-2xl p-6 overflow-y-auto flex flex-col justify-between border-l border-slate-200 dark:border-slate-800">
             <div>
               <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-200 dark:border-slate-800">
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">{selectedTicket.ticket_id}</h3>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white font-mono">{selectedTicket.ticket_id}</h3>
                   <p className="text-xs font-light text-slate-500 dark:text-slate-400">
                     {lang === 'tr' ? 'Talep Detay ve Süreç Günlüğü' : 'Requisition Dossier & Process History'}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedTicket(null)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xl font-bold p-1"
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-white text-xl font-bold p-1 cursor-pointer"
                 >
                   ✕
                 </button>
               </div>
 
               <div className="space-y-4 text-xs font-light">
+                {/* Location dossier card */}
+                {(() => {
+                  const resolved = buildingLookup.get(selectedTicket.location_block_id);
+                  return (
+                    <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-bold text-slate-700 dark:text-slate-200">
+                          {lang === 'tr' ? 'Lokasyon / Proje & Blok:' : 'Location / Project & Block:'}
+                        </span>
+                        <span className="font-mono text-[10px] bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded border border-blue-200/60 dark:border-blue-900/60 font-bold">
+                          {selectedTicket.location_block_id}
+                        </span>
+                      </div>
+                      {resolved ? (
+                        <div>
+                          <div className="text-xs font-bold text-slate-900 dark:text-white">
+                            {resolved.project?.project_name} • {resolved.building.building_name}
+                          </div>
+                          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-light mt-0.5 flex flex-wrap gap-2">
+                            <span><b>{lang === 'tr' ? 'Yapı Tipi:' : 'Type:'}</b> {resolved.building.building_type}</span>
+                            {resolved.building.category_name && (
+                              <span><b>{lang === 'tr' ? 'Kategori:' : 'Category:'}</b> {resolved.building.category_name}</span>
+                            )}
+                            {resolved.building.overall_completion_pct !== null && resolved.building.overall_completion_pct !== undefined && (
+                              <span><b>{lang === 'tr' ? 'İlerleme:' : 'Progress:'}</b> {resolved.building.overall_completion_pct}%</span>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-xs font-bold text-slate-900 dark:text-white">
+                          {selectedTicket.location_block_id}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Technical specs card */}
                 <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
                   <span className="block font-bold text-slate-700 dark:text-slate-200 mb-1">
                     {lang === 'tr' ? 'Teknik Şartname & Notlar:' : 'Technical Specifications & Notes:'}
@@ -414,7 +512,7 @@ export default function RequisitionWorkspace({
                     <button
                       onClick={() => handleTechApproval(selectedTicket.id)}
                       disabled={actionLoading}
-                      className="w-full bg-emerald-600 text-white font-bold px-4 py-2 rounded-lg text-xs hover:bg-emerald-700 transition-colors"
+                      className="w-full bg-emerald-600 text-white font-bold px-4 py-2 rounded-lg text-xs hover:bg-emerald-700 transition-colors cursor-pointer"
                     >
                       {actionLoading ? '...' : (lang === 'tr' ? 'Bütçeyi Kilitle ve Devret →' : 'Lock Budget & Handover →')}
                     </button>
@@ -478,7 +576,7 @@ export default function RequisitionWorkspace({
                       <button
                         onClick={() => handleSaveQuota(false)}
                         disabled={actionLoading || !quotaInput}
-                        className="flex-1 bg-blue-600 text-white font-bold px-4 py-2 rounded-lg text-xs hover:bg-blue-700 transition-colors disabled:bg-slate-300 dark:disabled:bg-slate-800"
+                        className="flex-1 bg-blue-600 text-white font-bold px-4 py-2 rounded-lg text-xs hover:bg-blue-700 transition-colors disabled:bg-slate-300 dark:disabled:bg-slate-800 cursor-pointer"
                       >
                         {actionLoading ? '...' : (lang === 'tr' ? 'Kotayı Kaydet' : 'Lock Quota')}
                       </button>
@@ -487,7 +585,7 @@ export default function RequisitionWorkspace({
                         <button
                           onClick={() => handleSaveQuota(true)}
                           disabled={actionLoading || !quotaInput}
-                          className="bg-purple-600 text-white font-bold px-3 py-2 rounded-lg text-xs hover:bg-purple-700 transition-colors disabled:bg-slate-300 dark:disabled:bg-slate-800"
+                          className="bg-purple-600 text-white font-bold px-3 py-2 rounded-lg text-xs hover:bg-purple-700 transition-colors disabled:bg-slate-300 dark:disabled:bg-slate-800 cursor-pointer"
                         >
                           {lang === 'tr' ? 'Yönetim Onayına İlet' : 'Escalate to Board'}
                         </button>
@@ -510,14 +608,14 @@ export default function RequisitionWorkspace({
                       <button
                         onClick={() => onExecutiveAction(selectedTicket.id, 'APPROVED')}
                         disabled={actionLoading}
-                        className="flex-1 bg-emerald-600 text-white font-bold px-3 py-2 rounded-lg text-xs hover:bg-emerald-700 transition-colors"
+                        className="flex-1 bg-emerald-600 text-white font-bold px-3 py-2 rounded-lg text-xs hover:bg-emerald-700 transition-colors cursor-pointer"
                       >
                         {lang === 'tr' ? 'Nihai Onay Ver' : 'Ratify Purchase'}
                       </button>
                       <button
                         onClick={() => onExecutiveAction(selectedTicket.id, 'REJECTED')}
                         disabled={actionLoading}
-                        className="flex-1 bg-red-600 text-white font-bold px-3 py-2 rounded-lg text-xs hover:bg-red-700 transition-colors"
+                        className="flex-1 bg-red-600 text-white font-bold px-3 py-2 rounded-lg text-xs hover:bg-red-700 transition-colors cursor-pointer"
                       >
                         {lang === 'tr' ? 'Talebi Reddet' : 'Void Requisition'}
                       </button>

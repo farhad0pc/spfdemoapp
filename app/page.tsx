@@ -2,7 +2,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { InventoryCatalogItem, PurchaseRequisition, RoleTier } from '@/types/requisition';
+import { 
+  InventoryCatalogItem, 
+  PurchaseRequisition, 
+  RoleTier, 
+  PortfolioProject, 
+  PortfolioBuilding 
+} from '@/types/requisition';
 import CorporateHeader from '@/components/CorporateHeader';
 import DesktopSidebar from '@/components/DesktopSidebar';
 import StickyControlsFAB from '@/components/StickyControlsFAB';
@@ -15,6 +21,8 @@ export default function PurchasingPortalPage() {
   const [currentRole, setCurrentRole] = useState<RoleTier>('TECH_OFFICE_USER');
   const [catalogItems, setCatalogItems] = useState<InventoryCatalogItem[]>([]);
   const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>([]);
+  const [portfolioProjects, setPortfolioProjects] = useState<PortfolioProject[]>([]);
+  const [portfolioBuildings, setPortfolioBuildings] = useState<PortfolioBuilding[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [lang, setLang] = useState<'tr' | 'en'>('tr');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -32,8 +40,20 @@ export default function PurchasingPortalPage() {
       .select('*, catalog_item:inventory_catalog(*)')
       .order('created_at', { ascending: false });
 
+    const { data: projects } = await supabase
+      .from('portfolio_projects')
+      .select('*')
+      .order('project_id', { ascending: true });
+
+    const { data: buildings } = await supabase
+      .from('portfolio_buildings')
+      .select('*')
+      .order('building_name', { ascending: true });
+
     if (catalog) setCatalogItems(catalog);
     if (reqs) setRequisitions(reqs as PurchaseRequisition[]);
+    if (projects) setPortfolioProjects(projects as PortfolioProject[]);
+    if (buildings) setPortfolioBuildings(buildings as PortfolioBuilding[]);
     setLoading(false);
   }, []);
 
@@ -306,12 +326,16 @@ export default function PurchasingPortalPage() {
               onBack={() => setView('WORKSPACE')}
               onSubmitTicket={handleSubmitTicket}
               catalogItems={catalogItems}
+              portfolioProjects={portfolioProjects}
+              portfolioBuildings={portfolioBuildings}
               userRole={currentRole}
               lang={lang}
             />
           ) : (
             <RequisitionWorkspace
               requisitions={requisitions}
+              portfolioProjects={portfolioProjects}
+              portfolioBuildings={portfolioBuildings}
               currentRole={currentRole}
               lang={lang}
               onOpenIntakeEngine={() => setView('TECHNICAL_INTAKE')}

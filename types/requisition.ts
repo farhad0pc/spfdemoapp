@@ -28,6 +28,24 @@ export interface InventoryCatalogItem {
   review_status: string;
 }
 
+export interface PortfolioProject {
+  project_id: string;
+  project_name: string;
+  location?: string | null;
+}
+
+export interface PortfolioBuilding {
+  building_id: string;
+  project_id: string;
+  building_name: string;
+  category_name?: string | null;
+  building_type: string;
+  total_floors?: number | null;
+  total_units?: number | null;
+  overall_completion_pct?: number | null;
+  details_notes?: string | null;
+}
+
 export interface PurchaseRequisition {
   id: string;
   ticket_id: string;

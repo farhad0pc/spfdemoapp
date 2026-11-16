@@ -126,9 +126,13 @@ caesar-purchasing-app/
 
 ---
 
-## 7. Current System State & Roadmap (Paused Status)
+## 7. Current System State & Roadmap
 
-The system compiles with 0 errors and 0 warnings under tsc and eslint. Active development is currently frozen at Milestone 2.5.0 pending three planned extensions:
-- Step A (Portfolio Integration): Integrating definitive Caesar Project & Location relational schema (portfolio_projects, portfolio_blocks, portfolio_levels) into Supabase.
-- Step B (Catalog Parameter Refresh): Ingesting authoritative, verified consumption rate coefficients and base EUR unit costs across the 151 catalog materials via SQL UPSERT.
-- Step C (Dedicated Depo / Inventory Management): Architecting public.depot_inventory and public.depot_stock_movements for warehouse stock checks and depot dispatch requests.
+The system compiles with 0 errors and 0 warnings under tsc and eslint.
+- **Step A (Portfolio & 3-Tier Cascading Location Selector Integration):** COMPLETED.
+  - Relational interfaces `PortfolioProject` and `PortfolioBuilding` established in `types/requisition.ts`.
+  - Supabase hydration and shared state routing in `app/page.tsx`.
+  - 3-tier cascading dropdowns (`Project` -> `Building Type` -> `Building / Block Name`) with strict validation in `components/TechnicalIntakeModule.tsx`.
+  - O(1) canonical ledger display resolving `location_block_id` to `[Project] • [Building]` alongside ID code, with Turkish locale search normalization (`toLocaleLowerCase('tr-TR')`) in `components/RequisitionWorkspace.tsx`.
+- **Step B (Catalog Parameter Refresh):** Ingesting authoritative, verified consumption rate coefficients and base EUR unit costs across the 151 catalog materials via SQL UPSERT (Completed baseline).
+- **Step C (Dedicated Depo / Inventory Management):** Architecting public.depot_inventory and public.depot_stock_movements for warehouse stock checks and depot dispatch requests (Planned).
