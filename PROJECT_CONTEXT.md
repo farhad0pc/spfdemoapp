@@ -1,9 +1,9 @@
 # Caesar Purchasing Sub-Ledger & Procurement Ecosystem — Project Context
-**Version:** v2.5.0 (Phase B Evolution)  
-**Last Updated:** 2026-11-11  
+**Version:** v2.5.0 (Phase B Evolution — Step A & Step B Completed)  
+**Last Updated:** 2026-11-16  
 **Lead Systems Architect:** Farhad Mokhtari  
 **Stack:** Next.js 15 (App Router), React 19, Tailwind CSS v4, Supabase (PostgreSQL 15)  
-**Status:** Compilation Clean (Exit Code 0: 0 errors, 0 warnings) — Paused at Milestone 2.5.0  
+**Status:** Compilation Clean (Exit Code 0: 0 errors, 0 warnings) — Milestone 2.5.0 Production Ready  
 
 ---
 
@@ -13,7 +13,7 @@ The **Caesar Purchasing Sub-Ledger & Procurement Ecosystem** is an enterprise pr
 
 ### Scope Boundaries & Anti-Collision Mandate
 - **Purchasing System (This Repository):** Governs construction material requisitions, predictive volume/consumption calculations, supplier quotation containment, purchasing sub-ledgers, warehouse inventory handovers, and executive capital exposure.
-  - Tables: public.inventory_catalog, public.purchase_requisitions, public.requisition_approvals, public.corporate_users.
+  - Tables: public.inventory_catalog, public.purchase_requisitions, public.requisition_approvals, public.corporate_users, public.portfolio_projects, public.portfolio_buildings.
   - Identifier Taxonomy: REQ-[YYYYMM]-[HEX].
 - **Daily Reporting System (Distinct Platform):** Governs daily construction progress, labor headcount shifts, heavy machinery hours, and quality control punch-lists (master_logs, tasks_log, etc.). Schema, table names, and ticket IDs are strictly partitioned to prevent context bleeding.
 
@@ -37,8 +37,8 @@ Development is governed by a strict operational protocol across three actors: Fa
 
 ## 3. Relational Database Architecture (Supabase PostgreSQL 15)
 
-### A. public.inventory_catalog (24-Column Yapitasi Taxonomy)
-Houses standardized material definitions, unit metrics, reference base costs, and engineered consumption coefficients:
+### A. public.inventory_catalog (24-Column Yapitasi Taxonomy & Step B Parameters)
+Houses 105 authoritative construction material definitions, unit metrics, reference base costs in EUR (benchmarked against 1 EUR = 55.74 TRY currency parity), and engineered consumption coefficients sourced from ÇŞİDB (T.C. Çevre, Şehircilik ve İklim Değişikliği Bakanlığı) and KTİMB (Kıbrıs Türk İnşaat Müteahhitleri Birliği) index telemetry:
 - item_id (UUID, Primary Key)
 - legacy_code (TEXT, Yapitasi resource reference code)
 - item_name_tr (TEXT, Authoritative Turkish nomenclature)
@@ -48,8 +48,8 @@ Houses standardized material definitions, unit metrics, reference base costs, an
 - resource_type_code (TEXT: M Materials, L Labor, E Equipment, S Subcontractor)
 - parent_item_id (UUID, Foreign key self-reference for parent-child grouping)
 - unit_of_measure (TEXT, Standard unit: kg, m2, m3, pcs, ton, etc.)
-- base_cost_eur (NUMERIC(12,2), Standardized unit price reference)
-- price_basis, price_region, price_source, price_as_of_date (Pricing telemetry)
+- base_cost_eur (NUMERIC(12,2), Standardized unit price reference, parity anchored to 55.74 TRY)
+- price_basis, price_region, price_source, price_as_of_date (Pricing telemetry, ÇŞİDB/KTİMB indexes)
 - consumption_rate (NUMERIC(10,4), Engineering usage multiplier per target unit)
 - consumption_metric (TEXT, Calculation formula unit: kg_per_m3, m2_per_m2, etc.)
 - consumption_basis, consumption_source, consumption_as_of_date (Consumption telemetry)
@@ -61,7 +61,7 @@ Houses standardized material definitions, unit metrics, reference base costs, an
 Houses operational requisitions, technical calculations, vendor quotes, and lifecycle status:
 - id (UUID, Primary Key)
 - ticket_id (TEXT UNIQUE, REQ-YYYYMM-HEX)
-- location_block_id (TEXT, Construction project block/floor reference)
+- location_block_id (TEXT NOT NULL, Foreign Key reference -> portfolio_buildings.building_id: PRJ-XX-BLD-XX)
 - requesting_party_uuid (UUID, Foreign Key -> corporate_users.id)
 - handover_recipient_role (RoleTier, default PURCHASING_AGENT)
 - catalog_item_id (UUID, Foreign Key -> inventory_catalog.item_id)
@@ -82,6 +82,23 @@ Audit trail tracking state transitions, actor signatures, and payload snapshots:
 
 ### D. public.corporate_users
 Stores authenticated users mapped to the 4-tier RBAC matrix (id, name, email, role).
+
+### E. public.portfolio_projects (8 Caesar Group Construction Projects)
+Houses authoritative master project definitions across Northern Cyprus:
+- project_id (TEXT, Primary Key: PRJ-01 to PRJ-08)
+- project_name (TEXT: Caesar Bay, Caesar Resort & Spa, Caesar Blue, Caesar Cliff, Caesar Beach, Caesar Palm Jumeirah, Caesar Zen, Caesar Palace)
+- location (TEXT: Tatlısu, İskele, Boğaz, Esentepe, Gaziveren)
+
+### F. public.portfolio_buildings (438 Distinct Blocks & Structures)
+Houses fine-grained structural hierarchy partitioned across 6 functional building types:
+- building_id (TEXT, Primary Key: PRJ-XX-BLD-XX)
+- project_id (TEXT, Foreign Key -> portfolio_projects.project_id)
+- building_name (TEXT: e.g. VICTORIUS, CLAUDIUS, Villa A1)
+- category_name (TEXT: e.g. Block V, Luxury, Waterfront)
+- building_type (TEXT: Villa, Residential Tower, Amenity / Facility, Commercial / Retail, Infrastructure & Admin, Outdoor / Landscaping)
+- total_floors & total_units (INTEGER)
+- overall_completion_pct (NUMERIC: 0.00 to 100.00%)
+- details_notes (TEXT)
 
 ---
 
@@ -111,15 +128,17 @@ Stores authenticated users mapped to the 4-tier RBAC matrix (id, name, email, ro
 caesar-purchasing-app/
 ├── app/
 │   ├── layout.tsx              # Root HTML shell, Oswald font binding
-│   └── page.tsx                # Master controller: role simulator, Supabase CDC hydration
+│   └── page.tsx                # Master controller: role simulator, Supabase CDC hydration & portfolio routing
 ├── components/
 │   ├── CorporateHeader.tsx     # Brand banner, Caesar emblem, active role switcher, Realtime pulse
+│   ├── DesktopSidebar.tsx      # Collapsible left navigation rail & module view router
 │   ├── StickyControlsFAB.tsx   # Fixed bottom-right action buttons (TR/EN toggle, Light/Dark theme)
-│   ├── TechnicalIntakeModule.tsx # Full-screen Drive-style predictive volume & budget intake engine
-│   ├── RequisitionWorkspace.tsx # Sub-ledger table, batch controls, search/filter, Asana sliding drawer
+│   ├── Toast.tsx               # Non-intrusive notification toast for module roadmap alerts
+│   ├── TechnicalIntakeModule.tsx # Full-screen 3-tier cascading location & predictive volume/budget intake engine
+│   ├── RequisitionWorkspace.tsx # Sub-ledger table with O(1) canonical portfolio lookup, batch controls, search/filter, sliding drawer
 │   └── ExecutiveTelemetryStrip.tsx # Board-level fiduciary KPI metrics strip (Executive only)
 ├── types/
-│   └── requisition.ts          # Phase B schema interfaces
+│   └── requisition.ts          # Phase B schema interfaces (PortfolioProject, PortfolioBuilding, Requisition)
 ├── lib/
 │   └── supabaseClient.ts       # Initialized Supabase client instance
 └── components_archive_v2_4_0/  # Quarantined legacy v2.4.0 components
@@ -129,10 +148,13 @@ caesar-purchasing-app/
 ## 7. Current System State & Roadmap
 
 The system compiles with 0 errors and 0 warnings under tsc and eslint.
-- **Step A (Portfolio & 3-Tier Cascading Location Selector Integration):** COMPLETED.
-  - Relational interfaces `PortfolioProject` and `PortfolioBuilding` established in `types/requisition.ts`.
-  - Supabase hydration and shared state routing in `app/page.tsx`.
-  - 3-tier cascading dropdowns (`Project` -> `Building Type` -> `Building / Block Name`) with strict validation in `components/TechnicalIntakeModule.tsx`.
-  - O(1) canonical ledger display resolving `location_block_id` to `[Project] • [Building]` alongside ID code, with Turkish locale search normalization (`toLocaleLowerCase('tr-TR')`) in `components/RequisitionWorkspace.tsx`.
-- **Step B (Catalog Parameter Refresh):** Ingesting authoritative, verified consumption rate coefficients and base EUR unit costs across the 151 catalog materials via SQL UPSERT (Completed baseline).
+- **Step A (Portfolio Integration — 8 Projects & 438 Buildings):** COMPLETED.
+  - Deployed `public.portfolio_projects` (8 projects) and `public.portfolio_buildings` (438 structures) in Supabase.
+  - Exported `PortfolioProject` and `PortfolioBuilding` interfaces in `types/requisition.ts`.
+  - Implemented 3-tier cascading selector (`Project` -> `Building Type` -> `Building / Block Name`) with completion % badge in `components/TechnicalIntakeModule.tsx`.
+  - Implemented O(1) `buildingLookup` map in `components/RequisitionWorkspace.tsx` displaying canonical `[Project] • [Building]` alongside monospace `building_id`, with full Turkish locale search normalization (`toLocaleLowerCase('tr-TR')`).
+- **Step B (Catalog Parameter Refresh — 105 Materials):** COMPLETED.
+  - Ingested 105 authoritative catalog materials via SQL UPSERT into `public.inventory_catalog`.
+  - Anchored base unit prices in EUR at a fixed currency parity of 1 EUR = 55.74 TRY.
+  - Formulated consumption coefficients and pricing metrics against ÇŞİDB (Ministry) and KTİMB (Union) published cost telemetry.
 - **Step C (Dedicated Depo / Inventory Management):** Architecting public.depot_inventory and public.depot_stock_movements for warehouse stock checks and depot dispatch requests (Planned).
