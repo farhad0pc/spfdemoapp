@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { supabaseAdmin } from '@/lib/supabaseClient';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { sendApprovalEmail } from '@/lib/emailService';
 
 const clampNumeric = (num: number, max = 9999999.99) =>

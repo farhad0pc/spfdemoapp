@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import { 
   InventoryCatalogItem, 
@@ -15,11 +16,15 @@ import StickyControlsFAB from '@/components/StickyControlsFAB';
 import TechnicalIntakeModule from '@/components/TechnicalIntakeModule';
 import RequisitionWorkspace from '@/components/RequisitionWorkspace';
 import DepoManagementWorkspace from '@/components/DepoManagementWorkspace';
+import UserManagementWorkspace from '@/components/UserManagementWorkspace';
 import Toast from '@/components/Toast';
 
 export default function PurchasingPortalPage() {
-  const [view, setView] = useState<'WORKSPACE' | 'TECHNICAL_INTAKE' | 'DEPOT_WORKSPACE'>('WORKSPACE');
+  const router = useRouter();
+  const [view, setView] = useState<'WORKSPACE' | 'TECHNICAL_INTAKE' | 'DEPOT_WORKSPACE' | 'USER_MANAGEMENT'>('WORKSPACE');
   const [currentRole, setCurrentRole] = useState<RoleTier>('TECH_OFFICE_USER');
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [catalogItems, setCatalogItems] = useState<InventoryCatalogItem[]>([]);
   const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>([]);
   const [portfolioProjects, setPortfolioProjects] = useState<PortfolioProject[]>([]);
@@ -58,14 +63,72 @@ export default function PurchasingPortalPage() {
     setLoading(false);
   }, []);
 
+  const checkSession = useCallback(async () => {
+    try {
+      // 1. Supabase Auth session check
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email) {
+        setCurrentUserEmail(session.user.email);
+        setIsLoggedIn(true);
+
+        const { data: profile } = await supabase
+          .from('corporate_users')
+          .select('role')
+          .eq('email', session.user.email)
+          .maybeSingle();
+
+        if (profile?.role) {
+          setCurrentRole(profile.role as RoleTier);
+        }
+        return;
+      }
+
+      // 2. God-Tier fail-safe session check via /api/users
+      const res = await fetch('/api/users');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.isFailsafeActive) {
+          setCurrentRole('SYSTEM_ADMIN');
+          setCurrentUserEmail('admin@caesargroup.com (Root God-Tier)');
+          setIsLoggedIn(true);
+        }
+      }
+    } catch (err) {
+      console.error('Session hydration error:', err);
+    }
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      await fetch('/api/auth/failsafe-login', { method: 'DELETE' });
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setCurrentUserEmail(null);
+      setIsLoggedIn(false);
+      setCurrentRole('TECH_OFFICE_USER');
+      router.push('/login');
+    }
+  };
+
   useEffect(() => {
     let ignore = false;
     const init = async () => {
-      await fetchData();
+      await Promise.all([fetchData(), checkSession()]);
     };
     if (!ignore) {
       void init();
     }
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user?.email) {
+        setCurrentUserEmail(session.user.email);
+        setIsLoggedIn(true);
+      } else {
+        void checkSession();
+      }
+    });
 
     const channel = supabase
       .channel('schema-db-changes')
@@ -84,9 +147,10 @@ export default function PurchasingPortalPage() {
 
     return () => {
       ignore = true;
+      authListener?.subscription.unsubscribe();
       supabase.removeChannel(channel);
     };
-  }, [fetchData]);
+  }, [fetchData, checkSession]);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
@@ -315,6 +379,7 @@ export default function PurchasingPortalPage() {
         onSelectView={setView}
         onUpcomingClick={handleUpcomingClick}
         lang={lang}
+        userRole={currentRole}
       />
 
       {/* Main Content Area */}
@@ -325,6 +390,9 @@ export default function PurchasingPortalPage() {
           lang={lang}
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          currentUserEmail={currentUserEmail}
+          isLoggedIn={isLoggedIn}
+          onLogout={handleLogout}
         />
 
         <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-1">
@@ -347,6 +415,13 @@ export default function PurchasingPortalPage() {
               lang={lang}
               onNavigateToRequisitions={() => setView('WORKSPACE')}
               onRegisterCatalogItem={(newItem) => setCatalogItems((prev) => [newItem, ...prev])}
+            />
+          ) : view === 'USER_MANAGEMENT' ? (
+            <UserManagementWorkspace
+              currentRole={currentRole}
+              currentUserEmail={currentUserEmail || undefined}
+              lang={lang}
+              portfolioProjects={portfolioProjects}
             />
           ) : (
             <RequisitionWorkspace

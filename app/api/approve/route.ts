@@ -1,7 +1,7 @@
 import { formatTicketId } from "@/lib/formatUtils";
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyApprovalToken } from '@/lib/tokenService';
-import { supabaseAdmin } from '@/lib/supabaseClient';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get('token');

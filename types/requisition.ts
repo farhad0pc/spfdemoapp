@@ -1,8 +1,15 @@
 export type RoleTier = 
-  | 'TECH_OFFICE_USER' 
-  | 'TECH_OFFICE_MANAGER' 
-  | 'PURCHASING_AGENT' 
-  | 'EXECUTIVE';
+  | 'SYSTEM_ADMIN'
+  | 'EXECUTIVE'
+  | 'TECH_OFFICE_MANAGER'
+  | 'PURCHASING_MANAGER'
+  | 'DEPOT_MANAGER'
+  | 'TECH_OFFICE_USER'
+  | 'PURCHASING_AGENT'
+  | 'DEPOT_SENIOR_STAFF'
+  | 'TECH_OFFICE_JUNIOR'
+  | 'PURCHASING_JUNIOR'
+  | 'DEPOT_JUNIOR_STAFF';
 
 export type TicketStatus = 
   | 'DRAFTING' 
@@ -181,6 +188,53 @@ export interface AssetRegisterItem {
   created_at?: string;
   updated_at?: string;
   catalog_item?: InventoryCatalogItem;
+}
+
+// ==========================================
+// STEP D: 2D RBAC, DELEGATION & USER MANAGEMENT
+// ==========================================
+
+export type DepartmentCode = 'SYSTEM' | 'EXECUTIVE' | 'TECH_OFFICE' | 'PURCHASING' | 'DEPOT';
+export type AuthorityTier = 0 | 1 | 2 | 3 | 4;
+export type UserAccountStatus = 'ACTIVE' | 'INVITED' | 'SUSPENDED';
+export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+
+export interface CorporateUserProfile {
+  id: string; // UUID in public.corporate_users
+  auth_user_id?: string | null; // UUID in auth.users
+  email: string;
+  full_name: string;
+  role: RoleTier;
+  department: DepartmentCode;
+  authority_tier: AuthorityTier;
+  account_status: UserAccountStatus;
+  allowed_project_ids?: string[] | null;
+  allowed_depot_ids?: string[] | null;
+  failsafe_password_hash?: string | null;
+  last_login_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UserInvitation {
+  invitation_id: string;
+  email: string;
+  full_name: string;
+  target_role: RoleTier;
+  target_department: DepartmentCode;
+  target_tier: AuthorityTier;
+  token_hash: string;
+  status: InvitationStatus;
+  invited_by_uuid: string;
+  expires_at: string;
+  accepted_at?: string | null;
+  revoked_at?: string | null;
+  created_at?: string;
+  inviter?: {
+    full_name: string;
+    email: string;
+    role: RoleTier;
+  };
 }
 
 // Native BarcodeDetector API typing

@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer';
 import { generateApprovalToken } from './tokenService';
+import { RoleTier, DepartmentCode } from '@/types/requisition';
+import { ROLE_METADATA } from './rbac';
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -145,4 +147,117 @@ export async function sendApprovalEmail(params: RequisitionNotificationParams) {
     subject: `[ONAY TALEBİ] ${ticketId} — €${totalEur.toLocaleString('en-US')} (${materialName})`,
     html: htmlContent,
   });
+}
+
+export interface UserInvitationNotificationParams {
+  recipientEmail: string;
+  recipientName: string;
+  targetRole: RoleTier;
+  targetDepartment: DepartmentCode;
+  inviterName: string;
+  inviterRole: RoleTier;
+  inviteUrl: string;
+  expiresAt: string;
+}
+
+export async function sendUserInvitationEmail(params: UserInvitationNotificationParams) {
+  const {
+    recipientEmail,
+    recipientName,
+    targetRole,
+    targetDepartment,
+    inviterName,
+    inviteUrl,
+    expiresAt,
+  } = params;
+
+  const roleMeta = ROLE_METADATA[targetRole];
+  const roleTitle = roleMeta ? roleMeta.titleTr : targetRole;
+  const expiryDateFormatted = new Date(expiresAt).toLocaleString('tr-TR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kullanıcı Daveti - Caesar Governance</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #05080f; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #f8fafc;">
+  <div style="width: 100%; max-width: 600px; margin: 30px auto; background-color: #090d16; border: 1px solid #3b82f6; border-radius: 18px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8);">
+    
+    <div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.25) 0%, rgba(9, 13, 22, 0.95) 100%); padding: 28px 24px; text-align: center; border-bottom: 1px solid rgba(59, 130, 246, 0.3);">
+      <div style="display: inline-block; background-color: rgba(59, 130, 246, 0.15); border: 1px solid rgba(59, 130, 246, 0.4); padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: #60a5fa; margin-bottom: 10px;">
+        AFIK GROUP &bull; CAESAR PURCHASING SUB-LEDGER
+      </div>
+      <h1 style="margin: 0; font-size: 20px; font-weight: 900; color: #ffffff; letter-spacing: 0.05em; text-transform: uppercase;">
+        EKİP DAVETİ &amp; ERİŞİM AKTİVASYONU
+      </h1>
+      <div style="font-size: 12px; font-weight: 700; color: #94a3b8; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.05em;">
+        INVITATION TO CAESAR GOVERNANCE PLATFORM
+      </div>
+    </div>
+
+    <div style="padding: 28px 24px;">
+      <p style="margin-top: 0; font-size: 14px; color: #cbd5e1; line-height: 1.6;">
+        Merhaba <strong>${recipientName}</strong>,<br>
+        <strong>${inviterName}</strong> tarafından Caesar Satın Alma ve Saha Yönetimi sistemine katılmanız için davet edildiniz.
+      </p>
+
+      <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin: 20px 0; font-size: 13px; background-color: #0d1322; border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;">
+        <tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); color: #94a3b8;">Atanan Rol / Role</td>
+          <td style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); font-weight: 700; color: #38bdf8; text-align: right;">${roleTitle}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); color: #94a3b8;">Departman / Division</td>
+          <td style="padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.06); font-weight: 700; color: #ffffff; text-align: right; text-transform: uppercase;">${targetDepartment}</td>
+        </tr>
+        <tr>
+          <td style="padding: 12px 16px; color: #94a3b8;">Bağlantı Geçerlilik Süresi</td>
+          <td style="padding: 12px 16px; font-weight: 700; color: #f59e0b; text-align: right;">48 Saat (${expiryDateFormatted} kadar)</td>
+        </tr>
+      </table>
+
+      <div style="margin: 32px 0 20px 0; text-align: center;">
+        <a href="${inviteUrl}" style="display: inline-block; background-color: #2563eb; color: #ffffff; text-decoration: none; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; padding: 14px 28px; border-radius: 10px; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);">
+          HESABI AKTİVE ET &amp; ŞİFRE BELİRLE
+        </a>
+      </div>
+
+      <p style="text-align: center; font-size: 11px; color: #64748b; margin-top: 16px;">
+        Bu davet tek kullanımlıktır ve SHA-256 dijital imzasıyla korunmaktadır.<br>
+        Butona tıklayarak parolanızı belirleyebilir ve sisteme anında giriş yapabilirsiniz.
+      </p>
+    </div>
+
+    <div style="background-color: #05080f; padding: 14px 24px; border-top: 1px solid rgba(255, 255, 255, 0.08); text-align: center; font-size: 11px; color: #475569;">
+      Caesar Resort &amp; Spa Sub-Ledger System &bull; 2D RBAC Delegation Engine
+    </div>
+  </div>
+</body>
+</html>`;
+
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    // In local development without SMTP credentials, log the URL safely
+    console.warn('[EMAIL SERVICE] SMTP credentials not configured. Activation link:', inviteUrl);
+    return { devMode: true, inviteUrl };
+  }
+
+  try {
+    return await transporter.sendMail({
+      from: `"Caesar Identity & Governance" <${process.env.GMAIL_USER}>`,
+      to: recipientEmail,
+      subject: `[DAVET] Caesar Satın Alma ve Yönetim Sistemine Davet Edildiniz (${roleTitle})`,
+      html: htmlContent,
+    });
+  } catch (err) {
+    console.warn('[EMAIL SERVICE] Failed to send email via SMTP, fallback to devMode:', err);
+    return { devMode: true, inviteUrl };
+  }
 }
