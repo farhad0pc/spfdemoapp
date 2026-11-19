@@ -12,6 +12,8 @@ export type TicketStatus =
   | 'APPROVED' 
   | 'REJECTED';
 
+export type PackagingUnitType = 'SINGLE_ITEM' | 'ATOMIC_SET';
+
 export interface InventoryCatalogItem {
   item_id: string;
   legacy_code: string | null;
@@ -26,6 +28,12 @@ export interface InventoryCatalogItem {
   consumption_metric: string | null;
   record_status: string;
   review_status: string;
+  // Step C parameters
+  barcode_ean?: string | null;
+  is_trackable_asset?: boolean | null;
+  packaging_unit_type?: PackagingUnitType | null;
+  set_piece_count?: number | null;
+  commercial_markup_pct?: number | null;
 }
 
 export interface PortfolioProject {
@@ -93,6 +101,115 @@ export interface RequisitionApprovalLog {
   new_payload: unknown;
   created_at: string;
 }
+
+// ==========================================
+// STEP C: DEPOT & ASSET CUSTODY DATA MODELS
+// ==========================================
+
+export interface DepotLocation {
+  depot_id: string; // e.g. 'DEPOT-PRJ02-MAIN'
+  project_id: string; // e.g. 'PRJ-02'
+  depot_name: string;
+  depot_category: string;
+  is_active: boolean;
+}
+
+export interface DepotStockBalance {
+  balance_id: string;
+  depot_id: string;
+  catalog_item_id: string;
+  quantity_on_hand: number;
+  quantity_reserved: number;
+  min_stock_threshold: number;
+  last_scanned_at?: string | null;
+  catalog_item?: InventoryCatalogItem;
+}
+
+export type DepotMovementType = 
+  | 'INBOUND_RECEIPT' 
+  | 'OUTBOUND_HANDOVER' 
+  | 'STOCK_ADJUSTMENT' 
+  | 'AFTERSALES_RETURN';
+
+export interface DepotTransaction {
+  transaction_id: string;
+  transaction_code: string; // MOV-[YYYYMM]-[HEX]
+  depot_id: string;
+  catalog_item_id: string;
+  movement_type: DepotMovementType;
+  quantity: number;
+  requisition_id?: string | null;
+  target_building_id?: string | null;
+  target_unit_label?: string | null;
+  irsaliye_number?: string | null;
+  irsaliye_doc_url?: string | null;
+  invoice_number?: string | null;
+  invoice_doc_url?: string | null;
+  supplier_name?: string | null;
+  unit_cost_eur: number;
+  final_valued_cost_eur: number; // unit_cost_eur * (1 + commercial_markup_pct / 100)
+  has_missing_docs: boolean; // PostgreSQL GENERATED ALWAYS column (read-only)
+  delivery_confirmed: boolean;
+  confirmed_by_uuid?: string | null;
+  confirmed_at?: string | null;
+  notes?: string | null;
+  created_at?: string;
+  catalog_item?: InventoryCatalogItem;
+}
+
+export type AssetCustodyStatus = 
+  | 'IN_DEPOT' 
+  | 'HANDED_OVER_TO_AFTERSALES' 
+  | 'INSTALLED_IN_UNIT' 
+  | 'UNDER_MAINTENANCE' 
+  | 'RETIRED';
+
+export interface AssetRegisterItem {
+  asset_id: string;
+  asset_tag: string; // AST-[YYYY]-[HEX]
+  catalog_item_id: string;
+  barcode_ean?: string | null;
+  serial_number: string;
+  current_depot_id?: string | null;
+  deployed_building_id?: string | null;
+  deployed_unit_label?: string | null;
+  custody_status: AssetCustodyStatus;
+  inbound_transaction_id?: string | null;
+  outbound_transaction_id?: string | null;
+  warranty_expiry_date?: string | null;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  catalog_item?: InventoryCatalogItem;
+}
+
+// Native BarcodeDetector API typing
+export interface BarcodeDetectorOptions {
+  formats: string[];
+}
+
+export interface DetectedBarcode {
+  boundingBox: DOMRectReadOnly;
+  cornerPoints: { x: number; y: number }[];
+  format: string;
+  rawValue: string;
+}
+
+declare global {
+  interface Window {
+    BarcodeDetector?: {
+      new (options?: BarcodeDetectorOptions): {
+        detect(image: ImageBitmapSource): Promise<DetectedBarcode[]>;
+        getSupportedFormats(): Promise<string[]>;
+      };
+      getSupportedFormats(): Promise<string[]>;
+    };
+  }
+}
+
+// ==========================================
+// LEGACY COMPATIBILITY EXPORTS
+// ==========================================
 
 export type CorporateRole = 'FOREMAN' | 'PURCHASING_MGR' | 'PROJECT_DIRECTOR' | 'EXECUTIVE';
 export type UserRole = CorporateRole;

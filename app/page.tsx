@@ -14,10 +14,11 @@ import DesktopSidebar from '@/components/DesktopSidebar';
 import StickyControlsFAB from '@/components/StickyControlsFAB';
 import TechnicalIntakeModule from '@/components/TechnicalIntakeModule';
 import RequisitionWorkspace from '@/components/RequisitionWorkspace';
+import DepoManagementWorkspace from '@/components/DepoManagementWorkspace';
 import Toast from '@/components/Toast';
 
 export default function PurchasingPortalPage() {
-  const [view, setView] = useState<'WORKSPACE' | 'TECHNICAL_INTAKE'>('WORKSPACE');
+  const [view, setView] = useState<'WORKSPACE' | 'TECHNICAL_INTAKE' | 'DEPOT_WORKSPACE'>('WORKSPACE');
   const [currentRole, setCurrentRole] = useState<RoleTier>('TECH_OFFICE_USER');
   const [catalogItems, setCatalogItems] = useState<InventoryCatalogItem[]>([]);
   const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>([]);
@@ -58,8 +59,13 @@ export default function PurchasingPortalPage() {
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchData();
+    let ignore = false;
+    const init = async () => {
+      await fetchData();
+    };
+    if (!ignore) {
+      void init();
+    }
 
     const channel = supabase
       .channel('schema-db-changes')
@@ -77,6 +83,7 @@ export default function PurchasingPortalPage() {
       .subscribe();
 
     return () => {
+      ignore = true;
       supabase.removeChannel(channel);
     };
   }, [fetchData]);
@@ -330,6 +337,15 @@ export default function PurchasingPortalPage() {
               portfolioBuildings={portfolioBuildings}
               userRole={currentRole}
               lang={lang}
+            />
+          ) : view === 'DEPOT_WORKSPACE' ? (
+            <DepoManagementWorkspace
+              catalogItems={catalogItems}
+              portfolioProjects={portfolioProjects}
+              portfolioBuildings={portfolioBuildings}
+              currentRole={currentRole}
+              lang={lang}
+              onNavigateToRequisitions={() => setView('WORKSPACE')}
             />
           ) : (
             <RequisitionWorkspace

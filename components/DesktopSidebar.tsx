@@ -6,8 +6,8 @@ import Image from 'next/image';
 interface DesktopSidebarProps {
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  currentView: 'WORKSPACE' | 'TECHNICAL_INTAKE';
-  onSelectView: (view: 'WORKSPACE' | 'TECHNICAL_INTAKE') => void;
+  currentView: 'WORKSPACE' | 'TECHNICAL_INTAKE' | 'DEPOT_WORKSPACE';
+  onSelectView: (view: 'WORKSPACE' | 'TECHNICAL_INTAKE' | 'DEPOT_WORKSPACE') => void;
   onUpcomingClick: (title: string) => void;
   lang: 'tr' | 'en';
 }
@@ -33,13 +33,13 @@ export default function DesktopSidebar({
     reports: lang === 'tr' ? 'Yönetim Kurulu Raporları' : 'Executive Dossiers',
     devTools: lang === 'tr' ? 'Geliştirici & DB Araçları' : 'Database & Dev Tools',
     badgeLocked: lang === 'tr' ? 'YAKINDA' : 'SOON',
+    badgeNew: lang === 'tr' ? 'YENİ' : 'NEW',
     collapseLabel: isCollapsed
       ? (lang === 'tr' ? 'Genişlet' : 'Expand')
       : (lang === 'tr' ? 'Menüyü Daralt' : 'Collapse Sidebar'),
   };
 
   const upcomingModules = [
-    { key: 'DEPOT', title: t.depot },
     { key: 'PORTFOLIO', title: t.portfolio },
     { key: 'CATALOG', title: t.catalog },
     { key: 'PERSONNEL', title: t.personnel },
@@ -95,6 +95,8 @@ export default function DesktopSidebar({
               </span>
             )}
             <div className="space-y-1">
+              
+              {/* Module 1: Requisition Workspace */}
               <button
                 onClick={() => onSelectView('WORKSPACE')}
                 title={isCollapsed ? t.workspace : undefined}
@@ -110,6 +112,7 @@ export default function DesktopSidebar({
                 {!isCollapsed && <span className="truncate">{t.workspace}</span>}
               </button>
 
+              {/* Module 2: Technical Intake Engine */}
               <button
                 onClick={() => onSelectView('TECHNICAL_INTAKE')}
                 title={isCollapsed ? t.intake : undefined}
@@ -124,6 +127,30 @@ export default function DesktopSidebar({
                 </svg>
                 {!isCollapsed && <span className="truncate">{t.intake}</span>}
               </button>
+
+              {/* Module 3: Depo ve Stok Yönetimi (Step C Active Module) */}
+              <button
+                onClick={() => onSelectView('DEPOT_WORKSPACE')}
+                title={isCollapsed ? t.depot : undefined}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold transition-colors ${
+                  currentView === 'DEPOT_WORKSPACE'
+                    ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60'
+                }`}
+              >
+                <div className="flex items-center space-x-3 truncate">
+                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                  </svg>
+                  {!isCollapsed && <span className="truncate">{t.depot}</span>}
+                </div>
+                {!isCollapsed && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                    {t.badgeNew}
+                  </span>
+                )}
+              </button>
+
             </div>
           </div>
 
