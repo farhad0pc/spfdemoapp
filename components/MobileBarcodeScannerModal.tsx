@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { BarcodeDetector as ZXingBarcodeDetector } from 'barcode-detector/ponyfill';
+import { 
+  BarcodeDetector as ZXingBarcodeDetector,
+  prepareZXingModule 
+} from 'barcode-detector/ponyfill';
 import { 
   InventoryCatalogItem, 
   DepotStockBalance, 
@@ -51,6 +54,7 @@ export default function MobileBarcodeScannerModal({
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [engineStatus, setEngineStatus] = useState<'INITIALIZING' | 'READY' | 'ERROR'>('INITIALIZING');
   
   // Scanning & Detection State
   const [manualInput, setManualInput] = useState<string>('');
@@ -94,8 +98,8 @@ export default function MobileBarcodeScannerModal({
   const t = {
     title: lang === 'tr' ? 'Evrensel Barkod & Seri No Tarayıcı' : 'Universal Barcode & Serial Scanner',
     subTitle: lang === 'tr' 
-      ? 'ZXing WebAssembly Motoru • Çoklu Barkod Okuma & Doğrudan Veri Tabanı Kaydı' 
-      : 'ZXing WebAssembly Engine • Multi-Barcode Detection & Direct Database Registry',
+      ? 'ZXing WebAssembly Motoru • Çift-Yönlü Ayna Çözümleyici & Doğrudan Veri Tabanı Kaydı' 
+      : 'ZXing WebAssembly Engine • Dual-Pass Mirror Resolver & Direct Database Registry',
     close: lang === 'tr' ? 'Kapat' : 'Close',
     cameraUnavailable: lang === 'tr' 
       ? 'Kamera erişimi sağlanamadı. Lütfen manuel barkod girişini kullanınız.' 
@@ -283,28 +287,86 @@ export default function MobileBarcodeScannerModal({
     setCameraActive(false);
   }, []);
 
-  // Initialize ZXing-WASM Ponyfill Detector
+  // Handle camera device switch
+  const handleCameraChange = (newDeviceId: string) => {
+    setSelectedDeviceId(newDeviceId);
+    void startCamera(newDeviceId);
+  };
+
+  // Manage Camera on Modal Open/Close
   useEffect(() => {
-    try {
-      detectorRef.current = new ZXingBarcodeDetector({
-        formats: [
-          'ean_13', 
-          'ean_8', 
-          'upc_a', 
-          'upc_e', 
-          'code_128', 
-          'code_39', 
-          'itf', 
-          'qr_code', 
-          'data_matrix'
-        ],
-      });
-    } catch {
-      detectorRef.current = null;
+    if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void startCamera(selectedDeviceId || undefined);
+    } else {
+      stopCamera();
+      setScannedCode(null);
+      setMatchedCatalogItem(null);
+      setMatchedAsset(null);
+      setDetectedBarcodes([]);
+      setIsRegistering(false);
+      setRegSuccessMessage(null);
     }
+    return () => {
+      stopCamera();
+    };
+  }, [isOpen, selectedDeviceId, startCamera, stopCamera]);
+
+  // Initialize ZXing-WASM Ponyfill Detector with Local Next.js 16 WASM Serving
+  useEffect(() => {
+    let isMounted = true;
+
+    const initEngine = async () => {
+      try {
+        setEngineStatus('INITIALIZING');
+
+        // Configure ZXing WebAssembly to load from local Next.js public directory
+        await prepareZXingModule({
+          overrides: {
+            locateFile: (path: string, prefix: string) => {
+              if (path.endsWith('.wasm')) {
+                return '/wasm/zxing_reader.wasm';
+              }
+              return prefix + path;
+            },
+          },
+          fireImmediately: true,
+        });
+
+        const detector = new ZXingBarcodeDetector({
+          formats: [
+            'ean_13', 
+            'ean_8', 
+            'upc_a', 
+            'upc_e', 
+            'code_128', 
+            'code_39', 
+            'itf', 
+            'qr_code', 
+            'data_matrix'
+          ],
+        });
+
+        if (isMounted) {
+          detectorRef.current = detector;
+          setEngineStatus('READY');
+        }
+      } catch (err) {
+        if (isMounted) {
+          console.error('Failed to initialize ZXing WebAssembly detector:', err);
+          setEngineStatus('ERROR');
+        }
+      }
+    };
+
+    void initEngine();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Multi-Barcode Frame Detection Loop
+  // Multi-Barcode Frame Detection Loop (Dual-Pass: Raw + Horizontal Un-Mirror)
   useEffect(() => {
     if (!isOpen || !cameraActive || !videoRef.current) return;
 
@@ -324,49 +386,91 @@ export default function MobileBarcodeScannerModal({
 
       if (detectorRef.current && video.videoWidth > 0 && video.videoHeight > 0) {
         try {
-          offscreenCanvas.width = video.videoWidth;
-          offscreenCanvas.height = video.videoHeight;
-          offscreenCtx?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+          const vw = video.videoWidth;
+          const vh = video.videoHeight;
 
-          const barcodes = await detectorRef.current.detect(offscreenCanvas);
+          // Pass 1: Raw capture for rear smartphone cameras / non-mirrored feeds
+          offscreenCanvas.width = vw;
+          offscreenCanvas.height = vh;
+          offscreenCtx?.drawImage(video, 0, 0, vw, vh);
+
+          let barcodes = await detectorRef.current.detect(offscreenCanvas);
+          let isFlippedMatch = false;
+
+          // Pass 2: If no barcodes found, capture horizontally flipped frame for mirrored front webcams
+          if ((!barcodes || barcodes.length === 0) && offscreenCtx) {
+            offscreenCtx.save();
+            offscreenCtx.translate(vw, 0);
+            offscreenCtx.scale(-1, 1);
+            offscreenCtx.drawImage(video, 0, 0, vw, vh);
+            offscreenCtx.restore();
+
+            const flippedBarcodes = await detectorRef.current.detect(offscreenCanvas);
+            if (flippedBarcodes && flippedBarcodes.length > 0) {
+              barcodes = flippedBarcodes;
+              isFlippedMatch = true;
+            }
+          }
 
           if (overlayCanvas && overlayCtx) {
-            overlayCanvas.width = video.videoWidth;
-            overlayCanvas.height = video.videoHeight;
+            overlayCanvas.width = vw;
+            overlayCanvas.height = vh;
             overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
           }
 
           if (barcodes && barcodes.length > 0) {
             const currentItems: DetectedItemInfo[] = [];
 
+            // Coordinate un-flipper function for visual bounding box alignment
+            const mapX = (x: number) => (isFlippedMatch ? vw - x : x);
+
             barcodes.forEach((b) => {
               const raw = b.rawValue?.trim();
               if (raw) {
+                // Map coordinates back to visible camera space if detected on flipped canvas
+                const mappedCornerPoints = b.cornerPoints?.map((p) => ({
+                  x: mapX(p.x),
+                  y: p.y,
+                }));
+
+                const mappedBoundingBox = b.boundingBox
+                  ? new DOMRectReadOnly(
+                      isFlippedMatch ? vw - (b.boundingBox.x + b.boundingBox.width) : b.boundingBox.x,
+                      b.boundingBox.y,
+                      b.boundingBox.width,
+                      b.boundingBox.height
+                    )
+                  : undefined;
+
                 currentItems.push({
                   rawValue: raw,
                   format: b.format,
-                  cornerPoints: b.cornerPoints,
-                  boundingBox: b.boundingBox,
+                  cornerPoints: mappedCornerPoints,
+                  boundingBox: mappedBoundingBox,
                 });
 
                 // Draw live bounding box on overlay canvas
-                if (overlayCtx && b.cornerPoints && b.cornerPoints.length >= 4) {
+                if (overlayCtx && mappedCornerPoints && mappedCornerPoints.length >= 4) {
                   overlayCtx.beginPath();
-                  overlayCtx.moveTo(b.cornerPoints[0].x, b.cornerPoints[0].y);
-                  overlayCtx.lineTo(b.cornerPoints[1].x, b.cornerPoints[1].y);
-                  overlayCtx.lineTo(b.cornerPoints[2].x, b.cornerPoints[2].y);
-                  overlayCtx.lineTo(b.cornerPoints[3].x, b.cornerPoints[3].y);
+                  overlayCtx.moveTo(mappedCornerPoints[0].x, mappedCornerPoints[0].y);
+                  overlayCtx.lineTo(mappedCornerPoints[1].x, mappedCornerPoints[1].y);
+                  overlayCtx.lineTo(mappedCornerPoints[2].x, mappedCornerPoints[2].y);
+                  overlayCtx.lineTo(mappedCornerPoints[3].x, mappedCornerPoints[3].y);
                   overlayCtx.closePath();
                   overlayCtx.lineWidth = 4;
-                  overlayCtx.strokeStyle = '#10b981';
+                  overlayCtx.strokeStyle = isFlippedMatch ? '#06b6d4' : '#10b981';
                   overlayCtx.stroke();
 
-                  // Format label tag
-                  overlayCtx.fillStyle = '#10b981';
-                  overlayCtx.fillRect(b.cornerPoints[0].x, b.cornerPoints[0].y - 22, 100, 20);
+                  // Format label tag with mirror detection badge
+                  const labelX = Math.min(mappedCornerPoints[0].x, mappedCornerPoints[1].x, mappedCornerPoints[2].x, mappedCornerPoints[3].x);
+                  const labelY = Math.min(mappedCornerPoints[0].y, mappedCornerPoints[1].y, mappedCornerPoints[2].y, mappedCornerPoints[3].y);
+                  const tagText = `${b.format.toUpperCase()}${isFlippedMatch ? ' (MIRRORED)' : ''}`;
+
+                  overlayCtx.fillStyle = isFlippedMatch ? '#0891b2' : '#059669';
+                  overlayCtx.fillRect(labelX, Math.max(0, labelY - 24), tagText.length * 8 + 12, 22);
                   overlayCtx.fillStyle = '#ffffff';
-                  overlayCtx.font = 'bold 12px monospace';
-                  overlayCtx.fillText(b.format.toUpperCase(), b.cornerPoints[0].x + 4, b.cornerPoints[0].y - 6);
+                  overlayCtx.font = 'bold 11px monospace';
+                  overlayCtx.fillText(tagText, labelX + 6, Math.max(14, labelY - 8));
                 }
               }
             });
@@ -398,7 +502,9 @@ export default function MobileBarcodeScannerModal({
         }
       }
 
-      scanLoopRef.current = requestAnimationFrame(checkFrame);
+      if (isScanning) {
+        scanLoopRef.current = requestAnimationFrame(checkFrame);
+      }
     };
 
     scanLoopRef.current = requestAnimationFrame(checkFrame);
@@ -412,41 +518,14 @@ export default function MobileBarcodeScannerModal({
     };
   }, [isOpen, cameraActive, handleResolveCode]);
 
-  // Modal lifecycle
-  useEffect(() => {
-    let ignore = false;
-    const init = async () => {
-      if (isOpen) {
-        await startCamera(selectedDeviceId || undefined);
-      } else {
-        stopCamera();
-        setScannedCode(null);
-        setMatchedCatalogItem(null);
-        setMatchedAsset(null);
-        setManualInput('');
-        setDetectedBarcodes([]);
-        setIsRegistering(false);
-        setRegSuccessMessage(null);
-      }
-    };
-
-    if (!ignore) {
-      void init();
-    }
-
-    return () => {
-      ignore = true;
-      stopCamera();
-    };
-  }, [isOpen, selectedDeviceId, startCamera, stopCamera]);
-
-  // Switch camera lens
-  const handleCameraChange = (deviceId: string) => {
-    setSelectedDeviceId(deviceId);
-    void startCamera(deviceId);
+  // Handle Manual Form Search
+  const handleManualSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualInput.trim()) return;
+    handleResolveCode(manualInput.trim());
   };
 
-  // Submit Unregistered Item Registry Form
+  // Handle Submission of Unregistered Item Form
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regNameTr.trim() || !regBarcode.trim()) return;
@@ -454,32 +533,31 @@ export default function MobileBarcodeScannerModal({
     setRegSubmitting(true);
     setRegSuccessMessage(null);
 
-    const newItemId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `cat-${Date.now()}`;
-    const legacyCode = regLegacyCode.trim() || `MAT-NEW-${Math.random().toString(16).substring(2, 6).toUpperCase()}`;
+    const newItemId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}`;
     const costEur = Number(regBaseCostEur) || 0;
-    const markup = Number(regMarkupPct) || 30;
+    const markup = Number(regMarkupPct) || 15;
     const valuedEur = Number((costEur * (1 + markup / 100)).toFixed(2));
     const qty = Math.max(1, Number(regInitialQty) || 1);
 
-    // 1. New Catalog Item
+    // 1. New Inventory Catalog Item
     const newCatalogItem: InventoryCatalogItem = {
       item_id: newItemId,
-      legacy_code: legacyCode,
+      legacy_code: regLegacyCode.trim() || `SKU-${Date.now()}`,
       item_name_tr: regNameTr.trim(),
-      item_name_en: regNameEn.trim() || null,
-      specification: regSpec.trim() || null,
-      category: regCategory.trim() || 'Mekanik & İklimlendirme',
+      item_name_en: regNameEn.trim() || regNameTr.trim(),
+      specification: regSpec.trim() || 'Hızlı barkod kaydı',
+      category: regCategory.trim(),
       subcategory: regSubcategory.trim() || null,
-      unit_of_measure: regUnit,
+      unit_of_measure: regUnit.trim() || 'adet',
       base_cost_eur: costEur,
       consumption_rate: 1.0,
-      consumption_metric: `${regUnit}_per_unit`,
+      consumption_metric: 'pcs_per_building',
       record_status: 'active',
       review_status: 'approved',
       barcode_ean: regBarcode.trim(),
       is_trackable_asset: regIsTrackable,
       packaging_unit_type: regPackagingType,
-      set_piece_count: regPackagingType === 'ATOMIC_SET' ? Number(regPieceCount) || 1 : 1,
+      set_piece_count: regPackagingType === 'ATOMIC_SET' ? Math.max(2, regPieceCount) : 1,
       commercial_markup_pct: markup,
     };
 
@@ -601,9 +679,24 @@ export default function MobileBarcodeScannerModal({
                 <h2 className="text-base font-bold text-slate-900 dark:text-white uppercase tracking-wide">
                   {t.title}
                 </h2>
-                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800">
-                  ZXING WASM
-                </span>
+                {engineStatus === 'READY' && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    WASM Ready
+                  </span>
+                )}
+                {engineStatus === 'INITIALIZING' && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300 dark:border-amber-800 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-spin" />
+                    Loading WASM...
+                  </span>
+                )}
+                {engineStatus === 'ERROR' && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-300 dark:border-rose-800 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                    WASM Error
+                  </span>
+                )}
               </div>
               <p className="text-[11px] font-light text-slate-500 dark:text-slate-400">
                 {t.subTitle}
@@ -678,343 +771,338 @@ export default function MobileBarcodeScannerModal({
 
                 {/* Camera error badge if failed */}
                 {cameraError && (
-                  <div className="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center p-4 text-center">
-                    <svg className="w-10 h-10 text-amber-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <p className="text-xs font-light text-slate-300 max-w-xs mb-3">{cameraError}</p>
-                    <button
-                      onClick={() => void startCamera(selectedDeviceId || undefined)}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors"
-                    >
-                      {lang === 'tr' ? 'Kamerayı Yeniden Başlat' : 'Retry Camera'}
-                    </button>
+                  <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center">
+                    <span className="text-rose-400 font-bold text-sm mb-1">
+                      {cameraError}
+                    </span>
+                    <p className="text-xs text-slate-400 max-w-sm">
+                      {t.cameraUnavailable}
+                    </p>
                   </div>
                 )}
               </div>
+
+              {/* Detected Barcodes in Current Frame (Interactive Chips) */}
+              {detectedBarcodes.length > 0 && (
+                <div className="bg-slate-100 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-1.5">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                    <span>{t.detectedInFrame}</span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400">{detectedBarcodes.length} Algılandı</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {detectedBarcodes.map((item, idx) => (
+                      <button
+                        key={`${item.rawValue}-${idx}`}
+                        type="button"
+                        onClick={() => handleResolveCode(item.rawValue)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all flex items-center space-x-1.5 ${
+                          scannedCode === item.rawValue
+                            ? 'bg-blue-600 text-white border-blue-500 shadow-xs'
+                            : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:border-blue-400'
+                        }`}
+                      >
+                        <span className="text-[9px] opacity-70 uppercase font-sans">{item.format}</span>
+                        <span>{item.rawValue}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Multi-Barcode Interactive Chips Tray */}
-          {detectedBarcodes.length > 0 && !isRegistering && (
-            <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1.5 animate-fade-in">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  {t.detectedInFrame}
-                </span>
-                {detectedBarcodes.length >= 2 && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
-                    {t.dualDetected}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {detectedBarcodes.map((item, idx) => (
-                  <button
-                    key={`${item.rawValue}-${idx}`}
-                    type="button"
-                    onClick={() => handleResolveCode(item.rawValue)}
-                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-700 hover:border-blue-500 hover:text-blue-600 shadow-2xs flex items-center space-x-1.5"
-                  >
-                    <span className="text-[9px] font-sans px-1 py-0.2 rounded bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300">
-                      {item.format.toUpperCase()}
-                    </span>
-                    <span>{item.rawValue}</span>
-                  </button>
-                ))}
+          {/* Manual Input Form / USB Scanner Barcode Field */}
+          {!isRegistering && (
+            <form onSubmit={handleManualSearch} className="flex gap-2">
+              <input
+                type="text"
+                value={manualInput}
+                onChange={(e) => setManualInput(e.target.value)}
+                placeholder={t.manualPlaceholder}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
+              >
+                {t.btnSearch}
+              </button>
+            </form>
+          )}
+
+          {/* Quick Test Barcodes Tray */}
+          {!isRegistering && (
+            <div className="pt-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                {t.quickPresets}
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleResolveCode('8690123456789')}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-mono font-bold border border-slate-200 dark:border-slate-700"
+                >
+                  8690123456789 (VRF Set)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleResolveCode('SN-VRF-884920')}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-mono font-bold border border-slate-200 dark:border-slate-700"
+                >
+                  SN-VRF-884920 (Seri No)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleResolveCode('8690987654321')}
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-mono font-bold border border-slate-200 dark:border-slate-700"
+                >
+                  8690987654321 (Gömme Rezervuar)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleResolveCode('8700216605830')}
+                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-mono font-bold border border-amber-300 dark:border-amber-800"
+                >
+                  8700216605830 (Test Kayıtsız EAN)
+                </button>
               </div>
             </div>
           )}
 
           {/* Success Banner if newly registered */}
           {regSuccessMessage && (
-            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold flex items-center space-x-2 animate-fade-in">
-              <span>✓</span>
+            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-xl flex items-center space-x-2 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
+              <svg className="w-4 h-4 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
               <span>{regSuccessMessage}</span>
             </div>
           )}
 
-          {/* Manual Input Fallback */}
-          {!isRegistering && (
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <input
-                    type="text"
-                    value={manualInput}
-                    onChange={(e) => setManualInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleResolveCode(manualInput);
-                      }
-                    }}
-                    placeholder={t.manualPlaceholder}
-                    className="w-full pl-9 pr-3 py-2.5 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-mono"
-                    autoFocus
-                  />
-                  <svg className="w-4 h-4 text-slate-400 absolute left-3 top-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+          {/* Matched Item / Asset Card */}
+          {matchedCatalogItem && !isRegistering && (
+            <div className="bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+                      {t.itemFound}
+                    </span>
+                    <span className="text-[10px] font-mono text-slate-400">
+                      [{scannedCode}]
+                    </span>
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1">
+                    {lang === 'tr' ? matchedCatalogItem.item_name_tr : matchedCatalogItem.item_name_en}
+                  </h3>
+                  <p className="text-xs font-light text-slate-500 dark:text-slate-400">
+                    {matchedCatalogItem.specification}
+                  </p>
                 </div>
-                <button
-                  onClick={() => handleResolveCode(manualInput)}
-                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
-                >
-                  {t.btnSearch}
-                </button>
-              </div>
 
-              {/* Quick Presets */}
-              <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{t.quickPresets}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setManualInput('8690123456789');
-                    handleResolveCode('8690123456789');
-                  }}
-                  className="px-2 py-0.5 text-[10px] font-mono font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-300 dark:border-amber-800 rounded-md hover:bg-amber-100"
-                >
-                  EAN: 8690123456789
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setManualInput('8699999000111');
-                    handleResolveCode('8699999000111');
-                  }}
-                  className="px-2 py-0.5 text-[10px] font-mono font-bold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-400 border border-rose-300 dark:border-rose-800 rounded-md hover:bg-rose-100"
-                >
-                  Kayıtsız Barkod Testi
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setManualInput('AST-2026-9A1F');
-                    handleResolveCode('AST-2026-9A1F');
-                  }}
-                  className="px-2 py-0.5 text-[10px] font-mono font-bold bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-800 rounded-md hover:bg-cyan-100"
-                >
-                  Tag: AST-2026-9A1F
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* MATCHED RESULT CARD */}
-          {!isRegistering && scannedCode && matchedCatalogItem && (
-            <div className="border border-slate-200 dark:border-slate-800 rounded-xl p-4 bg-slate-50 dark:bg-slate-900/50 space-y-3 animate-fade-in">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  {t.itemFound}: <span className="font-mono text-slate-800 dark:text-slate-200">{scannedCode}</span>
-                </span>
                 {matchedCatalogItem.packaging_unit_type === 'ATOMIC_SET' ? (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+                  <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
                     {t.atomicSet} ({matchedCatalogItem.set_piece_count || 1} {t.pieceCount})
                   </span>
                 ) : (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  <span className="px-2.5 py-1 rounded-lg text-xs font-light bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                     {t.singleItem}
                   </span>
                 )}
               </div>
 
-              <div className="space-y-3">
+              {/* SKU & Price Breakdown */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-emerald-500/20">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase">
-                    {lang === 'tr' ? matchedCatalogItem.item_name_tr : (matchedCatalogItem.item_name_en || matchedCatalogItem.item_name_tr)}
-                  </h3>
-                  <p className="text-[11px] font-light text-slate-500 dark:text-slate-400">
-                    {matchedCatalogItem.category} • {matchedCatalogItem.subcategory || 'Genel'}
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">{t.sku}</span>
+                  <p className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
+                    {matchedCatalogItem.legacy_code}
                   </p>
                 </div>
-
-                <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-200 dark:border-slate-800 text-center">
-                  <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{t.stockOnHand}</span>
-                    <span className="text-sm font-bold text-slate-900 dark:text-white">
-                      {currentStockQty} <span className="text-[10px] font-light text-slate-500">{matchedCatalogItem.unit_of_measure}</span>
-                    </span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{t.baseCost}</span>
-                    <span className="text-sm font-light text-slate-700 dark:text-slate-300">
-                      €{baseCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-slate-400 uppercase">{t.valuedCost} (+{markupPct}%)</span>
-                    <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                      €{valuedCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">{t.stockOnHand}</span>
+                  <p className="text-xs font-bold text-slate-900 dark:text-white">
+                    {currentStockQty} {matchedCatalogItem.unit_of_measure}
+                  </p>
                 </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">{t.baseCost}</span>
+                  <p className="text-xs font-light text-slate-700 dark:text-slate-300">
+                    €{baseCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">{t.valuedCost}</span>
+                  <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    €{valuedCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
 
-                {matchedAsset && (
-                  <div className="p-2.5 rounded-lg bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 space-y-1 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">{t.assetTag}:</span>
-                      <span className="font-mono font-bold text-blue-700 dark:text-blue-300">{matchedAsset.asset_tag}</span>
+              {/* Matched Asset Details (if serialized) */}
+              {matchedAsset && (
+                <div className="bg-white/60 dark:bg-slate-900/60 rounded-xl p-3 border border-purple-300 dark:border-purple-900/50 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-purple-700 dark:text-purple-400">
+                      Zimmetli Varlık Bilgisi:
+                    </span>
+                    <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
+                      {matchedAsset.asset_tag}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">{t.serialNo}</span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">{matchedAsset.serial_number}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">{t.serialNo}:</span>
-                      <span className="font-mono font-bold text-slate-800 dark:text-slate-100">{matchedAsset.serial_number}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500 dark:text-slate-400">{t.custody}:</span>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">{t.custody}</span>
                       <span className="font-bold text-amber-600 dark:text-amber-400">{matchedAsset.custody_status}</span>
                     </div>
                   </div>
-                )}
-
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button
-                    onClick={() => {
-                      onQuickAction?.(matchedCatalogItem, 'INBOUND', matchedAsset || undefined);
-                      onClose();
-                    }}
-                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center justify-center space-x-1.5"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                    </svg>
-                    <span>{t.btnInbound}</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onQuickAction?.(matchedCatalogItem, 'OUTBOUND', matchedAsset || undefined);
-                      onClose();
-                    }}
-                    className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center justify-center space-x-1.5"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                    </svg>
-                    <span>{t.btnOutbound}</span>
-                  </button>
                 </div>
+              )}
+
+              {/* Action Buttons for Matched Item */}
+              <div className="flex flex-wrap gap-2 pt-2">
+                <button
+                  onClick={() => {
+                    onClose();
+                    onQuickAction?.(matchedCatalogItem, 'INBOUND', matchedAsset || undefined);
+                  }}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
+                >
+                  {t.btnInbound}
+                </button>
+                <button
+                  onClick={() => {
+                    onClose();
+                    onQuickAction?.(matchedCatalogItem, 'OUTBOUND', matchedAsset || undefined);
+                  }}
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
+                >
+                  {t.btnOutbound}
+                </button>
+                {matchedCatalogItem.is_trackable_asset && !matchedAsset && (
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onQuickAction?.(matchedCatalogItem, 'REGISTER_ASSET');
+                    }}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
+                  >
+                    {t.btnRegisterAsset}
+                  </button>
+                )}
               </div>
             </div>
           )}
 
-          {/* UNREGISTERED BARCODE PROMPT */}
-          {!isRegistering && scannedCode && !matchedCatalogItem && !matchedAsset && (
-            <div className="border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 rounded-xl p-4 space-y-3 animate-fade-in">
-              <div className="flex items-start space-x-3">
-                <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-xs font-bold text-amber-900 dark:text-amber-300 uppercase">
-                    {t.unregisteredTitle}
-                  </h3>
-                  <p className="text-xs font-light text-amber-800 dark:text-amber-400 mt-1">
-                    {t.unregisteredDesc(scannedCode)}
-                  </p>
-                </div>
+          {/* Unregistered Barcode Found -> Prompt Quick Registry */}
+          {scannedCode && !matchedCatalogItem && !matchedAsset && !isRegistering && (
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 sm:p-5 space-y-3">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
+                <h4 className="text-sm font-bold text-amber-800 dark:text-amber-400 uppercase">
+                  {t.unregisteredTitle}
+                </h4>
               </div>
-
-              <div className="pt-1">
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                {t.unregisteredDesc(scannedCode)}
+              </p>
+              <div className="flex items-center space-x-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setIsRegistering(true)}
-                  className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center justify-center space-x-2"
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center space-x-1.5"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-                  </svg>
                   <span>{t.btnOpenRegistry}</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* FULL DATABASE ITEM & ASSET REGISTRY FORM */}
+          {/* ================================================= */}
+          {/* INLINE UNREGISTERED ITEM QUICK-REGISTRY FORM */}
+          {/* ================================================= */}
           {isRegistering && (
-            <form onSubmit={handleRegisterSubmit} className="space-y-4 animate-fade-in border border-slate-200 dark:border-slate-800 rounded-xl p-4 bg-slate-50 dark:bg-slate-900/60">
+            <form onSubmit={handleRegisterSubmit} className="bg-slate-50 dark:bg-slate-900/90 border border-blue-500/40 rounded-2xl p-4 sm:p-5 space-y-4">
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-                <div className="flex items-center space-x-2">
-                  <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase">
+                <div>
+                  <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase">
                     {t.formTitle}
-                  </h3>
+                  </h4>
+                  <p className="text-[11px] font-mono text-slate-400">
+                    EAN: {regBarcode}
+                  </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setIsRegistering(false)}
-                  className="text-xs text-slate-400 hover:text-slate-600"
+                  className="text-slate-400 hover:text-slate-600 text-xs font-bold"
                 >
-                  ✕
+                  ✕ {t.btnCancel}
                 </button>
               </div>
 
+              {/* Form Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                
+                {/* Barcode & SKU Code */}
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblBarcode}
-                  </label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblBarcode}</label>
                   <input
                     type="text"
                     required
                     value={regBarcode}
                     onChange={(e) => setRegBarcode(e.target.value)}
-                    className="w-full px-3 py-2 font-mono font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblLegacyCode}
-                  </label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblLegacyCode}</label>
                   <input
                     type="text"
                     required
                     value={regLegacyCode}
                     onChange={(e) => setRegLegacyCode(e.target.value)}
-                    className="w-full px-3 py-2 font-mono font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblNameTr}
-                  </label>
+                {/* Names */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblNameTr}</label>
                   <input
                     type="text"
                     required
-                    placeholder="Örn: 24.000 BTU Inverter VRF İç Ünite"
                     value={regNameTr}
                     onChange={(e) => setRegNameTr(e.target.value)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    placeholder="Örn: 24kW Inverter VRF Klima Dış Ünite"
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblNameEn}
-                  </label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblNameEn}</label>
                   <input
                     type="text"
-                    placeholder="e.g. 24,000 BTU Inverter VRF Indoor Unit"
                     value={regNameEn}
                     onChange={(e) => setRegNameEn(e.target.value)}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    placeholder="e.g. 24kW Inverter VRF Outdoor Unit"
+                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
+                {/* Category & Subcategory */}
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblCategory}
-                  </label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblCategory}</label>
                   <select
                     value={regCategory}
                     onChange={(e) => setRegCategory(e.target.value)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   >
                     {categoryOptions.map((cat) => (
                       <option key={cat} value={cat}>{cat}</option>
@@ -1023,199 +1111,179 @@ export default function MobileBarcodeScannerModal({
                     <option value="Sıhhi Tesisat & Vitrifiye">Sıhhi Tesisat & Vitrifiye</option>
                     <option value="Elektrik & Altyapı">Elektrik & Altyapı</option>
                     <option value="İnce Yapı & Kaplama">İnce Yapı & Kaplama</option>
-                    <option value="Kaba Yapı & Çelik">Kaba Yapı & Çelik</option>
+                    <option value="Kaba Yapı & Betonarme">Kaba Yapı & Betonarme</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblSubcategory}
-                  </label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblSubcategory}</label>
                   <input
                     type="text"
-                    placeholder="Örn: VRF Sistemleri"
                     value={regSubcategory}
                     onChange={(e) => setRegSubcategory(e.target.value)}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    placeholder="Örn: Isı Pompası / Seramik"
+                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
+                {/* Unit of Measure & Technical Spec */}
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblUnit}
-                  </label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblUnit}</label>
                   <select
                     value={regUnit}
                     onChange={(e) => setRegUnit(e.target.value)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   >
                     <option value="adet">adet</option>
                     <option value="set">set</option>
-                    <option value="kutu">kutu</option>
-                    <option value="kg">kg</option>
                     <option value="m2">m2</option>
                     <option value="m3">m3</option>
-                    <option value="lt">lt</option>
+                    <option value="kg">kg</option>
                     <option value="ton">ton</option>
-                    <option value="metre">metre</option>
+                    <option value="mt">mt</option>
+                    <option value="paket">paket</option>
                   </select>
                 </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblSpecification}
-                  </label>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblSpecification}</label>
                   <input
                     type="text"
-                    placeholder="Örn: R32 Inverter, 60x60 Panel, A++ Verimlilik"
                     value={regSpec}
                     onChange={(e) => setRegSpec(e.target.value)}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    placeholder="Örn: R32 Inverter, 400V, CE Onaylı"
+                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
-                {/* Packaging Type */}
+                {/* Packaging Type & Piece Count */}
                 <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblPackaging}
-                  </label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblPackaging}</label>
                   <select
                     value={regPackagingType}
                     onChange={(e) => setRegPackagingType(e.target.value as PackagingUnitType)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   >
-                    <option value="SINGLE_ITEM">TEKİL ÜRÜN (Single Item)</option>
-                    <option value="ATOMIC_SET">AYRILMAZ SET (Atomic Set)</option>
+                    <option value="SINGLE_ITEM">{t.singleItem}</option>
+                    <option value="ATOMIC_SET">{t.atomicSet} (Parça Seti)</option>
                   </select>
                 </div>
 
                 {regPackagingType === 'ATOMIC_SET' && (
                   <div>
-                    <label className="block font-bold text-slate-500 uppercase mb-1">
-                      {t.lblPieces}
-                    </label>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblPieces}</label>
                     <input
                       type="number"
-                      min="1"
+                      min="2"
                       value={regPieceCount}
                       onChange={(e) => setRegPieceCount(Number(e.target.value))}
-                      className="w-full px-3 py-2 font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                      className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                     />
                   </div>
                 )}
 
-                {/* Trackable Asset Switch */}
-                <div className="sm:col-span-2 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-300 dark:border-slate-700 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 dark:text-slate-200">
-                      {t.lblTrackable}
-                    </span>
+                {/* Cost and Commercial Markup */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblCost}</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={regBaseCostEur}
+                    onChange={(e) => setRegBaseCostEur(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblMarkup}</label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    value={regMarkupPct}
+                    onChange={(e) => setRegMarkupPct(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                {/* Intake Quantity & Delivery Note */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblInitialQty}</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={regInitialQty}
+                    onChange={(e) => setRegInitialQty(Number(e.target.value))}
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblIrsaliye}</label>
+                  <input
+                    type="text"
+                    value={regIrsaliye}
+                    onChange={(e) => setRegIrsaliye(e.target.value)}
+                    placeholder="IRS-2026-..."
+                    className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblSupplier}</label>
+                  <input
+                    type="text"
+                    value={regSupplier}
+                    onChange={(e) => setRegSupplier(e.target.value)}
+                    placeholder="Örn: Daikin Kıbrıs / Çimko Çimento"
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                {/* Trackable Serialized Asset Options */}
+                <div className="sm:col-span-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                  <label className="flex items-center space-x-2 cursor-pointer mb-2">
                     <input
                       type="checkbox"
                       checked={regIsTrackable}
                       onChange={(e) => setRegIsTrackable(e.target.checked)}
-                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                      className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
                     />
-                  </div>
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      {t.lblTrackable}
+                    </span>
+                  </label>
 
                   {regIsTrackable && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-6">
                       <div>
-                        <label className="block font-bold text-slate-500 uppercase mb-1">
-                          {t.lblSerial}
-                        </label>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblSerial}</label>
                         <input
                           type="text"
-                          placeholder="Örn: SN-VRF-992100"
                           value={regSerialNo}
                           onChange={(e) => setRegSerialNo(e.target.value)}
-                          className="w-full px-3 py-2 font-mono font-bold rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                          placeholder="SN-XXXX-YYYY"
+                          className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                         />
                       </div>
                       <div>
-                        <label className="block font-bold text-slate-500 uppercase mb-1">
-                          {t.lblWarranty}
-                        </label>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblWarranty}</label>
                         <input
                           type="date"
                           value={regWarrantyDate}
                           onChange={(e) => setRegWarrantyDate(e.target.value)}
-                          className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                          className="w-full px-3 py-2 text-xs font-mono rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                         />
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Pricing & Intake */}
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblCost}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={regBaseCostEur}
-                    onChange={(e) => setRegBaseCostEur(Number(e.target.value))}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblMarkup}
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={regMarkupPct}
-                    onChange={(e) => setRegMarkupPct(Number(e.target.value))}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblInitialQty}
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={regInitialQty}
-                    onChange={(e) => setRegInitialQty(Number(e.target.value))}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblIrsaliye}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="IRS-2026-..."
-                    value={regIrsaliye}
-                    onChange={(e) => setRegIrsaliye(e.target.value)}
-                    className="w-full px-3 py-2 font-mono font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block font-bold text-slate-500 uppercase mb-1">
-                    {t.lblSupplier}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Örn: Daikin / Geberit / Çimko"
-                    value={regSupplier}
-                    onChange={(e) => setRegSupplier(e.target.value)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
-                  />
-                </div>
               </div>
 
-              <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+              {/* Form Action Buttons */}
+              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={() => setIsRegistering(false)}
