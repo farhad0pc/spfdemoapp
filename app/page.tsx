@@ -346,6 +346,7 @@ export default function PurchasingPortalPage() {
               currentRole={currentRole}
               lang={lang}
               onNavigateToRequisitions={() => setView('WORKSPACE')}
+              onRegisterCatalogItem={(newItem) => setCatalogItems((prev) => [newItem, ...prev])}
             />
           ) : (
             <RequisitionWorkspace

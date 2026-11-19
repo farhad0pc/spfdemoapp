@@ -21,6 +21,7 @@ interface DepoManagementWorkspaceProps {
   currentRole: RoleTier;
   lang: 'tr' | 'en';
   onNavigateToRequisitions?: () => void;
+  onRegisterCatalogItem?: (newItem: InventoryCatalogItem) => void;
 }
 
 // Authoritative fallback seed dataset for DEPOT-PRJ02-MAIN (Caesar Resort & Spa - Main Depot)
@@ -272,6 +273,7 @@ export default function DepoManagementWorkspace({
   currentRole,
   lang,
   onNavigateToRequisitions,
+  onRegisterCatalogItem,
 }: DepoManagementWorkspaceProps) {
   // State
   const [activeDepotId, setActiveDepotId] = useState<string>(SEED_DEPOT.depot_id);
@@ -284,6 +286,18 @@ export default function DepoManagementWorkspace({
   const [movementFilter, setMovementFilter] = useState<string>('ALL');
   const [missingDocsOnly, setMissingDocsOnly] = useState<boolean>(false);
   const [lowStockOnly, setLowStockOnly] = useState<boolean>(false);
+
+  // Local state for registered catalog items to instantly reflect additions
+  const [localCatalogItems, setLocalCatalogItems] = useState<InventoryCatalogItem[]>([]);
+
+  // Merged catalog list for all dropdowns, lookups and scanner modals
+  const allCatalogItems = useMemo(() => {
+    const base = catalogItems.length > 0 ? catalogItems : balances.map((b) => b.catalog_item!).filter(Boolean);
+    const map = new Map<string, InventoryCatalogItem>();
+    base.forEach((item) => map.set(item.item_id, item));
+    localCatalogItems.forEach((item) => map.set(item.item_id, item));
+    return Array.from(map.values());
+  }, [catalogItems, balances, localCatalogItems]);
 
   // Modals & Drawers
   const [editingTransaction, setEditingTransaction] = useState<DepotTransaction | null>(null);
@@ -411,8 +425,16 @@ export default function DepoManagementWorkspace({
   }, [activeDepotId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchDepotData();
+    let ignore = false;
+    const init = async () => {
+      await fetchDepotData();
+    };
+    if (!ignore) {
+      void init();
+    }
+    return () => {
+      ignore = true;
+    };
   }, [fetchDepotData]);
 
   // Turkish locale search normalizer
@@ -595,11 +617,33 @@ export default function DepoManagementWorkspace({
     setEditingTransaction(null);
   };
 
+  // Handle Registered Item from Quick-Registry Form in MobileBarcodeScannerModal
+  const handleItemRegistered = useCallback((
+    newCatalogItem: InventoryCatalogItem,
+    newBalance: DepotStockBalance,
+    newTx: DepotTransaction,
+    newAsset?: AssetRegisterItem
+  ) => {
+    setLocalCatalogItems((prev) => [newCatalogItem, ...prev]);
+    setBalances((prev) => {
+      const exists = prev.some((b) => b.catalog_item_id === newBalance.catalog_item_id && b.depot_id === newBalance.depot_id);
+      if (exists) {
+        return prev.map((b) => (b.catalog_item_id === newBalance.catalog_item_id && b.depot_id === newBalance.depot_id ? newBalance : b));
+      }
+      return [newBalance, ...prev];
+    });
+    setTransactions((prev) => [newTx, ...prev]);
+    if (newAsset) {
+      setAssets((prev) => [newAsset, ...prev]);
+    }
+    onRegisterCatalogItem?.(newCatalogItem);
+  }, [onRegisterCatalogItem]);
+
   // Handle Inbound Form Submit
   const handleCreateInbound = async () => {
     if (!inboundCatalogId || inboundQty <= 0) return;
 
-    const catalogItem = catalogItems.find((c) => c.item_id === inboundCatalogId) ||
+    const catalogItem = allCatalogItems.find((c) => c.item_id === inboundCatalogId) ||
                         balances.find((b) => b.catalog_item_id === inboundCatalogId)?.catalog_item;
     if (!catalogItem) return;
 
@@ -688,7 +732,7 @@ export default function DepoManagementWorkspace({
   const handleCreateOutbound = async () => {
     if (!outboundCatalogId || outboundQty <= 0) return;
 
-    const catalogItem = catalogItems.find((c) => c.item_id === outboundCatalogId) ||
+    const catalogItem = allCatalogItems.find((c) => c.item_id === outboundCatalogId) ||
                         balances.find((b) => b.catalog_item_id === outboundCatalogId)?.catalog_item;
     if (!catalogItem) return;
 
@@ -1360,7 +1404,8 @@ export default function DepoManagementWorkspace({
       <MobileBarcodeScannerModal
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
-        catalogItems={catalogItems.length > 0 ? catalogItems : balances.map((b) => b.catalog_item!).filter(Boolean)}
+        activeDepotId={activeDepotId}
+        catalogItems={allCatalogItems}
         stockBalances={balances}
         assetRegister={assets}
         lang={lang}
@@ -1374,6 +1419,7 @@ export default function DepoManagementWorkspace({
             setIsOutboundModalOpen(true);
           }
         }}
+        onItemRegistered={handleItemRegistered}
       />
 
       {/* ================================================= */}
@@ -1498,7 +1544,7 @@ export default function DepoManagementWorkspace({
                   value={inboundCatalogId}
                   onChange={(e) => {
                     setInboundCatalogId(e.target.value);
-                    const selected = catalogItems.find((c) => c.item_id === e.target.value) ||
+                    const selected = allCatalogItems.find((c) => c.item_id === e.target.value) ||
                                      balances.find((b) => b.catalog_item_id === e.target.value)?.catalog_item;
                     if (selected) {
                       setInboundCostEur(selected.base_cost_eur || 0);
@@ -1507,7 +1553,7 @@ export default function DepoManagementWorkspace({
                   className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
                 >
                   <option value="">{lang === 'tr' ? '-- Malzeme Seçiniz --' : '-- Select Material --'}</option>
-                  {(catalogItems.length > 0 ? catalogItems : balances.map((b) => b.catalog_item!).filter(Boolean)).map((c) => (
+                  {allCatalogItems.map((c) => (
                     <option key={c.item_id} value={c.item_id}>
                       {c.item_name_tr} ({c.unit_of_measure}) - {c.legacy_code || c.barcode_ean || 'SKU'}
                     </option>

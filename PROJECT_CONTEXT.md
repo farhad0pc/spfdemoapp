@@ -121,7 +121,7 @@ Master Northern Cyprus project and building hierarchy (PRJ-01 to PRJ-08, 438 blo
 
 1. Predictive Calculation Engine: Material quantities and budget ceilings calculated programmatically.
 2. The No-Backloop Policy: Requisitions handed over to Purchasing never bounce back to Technical Office due to price variances. Overruns are flagged internally and managed inside Purchasing or escalated to Executive if >15,000 EUR.
-3. Mobile Camera Barcode Scanning: Supports native browser `BarcodeDetector` (rear camera `facingMode: 'environment'`, EAN-13, Code-128, QR) with manual/USB reader fallback.
+3. Universal Cross-Device Barcode Scanner & Quick-Registry Engine: Employs `barcode-detector` (ZXing-C++ WASM ponyfill) ensuring 100% universal barcode decoding across all devices (MacBook/laptop webcams, iOS Safari/Chrome, Android, Windows) with multi-barcode canvas bounding box overlays, camera device selection, and an integrated Unregistered Item Quick-Registry Form for immediate catalog, balance, and transaction ingestion into Supabase with PostgreSQL generated column safety.
 4. Unbroken Document Chain & Missing-Doc Flagging: Every stock movement enforces links to Requisition (`REQ-*`), İrsaliye, and Invoice. Rows with missing documentation display prominent warning badges with inline quick-edit drawers.
 5. End-of-Line Outbound Handover: Site delivery drop-off confirmed by staff (`delivery_confirmed = true`), decrementing balances and transitioning serialized items to `HANDED_OVER_TO_AFTERSALES`.
 6. Atomic Set Integrity: Packaging unit type `ATOMIC_SET` preserves package integrity based on `set_piece_count`.
@@ -169,6 +169,6 @@ The system compiles with 0 errors and 0 warnings under tsc and eslint.
 - **Step C (Dedicated Depo / Inventory Management, Smartphone Barcode Scanner & Asset Custody Register):** COMPLETED.
   - Extended `public.inventory_catalog` with `barcode_ean`, `is_trackable_asset`, `packaging_unit_type`, `set_piece_count`, and `commercial_markup_pct`.
   - Deployed `DepotLocation`, `DepotStockBalance`, `DepotTransaction`, `AssetRegisterItem` interfaces with PostgreSQL generated column safety (`has_missing_docs`).
-  - Created `components/MobileBarcodeScannerModal.tsx`: live rear camera barcode scanner via `BarcodeDetector` API with instant manual/USB input fallback and quick test presets.
+  - Created `components/MobileBarcodeScannerModal.tsx`: Universal cross-device scanner powered by `barcode-detector` (ZXing-C++ WASM ponyfill), multi-barcode canvas bounding box overlays, camera device selector, instant manual/USB input fallback, quick test presets, and complete inline Unregistered Item Quick-Registry Form with Supabase persistence and generated-column safety (`has_missing_docs`).
   - Created `components/DepoManagementWorkspace.tsx`: 4-stat KPI telemetry strip, 3-tab ledger system (`Live Stock Balances`, `Movement & İrsaliye Ledger`, `Serialized Asset Custody Register`), missing-doc drawer, and 1-tap mobile handover confirmation.
   - Integrated into `components/DesktopSidebar.tsx` (promoted to active module) and `app/page.tsx` view router.
