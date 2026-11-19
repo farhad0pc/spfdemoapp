@@ -208,7 +208,18 @@ export default function DepoManagementWorkspace({
   // Filtered Balances
   const filteredBalances = useMemo(() => {
     const query = normalizeText(filterText);
+    const allowedDepotIdsForProject =
+      filterProject === "ALL"
+        ? null
+        : new Set(
+            depotLocations
+              .filter((d) => d.project_id === filterProject)
+              .map((d) => d.depot_id)
+          );
     return balances.filter((b) => {
+      if (allowedDepotIdsForProject && !allowedDepotIdsForProject.has(b.depot_id)) {
+        return false;
+      }
       const item = b.catalog_item;
       const nameTr = normalizeText(item?.item_name_tr || '');
       const nameEn = normalizeText(item?.item_name_en || '');
@@ -219,7 +230,7 @@ export default function DepoManagementWorkspace({
       const matchesQuery = !query || nameTr.includes(query) || nameEn.includes(query) || code.includes(query) || barcode.includes(query) || cat.includes(query);
       return matchesQuery;
     });
-  }, [balances, filterText, normalizeText]);
+  }, [balances, filterText, normalizeText, filterProject, depotLocations]);
 
   // Filtered Transactions
   const filteredTransactions = useMemo(() => {
@@ -824,7 +835,14 @@ export default function DepoManagementWorkspace({
 
             <select
               value={filterProject}
-              onChange={(e) => setFilterProject(e.target.value)}
+              onChange={(e) => {
+                  const nextProject = e.target.value;
+                  setFilterProject(nextProject);
+                  if (nextProject !== "ALL") {
+                    const matchedDepot = depotLocations.find((d) => d.project_id === nextProject);
+                    if (matchedDepot) setActiveDepotId(matchedDepot.depot_id);
+                  }
+                }}
               className="text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-hidden"
             >
               <option value="ALL">{t.allProjects}</option>

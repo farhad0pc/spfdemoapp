@@ -150,6 +150,43 @@ export default function DesktopSidebar({
                   )}
                 </button>
               )}
+            {/* Roadmap & Upcoming Segments */}
+            <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-800/80">
+              {!isCollapsed && (
+                <div className="px-3 mb-2 text-[10px] font-bold tracking-widest uppercase text-slate-400 dark:text-slate-500">
+                  {lang === "tr" ? "YOL HARİTASI & YAKINDA" : "ROADMAP & UPCOMING"}
+                </div>
+              )}
+              <div className="space-y-1">
+                {[
+                  { id: "PORTFOLIO", en: "Portfolio & Locations", tr: "Portföy & Lokasyonlar" },
+                  { id: "CATALOG", en: "Master Catalog Admin", tr: "Ana Katalog Yönetimi" },
+                  { id: "REPORTS", en: "Executive Dossiers", tr: "Yönetici Raporları" },
+                  { id: "DEV_TOOLS", en: "Database & Dev Tools", tr: "Veritabanı & Geliştirici" },
+                ].map((item) => (
+                  <div
+                    key={item.id}
+                    title={lang === "tr" ? item.tr : item.en}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs text-slate-400 dark:text-slate-500 opacity-75 cursor-not-allowed select-none"
+                  >
+                    <div className="flex items-center space-x-3 truncate">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700 shrink-0" />
+                      {!isCollapsed && (
+                        <span className="font-light truncate">
+                          {lang === "tr" ? item.tr : item.en}
+                        </span>
+                      )}
+                    </div>
+                    {!isCollapsed && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                        {lang === "tr" ? "YAKINDA" : "SOON"}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
 
             </div>
           </div>
