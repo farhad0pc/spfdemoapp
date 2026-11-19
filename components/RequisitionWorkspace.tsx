@@ -10,6 +10,7 @@ import {
   PortfolioBuilding
 } from '@/types/requisition';
 import ExecutiveTelemetryStrip from '@/components/ExecutiveTelemetryStrip';
+import { DICTIONARY } from '@/lib/i18n';
 
 interface RequisitionWorkspaceProps {
   requisitions: PurchaseRequisition[];
@@ -42,6 +43,9 @@ export default function RequisitionWorkspace({
   onExecutiveAction,
   onBatchAction,
 }: RequisitionWorkspaceProps) {
+  const d = DICTIONARY[lang].requisitions;
+  const common = DICTIONARY[lang].common;
+
   const [selectedTicket, setSelectedTicket] = useState<PurchaseRequisition | null>(null);
   const [quotaInput, setQuotaInput] = useState<string>('');
   const [supplierInput, setSupplierInput] = useState<string>('');
@@ -52,31 +56,6 @@ export default function RequisitionWorkspace({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [auditLogs, setAuditLogs] = useState<RequisitionApprovalLog[]>([]);
   const [logsLoading, setLogsLoading] = useState<boolean>(false);
-
-  const t = {
-    title: lang === 'tr' ? 'Satın Alma ve Talep Yönetim Masası' : 'Procurement & Requisition Sub-Ledger',
-    subTitle: lang === 'tr' ? 'Caesar Purchasing Sub-Ledger • Phase B Canlı Takip Paneli' : 'Caesar Purchasing Sub-Ledger • Phase B Real-time Control Center',
-    btnNewReq: lang === 'tr' ? '+ Yeni Malzeme Talebi Hesapla' : '+ Calculate New Requisition',
-    searchPlaceholder: lang === 'tr' ? 'Talep No, Proje, Blok veya Malzeme Ara...' : 'Search Ticket ID, Project, Block or Material...',
-    allStatuses: lang === 'tr' ? 'Tüm Durumlar' : 'All Statuses',
-    totalRecords: lang === 'tr' ? 'kayıt listeleniyor' : 'records found',
-    thTicket: lang === 'tr' ? 'Talep No' : 'Ticket ID',
-    thLocation: lang === 'tr' ? 'Lokasyon / Blok' : 'Location / Block',
-    thMaterial: lang === 'tr' ? 'Talep Edilen Malzeme' : 'Requisitioned Material',
-    thBudget: lang === 'tr' ? 'Teknik Bütçe Limiti' : 'Approved Budget',
-    thQuota: lang === 'tr' ? 'Tedarikçi Kotası' : 'Supplier Quota',
-    thStatus: lang === 'tr' ? 'Canlı Durum' : 'Live Status',
-    thAction: lang === 'tr' ? 'İşlem' : 'Action',
-    noRecords: lang === 'tr' ? 'Kayıtlı talep bulunamadı.' : 'No requisitions found.',
-    overrunBadge: lang === 'tr' ? 'Kota Aşıldı (İç Yönetim)' : 'Quota Overrun (Internal)',
-    awaitingQuote: lang === 'tr' ? 'Teklif Bekleniyor' : 'Awaiting Quote',
-    btnApproveBudget: lang === 'tr' ? 'Bütçeyi Onayla' : 'Approve Budget',
-    btnInspect: lang === 'tr' ? 'İncele / Takip' : 'Inspect / Track',
-    batchSelected: lang === 'tr' ? 'Talep Seçildi' : 'Selected',
-    batchApprove: lang === 'tr' ? 'Seçilenleri Toplu Onayla' : 'Batch Approve Selected',
-    batchReject: lang === 'tr' ? 'Seçilenleri Toplu Reddet' : 'Batch Reject Selected',
-    batchCancel: lang === 'tr' ? 'İptal' : 'Clear',
-  };
 
   // Build O(1) Portfolio Lookup Map
   const buildingLookup = useMemo(() => {
@@ -144,7 +123,7 @@ export default function RequisitionWorkspace({
     setQuotaInput(ticket.purchasing_actual_quota_eur?.toString() || '');
     setSupplierInput((ticket.custom_technical_specs?.supplier_name as string) || '');
     setPurchasingNotesInput((ticket.custom_technical_specs?.purchasing_notes as string) || '');
-    fetchAuditLogs(ticket.id);
+    void fetchAuditLogs(ticket.id);
   };
 
   const handleToggleSelect = (id: string) => {
@@ -205,24 +184,24 @@ export default function RequisitionWorkspace({
   };
 
   return (
-    <div className="font-sans text-slate-800 dark:text-slate-100">
+    <div className="font-sans text-slate-800 dark:text-slate-100 pb-12">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-6 mb-6 border-b border-slate-200 dark:border-slate-800 gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-            {t.title}
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
+            {d.title}
           </h1>
           <p className="text-xs font-light text-slate-500 dark:text-slate-400 mt-1">
-            {t.subTitle}
+            {d.subtitle}
           </p>
         </div>
 
         <div className="flex items-center space-x-3">
-          {(currentRole === 'TECH_OFFICE_USER' || currentRole === 'TECH_OFFICE_MANAGER') && (
+          {(currentRole === 'TECH_OFFICE_USER' || currentRole === 'TECH_OFFICE_MANAGER' || currentRole === 'SYSTEM_ADMIN') && (
             <button
               onClick={onOpenIntakeEngine}
               className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg shadow-xs transition-colors cursor-pointer"
             >
-              <span>{t.btnNewReq}</span>
+              <span>{d.btnNewReq}</span>
             </button>
           )}
         </div>
@@ -236,10 +215,10 @@ export default function RequisitionWorkspace({
       {selectedIds.length > 0 && (
         <div className="bg-slate-900 text-white p-3 rounded-xl mb-4 flex items-center justify-between shadow-lg">
           <div className="flex items-center space-x-3 text-xs font-light">
-            <span className="font-bold bg-blue-600 px-2 py-0.5 rounded-md">
+            <span className="font-bold bg-blue-600 px-2 py-0.5 rounded-md font-mono">
               {selectedIds.length}
             </span>
-            <span>{t.batchSelected}</span>
+            <span>{d.batchSelected}</span>
           </div>
           <div className="flex items-center space-x-2">
             {currentRole === 'EXECUTIVE' && onBatchAction && (
@@ -249,14 +228,14 @@ export default function RequisitionWorkspace({
                   disabled={actionLoading}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                 >
-                  {t.batchApprove}
+                  {d.batchApprove}
                 </button>
                 <button
                   onClick={() => handleExecuteBatch('REJECTED')}
                   disabled={actionLoading}
                   className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-md transition-colors cursor-pointer"
                 >
-                  {t.batchReject}
+                  {d.batchReject}
                 </button>
               </>
             )}
@@ -264,7 +243,7 @@ export default function RequisitionWorkspace({
               onClick={() => setSelectedIds([])}
               className="text-slate-400 hover:text-white text-xs font-light px-2 cursor-pointer"
             >
-              {t.batchCancel}
+              {d.batchClear}
             </button>
           </div>
         </div>
@@ -275,7 +254,7 @@ export default function RequisitionWorkspace({
         <div className="flex items-center space-x-3 w-full md:w-auto">
           <input
             type="text"
-            placeholder={t.searchPlaceholder}
+            placeholder={d.searchPlaceholder}
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             className="text-xs font-light px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white w-full md:w-80 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
@@ -283,9 +262,9 @@ export default function RequisitionWorkspace({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="text-xs font-light px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="text-xs font-bold bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
-            <option value="ALL">{t.allStatuses}</option>
+            <option value="ALL">{d.allStatuses}</option>
             <option value="DRAFTING">DRAFTING</option>
             <option value="TECH_REVIEW">TECH_REVIEW</option>
             <option value="PURCHASING_SOURCING">PURCHASING_SOURCING</option>
@@ -296,7 +275,7 @@ export default function RequisitionWorkspace({
         </div>
 
         <div className="text-xs font-light text-slate-500 dark:text-slate-400">
-          <b>{filteredTickets.length}</b> {t.totalRecords}
+          <span className="font-bold text-slate-900 dark:text-white">{filteredTickets.length}</span> {lang === 'tr' ? 'kayıt listeleniyor' : 'records found'}
         </div>
       </div>
 
@@ -314,20 +293,20 @@ export default function RequisitionWorkspace({
                     className="rounded-sm border-slate-300 text-blue-600 focus:ring-blue-500"
                   />
                 </th>
-                <th className="py-3 px-4">{t.thTicket}</th>
-                <th className="py-3 px-4">{t.thLocation}</th>
-                <th className="py-3 px-4">{t.thMaterial}</th>
-                <th className="py-3 px-4 text-right">{t.thBudget}</th>
-                <th className="py-3 px-4 text-right">{t.thQuota}</th>
-                <th className="py-3 px-4">{t.thStatus}</th>
-                <th className="py-3 px-4 text-center">{t.thAction}</th>
+                <th className="py-3 px-4">{d.thTicketId}</th>
+                <th className="py-3 px-4">{d.thLocation}</th>
+                <th className="py-3 px-4">{d.thMaterial}</th>
+                <th className="py-3 px-4 text-right">{d.thBudget}</th>
+                <th className="py-3 px-4 text-right">{d.thQuote}</th>
+                <th className="py-3 px-4">{d.thStatus}</th>
+                <th className="py-3 px-4 text-center">{d.thActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-light text-slate-700 dark:text-slate-300">
               {filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-slate-400 dark:text-slate-500">
-                    {t.noRecords}
+                  <td colSpan={8} className="text-center py-12 text-slate-400 dark:text-slate-500 font-light">
+                    {d.noRecords}
                   </td>
                 </tr>
               ) : (
@@ -381,17 +360,17 @@ export default function RequisitionWorkspace({
                           {ticket.catalog_item?.category}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right font-bold text-slate-900 dark:text-white">
-                        €{Number(ticket.tech_approved_budget_eur).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      <td className="py-3 px-4 text-right font-light text-slate-900 dark:text-white">
+                        €{Number(ticket.tech_approved_budget_eur).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                       </td>
                       <td className="py-3 px-4 text-right">
                         {ticket.purchasing_actual_quota_eur !== null ? (
-                          <span className={`font-bold ${isOverrun ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            €{Number(ticket.purchasing_actual_quota_eur).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            {isOverrun && <span className="block text-[10px] text-red-500 font-light">{t.overrunBadge}</span>}
+                          <span className={`font-light ${isOverrun ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            €{Number(ticket.purchasing_actual_quota_eur).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            {isOverrun && <span className="block text-[10px] text-red-500 font-light">{d.overrunBadge}</span>}
                           </span>
                         ) : (
-                          <span className="text-slate-400 italic font-light">{t.awaitingQuote}</span>
+                          <span className="text-slate-400 italic font-light">{d.awaitingQuote}</span>
                         )}
                       </td>
                       <td className="py-3 px-4">
@@ -406,14 +385,14 @@ export default function RequisitionWorkspace({
                             disabled={actionLoading}
                             className="px-2.5 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 rounded-md transition-colors border border-emerald-200 dark:border-emerald-800 cursor-pointer"
                           >
-                            {t.btnApproveBudget}
+                            {lang === 'tr' ? 'Bütçeyi Onayla' : 'Approve Budget'}
                           </button>
                         )}
                         <button
                           onClick={() => handleSelectTicket(ticket)}
                           className="px-3 py-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 rounded-md transition-colors border border-blue-200 dark:border-blue-900 cursor-pointer"
                         >
-                          {t.btnInspect}
+                          {d.btnInspect}
                         </button>
                       </td>
                     </tr>
@@ -427,7 +406,7 @@ export default function RequisitionWorkspace({
 
       {/* Sliding History Drawer */}
       {selectedTicket && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex justify-end z-999999">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex justify-end z-50">
           <div className="w-full max-w-lg bg-white dark:bg-slate-900 h-full shadow-2xl p-6 overflow-y-auto flex flex-col justify-between border-l border-slate-200 dark:border-slate-800">
             <div>
               <div className="flex justify-between items-center pb-4 mb-4 border-b border-slate-200 dark:border-slate-800">
@@ -470,7 +449,7 @@ export default function RequisitionWorkspace({
                               <span><b>{lang === 'tr' ? 'Kategori:' : 'Category:'}</b> {resolved.building.category_name}</span>
                             )}
                             {resolved.building.overall_completion_pct !== null && resolved.building.overall_completion_pct !== undefined && (
-                              <span><b>{lang === 'tr' ? 'İlerleme:' : 'Progress:'}</b> {resolved.building.overall_completion_pct}%</span>
+                              <span><b>{lang === 'tr' ? 'İlerleme:' : 'Progress:'}</b> <span className="font-mono">{resolved.building.overall_completion_pct}%</span></span>
                             )}
                           </div>
                         </div>
@@ -519,7 +498,7 @@ export default function RequisitionWorkspace({
                   </div>
                 )}
 
-                {currentRole === 'PURCHASING_AGENT' && (
+                {(currentRole === 'PURCHASING_AGENT' || currentRole === 'SYSTEM_ADMIN') && (
                   <div className="bg-blue-50/50 dark:bg-blue-950/40 p-4 rounded-xl border border-blue-200 dark:border-blue-800 space-y-3">
                     <h4 className="text-xs font-bold text-blue-900 dark:text-blue-300 uppercase">
                       {lang === 'tr' ? 'Satın Alma Kotası & Tedarikçi Yönetimi' : 'Supplier Sourcing & Quota Entry'}
@@ -550,7 +529,7 @@ export default function RequisitionWorkspace({
                         placeholder="e.g. 2450.00"
                         value={quotaInput}
                         onChange={(e) => setQuotaInput(e.target.value)}
-                        className="w-full text-xs font-bold px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                        className="w-full text-xs font-light px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
 
@@ -568,7 +547,7 @@ export default function RequisitionWorkspace({
 
                     {Number(quotaInput) > selectedTicket.tech_approved_budget_eur && (
                       <div className="bg-amber-50 dark:bg-amber-950/40 p-2.5 rounded-lg border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-[11px]">
-                        <b>{lang === 'tr' ? 'Bütçe Aşımı:' : 'Budget Overrun:'}</b> +€{(Number(quotaInput) - selectedTicket.tech_approved_budget_eur).toFixed(2)}
+                        <b>{lang === 'tr' ? 'Bütçe Aşımı:' : 'Budget Overrun:'}</b> <span className="font-light">+€{(Number(quotaInput) - selectedTicket.tech_approved_budget_eur).toFixed(2)}</span>
                       </div>
                     )}
 
@@ -628,9 +607,9 @@ export default function RequisitionWorkspace({
                     {lang === 'tr' ? 'Tarihçe ve Denetim Kayıtları' : 'Immutable Audit History'}
                   </h4>
                   {logsLoading ? (
-                    <div className="text-[11px] text-slate-400 py-2">Loading logs...</div>
+                    <div className="text-[11px] text-slate-400 py-2 font-light">{common.loading}</div>
                   ) : auditLogs.length === 0 ? (
-                    <div className="text-[11px] text-slate-400 py-2">
+                    <div className="text-[11px] text-slate-400 py-2 font-light">
                       {lang === 'tr' ? 'Henüz denetim kaydı bulunmuyor.' : 'No audit entries recorded yet.'}
                     </div>
                   ) : (
@@ -639,7 +618,7 @@ export default function RequisitionWorkspace({
                         <div key={log.id} className="bg-slate-50 dark:bg-slate-800/40 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-[11px]">
                           <div className="flex justify-between text-slate-500 dark:text-slate-400 mb-1">
                             <span className="font-bold text-slate-800 dark:text-slate-200">{log.action}</span>
-                            <span>{new Date(log.created_at).toLocaleTimeString()}</span>
+                            <span className="font-mono font-light">{new Date(log.created_at).toLocaleTimeString(lang === 'tr' ? 'tr-TR' : 'en-US')}</span>
                           </div>
                           <div className="text-slate-400 font-light truncate">
                             Actor: {log.actor_uuid}
@@ -653,8 +632,8 @@ export default function RequisitionWorkspace({
             </div>
 
             <div className="pt-4 border-t border-slate-200 dark:border-slate-800 text-center">
-              <span className="text-[11px] text-slate-400 font-light">
-                {new Date(selectedTicket.created_at).toLocaleString()}
+              <span className="text-[11px] text-slate-400 font-light font-mono">
+                {new Date(selectedTicket.created_at).toLocaleString(lang === 'tr' ? 'tr-TR' : 'en-US')}
               </span>
             </div>
           </div>

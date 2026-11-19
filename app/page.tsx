@@ -35,6 +35,13 @@ export default function PurchasingPortalPage() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Synchronize document DOM language dynamically to prevent CSS uppercase dotted 'İ' in English
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = lang;
+    }
+  }, [lang]);
+
   const fetchData = useCallback(async () => {
     const { data: catalog } = await supabase
       .from('inventory_catalog')
@@ -364,13 +371,13 @@ export default function PurchasingPortalPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex items-center justify-center font-sans text-slate-500 text-sm">
-        Loading...
+        {lang === 'tr' ? 'Yükleniyor...' : 'Loading...'}
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex transition-colors font-sans">
       {/* Desktop Left Sidebar Rail */}
       <DesktopSidebar
         isCollapsed={isSidebarCollapsed}

@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { RoleTier, DepartmentCode } from '@/types/requisition';
 import { ROLE_METADATA } from '@/lib/rbac';
+import { DICTIONARY } from '@/lib/i18n';
 
 interface CorporateHeaderProps {
   currentRole: RoleTier;
@@ -33,58 +34,59 @@ export default function CorporateHeader({
   isLoggedIn = false,
   onLogout,
 }: CorporateHeaderProps) {
+  const t = DICTIONARY[lang].header;
   const activeMeta = ROLE_METADATA[currentRole];
   const departmentColor = activeMeta?.department ? DEPT_BADGE_COLORS[activeMeta.department] : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200';
   const isRootAdmin = currentRole === 'SYSTEM_ADMIN';
 
   return (
-    <header className="bg-white dark:bg-[#090d16] border-b border-slate-200 dark:border-slate-800 transition-colors sticky top-0 z-20">
+    <header className="bg-white dark:bg-[#090d16] border-b border-slate-200 dark:border-slate-800 transition-colors sticky top-0 z-20 select-none">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
           {/* Left: Sidebar Toggle & Context Description */}
           <div className="flex items-center space-x-3">
             <button
               onClick={onToggleSidebar}
-              className="p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title={lang === 'tr' ? 'Menüyü Aç / Kapat' : 'Toggle Sidebar'}
+              className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title={t.toggleSidebar}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
               </svg>
             </button>
             <div className="hidden sm:block">
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
-                {lang === 'tr' ? 'Operasyonel Kontrol Merkezi' : 'Operational Control Center'}
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide block">
+                {t.controlCenter}
               </span>
               <p className="text-[11px] font-light text-slate-400">
-                {lang === 'tr' ? 'Caesar İnşaat Grubu Tedarik & Satın Alma Ekosistemi' : 'Caesar Group Procurement & Supply Ecosystem'}
+                {t.ecosystemSubtitle}
               </p>
             </div>
           </div>
 
-          {/* Right: Role Telemetry, Simulator (Root Only) & Authentication State */}
+          {/* Right: Telemetry, Simulator (Root Only) & Authentication */}
           <div className="flex items-center space-x-3 sm:space-x-4">
             
             {/* Supabase Realtime Telemetry Pulse */}
             <div className="hidden md:flex flex-col items-end text-right">
               <span className="text-[10px] font-light text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                {lang === 'tr' ? 'Supabase Realtime Canlı' : 'Supabase Realtime Live'}
+                {t.realtimeLive}
               </span>
             </div>
 
             {/* Role Badge or Simulator Switcher */}
             {isRootAdmin ? (
-              /* Root Administrator Simulator Switcher (Exclusive to SYSTEM_ADMIN) */
+              /* Root Administrator Simulator Switcher (Exclusive to SYSTEM_ADMIN Tier 0) */
               <div className="flex items-center bg-slate-50 dark:bg-slate-800/80 p-1 rounded-xl border border-amber-300/60 dark:border-amber-700/60 shadow-xs">
                 <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 px-2 hidden lg:flex items-center gap-1 uppercase tracking-wider">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
-                  {lang === 'tr' ? 'Root Simülatör:' : 'Root Simulator:'}
+                  {t.rootSimulator}
                 </span>
                 <select
                   value={currentRole}
                   onChange={(e) => onRoleChange(e.target.value as RoleTier)}
-                  className="text-xs font-bold bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                  className="text-xs font-bold bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-1 focus:ring-amber-500 cursor-pointer"
                 >
                   {(Object.keys(ROLE_METADATA) as RoleTier[]).map((r) => {
                     const m = ROLE_METADATA[r];
@@ -116,17 +118,17 @@ export default function CorporateHeader({
                 </div>
                 <div className="hidden lg:flex flex-col text-left">
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200 max-w-[140px] truncate">
-                    {currentUserEmail || 'Aktif Kullanıcı'}
+                    {currentUserEmail || t.activeUser}
                   </span>
                   <span className="text-[10px] font-light text-slate-400">
-                    {lang === 'tr' ? 'Oturum Açık' : 'Logged In'}
+                    {t.loggedIn}
                   </span>
                 </div>
                 {onLogout && (
                   <button
                     onClick={onLogout}
-                    title={lang === 'tr' ? 'Oturumu Kapat' : 'Sign Out'}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                    title={t.signOut}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors cursor-pointer"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -137,12 +139,12 @@ export default function CorporateHeader({
             ) : (
               <Link
                 href="/login"
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center space-x-1.5"
+                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center space-x-1.5 cursor-pointer"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                 </svg>
-                <span>{lang === 'tr' ? 'Giriş Yap' : 'Sign In'}</span>
+                <span>{t.signIn}</span>
               </Link>
             )}
 

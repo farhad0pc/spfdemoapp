@@ -13,6 +13,7 @@ import {
   canManageUser, 
   getAssignableRoles 
 } from '@/lib/rbac';
+import { DICTIONARY } from '@/lib/i18n';
 
 interface UserManagementWorkspaceProps {
   currentRole: RoleTier;
@@ -41,6 +42,8 @@ export default function UserManagementWorkspace({
   portfolioProjects = [],
 }: UserManagementWorkspaceProps) {
   const currentClockSec = useSyncExternalStore(subscribeToClock, getClockSnapshot, getServerSnapshot);
+  const d = DICTIONARY[lang].personnel;
+  const common = DICTIONARY[lang].common;
 
   // Data State
   const [users, setUsers] = useState<CorporateUserProfile[]>([]);
@@ -65,53 +68,6 @@ export default function UserManagementWorkspace({
   const [editingUser, setEditingUser] = useState<CorporateUserProfile | null>(null);
   const [editRole, setEditRole] = useState<RoleTier | ''>('');
   const [editSubmitting, setEditSubmitting] = useState(false);
-
-  const t = {
-    title: lang === 'tr' ? 'Personel & 2D RBAC Yetki Yönetim Merkezi' : 'Personnel & 2D RBAC Governance Center',
-    subtitle: lang === 'tr' 
-      ? 'Caesar Purchasing Sub-Ledger • 48 Saatlik Kriptografik Davetler & Hiyerarşik Delegasyon' 
-      : 'Caesar Purchasing Sub-Ledger • 48-Hour Cryptographic Invites & Hierarchical Delegation',
-    btnInvite: lang === 'tr' ? '+ Yeni Ekip Üyesi Davet Et' : '+ Invite Team Member',
-    tabRoster: lang === 'tr' ? 'Aktif Kurumsal Kadro' : 'Active Team Roster',
-    tabInvites: lang === 'tr' ? 'Bekleyen & Geçmiş Davetler' : 'Pending & Past Invites',
-    searchPlaceholder: lang === 'tr' ? 'İsim, e-posta, rol veya departman ara...' : 'Search name, email, role, or department...',
-    kpiTotalUsers: lang === 'tr' ? 'Toplam Kayıtlı Kullanıcı' : 'Total Registered Users',
-    kpiActiveUsers: lang === 'tr' ? 'Aktif Hesaplar' : 'Active Accounts',
-    kpiPendingInvites: lang === 'tr' ? 'Bekleyen Davetler (48s)' : 'Pending Invites (48h)',
-    kpiDepartments: lang === 'tr' ? 'Aktif Departman Sayısı' : 'Active Departments',
-
-    // Table Headers
-    thUser: lang === 'tr' ? 'Kullanıcı / Personel' : 'User / Personnel',
-    thDepartment: lang === 'tr' ? 'Departman' : 'Department',
-    thRole: lang === 'tr' ? 'Rol & Hiyerarşi' : 'Role & Hierarchy',
-    thTier: lang === 'tr' ? 'Yetki Seviyesi' : 'Authority Tier',
-    thStatus: lang === 'tr' ? 'Durum' : 'Status',
-    thLastLogin: lang === 'tr' ? 'Son Giriş' : 'Last Login',
-    thActions: lang === 'tr' ? 'İşlemler' : 'Actions',
-
-    // Invites Table
-    thInvitee: lang === 'tr' ? 'Davet Edilen' : 'Invitee',
-    thTargetRole: lang === 'tr' ? 'Hedef Rol & Departman' : 'Target Role & Division',
-    thExpiresIn: lang === 'tr' ? 'Kalan Süre (48 Saatlik Sayaç)' : 'Expires In (48h Clock)',
-    thInviteStatus: lang === 'tr' ? 'Davet Durumu' : 'Invite Status',
-
-    // Modals
-    modalInviteTitle: lang === 'tr' ? 'Yeni Ekip Üyesi Daveti Oluştur' : 'Create Team Member Invitation',
-    lblFullName: lang === 'tr' ? 'Adı Soyadı *' : 'Full Name *',
-    lblEmail: lang === 'tr' ? 'Kurumsal E-posta Adresi *' : 'Corporate Email Address *',
-    lblTargetRole: lang === 'tr' ? 'Atanacak Rol (Delegasyon Kapsamında) *' : 'Assignable Role (Within Delegation Scope) *',
-    lblDepartmentAuto: lang === 'tr' ? 'Departman (Otomatik Eşleşir)' : 'Department (Auto-Assigned)',
-    lblAllowedProjects: lang === 'tr' ? 'Erişim İzni Verilen Şantiyeler (Opsiyonel)' : 'Permitted Projects (Optional)',
-    btnSendInvite: lang === 'tr' ? 'Davet Bağlantısı Oluştur & Gönder' : 'Generate & Send Invite',
-    btnCancel: lang === 'tr' ? 'Kapat' : 'Close',
-    copyLinkSuccess: lang === 'tr' ? 'Bağlantı Panoya Kopyalandı!' : 'Link Copied to Clipboard!',
-    btnCopy: lang === 'tr' ? 'Linki Kopyala' : 'Copy Link',
-    btnResend: lang === 'tr' ? 'Yenile (48s)' : 'Resend (48h)',
-    btnRevoke: lang === 'tr' ? 'İptal Et' : 'Revoke',
-    btnSuspend: lang === 'tr' ? 'Askıya Al' : 'Suspend',
-    btnActivate: lang === 'tr' ? 'Aktifleştir' : 'Activate',
-    btnChangeRole: lang === 'tr' ? 'Rol Düzenle' : 'Change Role',
-  };
 
   // Fetch Users & Invites
   const fetchPersonnelData = useCallback(async () => {
@@ -194,19 +150,19 @@ export default function UserManagementWorkspace({
     if (status !== 'PENDING') {
       return status === 'ACCEPTED' ? (
         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400">
-          KULLANILDI (ACCEPTED)
+          {d.statusAccepted}
         </span>
       ) : (
         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-          İPTAL (REVOKED)
+          {d.statusRevoked}
         </span>
       );
     }
 
     if (!currentClockSec) {
       return (
-        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
-          Hesaplanıyor...
+        <span className="text-[10px] font-light px-2 py-0.5 rounded bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+          {common.loading}
         </span>
       );
     }
@@ -217,7 +173,7 @@ export default function UserManagementWorkspace({
     if (diffSec <= 0) {
       return (
         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400">
-          SÜRESİ DOLDU (EXPIRED)
+          {d.statusExpired}
         </span>
       );
     }
@@ -226,9 +182,9 @@ export default function UserManagementWorkspace({
     const mins = Math.floor((diffSec % 3600) / 60);
 
     return (
-      <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 flex items-center gap-1">
+      <span className="text-[10px] font-mono font-light px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 flex items-center gap-1">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-        {hours}s {mins}d kaldı
+        <span className="font-bold">{hours}</span>{lang === 'tr' ? 's' : 'h'} <span className="font-bold">{mins}</span>{lang === 'tr' ? 'd' : 'm'} {lang === 'tr' ? 'kaldı' : 'left'}
       </span>
     );
   };
@@ -257,7 +213,7 @@ export default function UserManagementWorkspace({
 
       const data = await res.json();
       if (!res.ok) {
-        setInviteError(data.error || 'Davet oluşturulamadı.');
+        setInviteError(data.error || (lang === 'tr' ? 'Davet oluşturulamadı.' : 'Failed to generate invitation.'));
         setInviteSubmitting(false);
         return;
       }
@@ -287,13 +243,13 @@ export default function UserManagementWorkspace({
       const data = await res.json();
       if (res.ok && data.invite_url) {
         await navigator.clipboard.writeText(data.invite_url);
-        alert(lang === 'tr' ? 'Davet yenilendi ve 48 saatlik yeni bağlantı panoya kopyalandı!' : 'Invite refreshed! New link copied to clipboard.');
+        alert(lang === 'tr' ? 'Davet yenilendi ve 48 saatlik yeni bağlantı panoya kopyalandı!' : 'Invite refreshed! New 48-hour link copied to clipboard.');
         void fetchPersonnelData();
       } else {
-        alert(data.error || 'İşlem başarısız.');
+        alert(data.error || (lang === 'tr' ? 'İşlem başarısız.' : 'Action failed.'));
       }
     } catch {
-      alert('İstek gönderilemedi.');
+      alert(lang === 'tr' ? 'İstek gönderilemedi.' : 'Network error.');
     }
   };
 
@@ -336,7 +292,7 @@ export default function UserManagementWorkspace({
         void fetchPersonnelData();
       } else {
         const data = await res.json();
-        alert(data.error || 'İşlem başarısız.');
+        alert(data.error || (lang === 'tr' ? 'İşlem başarısız.' : 'Operation failed.'));
       }
     } catch {
       // Ignore
@@ -364,7 +320,7 @@ export default function UserManagementWorkspace({
         void fetchPersonnelData();
       } else {
         const data = await res.json();
-        alert(data.error || 'Rol güncellenemedi.');
+        alert(data.error || (lang === 'tr' ? 'Rol güncellenemedi.' : 'Failed to update role.'));
       }
     } finally {
       setEditSubmitting(false);
@@ -372,7 +328,7 @@ export default function UserManagementWorkspace({
   };
 
   return (
-    <div className="space-y-6 animate-fade-in pb-16">
+    <div className="space-y-6 animate-fade-in pb-16 font-sans">
       
       {/* Header Banner */}
       <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs">
@@ -381,17 +337,17 @@ export default function UserManagementWorkspace({
             <div className="flex items-center space-x-2.5">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
               <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
-                {t.title}
+                {d.title}
               </h1>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-300 dark:border-blue-800">
                 2D RBAC
               </span>
-              <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">
+              <span className="text-[10px] font-mono font-bold text-slate-400 hidden sm:inline">
                 [{currentRole}]
               </span>
             </div>
             <p className="text-xs font-light text-slate-500 dark:text-slate-400">
-              {t.subtitle}
+              {d.subtitle}
             </p>
           </div>
 
@@ -411,7 +367,7 @@ export default function UserManagementWorkspace({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
               </svg>
-              <span>{t.btnInvite}</span>
+              <span>{d.btnInvite}</span>
             </button>
           )}
         </div>
@@ -423,52 +379,52 @@ export default function UserManagementWorkspace({
         {/* KPI 1: Total Users */}
         <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            {t.kpiTotalUsers}
+            {d.kpiTotalUsers}
           </span>
           <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-bold text-slate-900 dark:text-white">
+            <span className="text-2xl font-light text-slate-900 dark:text-white">
               {kpiStats.total}
             </span>
-            <span className="text-xs font-light text-slate-400">Kayıt</span>
+            <span className="text-xs font-light text-slate-400">{d.kpiTotalUsersSub}</span>
           </div>
         </div>
 
         {/* KPI 2: Active Accounts */}
         <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            {t.kpiActiveUsers}
+            {d.kpiActiveUsers}
           </span>
           <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+            <span className="text-2xl font-light text-emerald-600 dark:text-emerald-400">
               {kpiStats.active}
             </span>
-            <span className="text-xs font-light text-slate-400">Aktif</span>
+            <span className="text-xs font-light text-slate-400">{d.kpiActiveUsersSub}</span>
           </div>
         </div>
 
         {/* KPI 3: Pending Invites */}
         <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            {t.kpiPendingInvites}
+            {d.kpiPendingInvites}
           </span>
           <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+            <span className="text-2xl font-light text-amber-600 dark:text-amber-400">
               {kpiStats.pendingInvites}
             </span>
-            <span className="text-xs font-light text-slate-400">Açık Davet</span>
+            <span className="text-xs font-light text-slate-400">{d.kpiPendingInvitesSub}</span>
           </div>
         </div>
 
         {/* KPI 4: Active Departments */}
         <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-            {t.kpiDepartments}
+            {d.kpiDepartments}
           </span>
           <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            <span className="text-2xl font-light text-blue-600 dark:text-blue-400">
               {kpiStats.depts}
             </span>
-            <span className="text-xs font-light text-slate-400">Bölüm</span>
+            <span className="text-xs font-light text-slate-400">{d.kpiDepartmentsSub}</span>
           </div>
         </div>
 
@@ -488,7 +444,7 @@ export default function UserManagementWorkspace({
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
-              {t.tabRoster} ({users.length})
+              {d.tabRoster} <span className="font-light">({users.length})</span>
             </button>
 
             <button
@@ -499,9 +455,9 @@ export default function UserManagementWorkspace({
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
-              {t.tabInvites} ({invitations.length})
+              {d.tabInvites} <span className="font-light">({invitations.length})</span>
               {kpiStats.pendingInvites > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.2 rounded-full text-[9px] bg-amber-500 text-white">
+                <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500 text-white">
                   {kpiStats.pendingInvites}
                 </span>
               )}
@@ -515,7 +471,7 @@ export default function UserManagementWorkspace({
               onChange={(e) => setDepartmentFilter(e.target.value)}
               className="text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-hidden"
             >
-              <option value="ALL">{lang === 'tr' ? 'Tüm Departmanlar' : 'All Departments'}</option>
+              <option value="ALL">{d.allDepartments}</option>
               <option value="SYSTEM">SYSTEM</option>
               <option value="EXECUTIVE">EXECUTIVE</option>
               <option value="TECH_OFFICE">TECH_OFFICE</option>
@@ -531,8 +487,8 @@ export default function UserManagementWorkspace({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t.searchPlaceholder}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sans"
+            placeholder={d.searchPlaceholder}
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-light text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           />
           <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -545,26 +501,26 @@ export default function UserManagementWorkspace({
             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold uppercase text-[10px] text-slate-400 tracking-wider">
                 <tr>
-                  <th className="px-4 py-3">{t.thUser}</th>
-                  <th className="px-4 py-3">{t.thDepartment}</th>
-                  <th className="px-4 py-3">{t.thRole}</th>
-                  <th className="px-4 py-3 text-center">{t.thTier}</th>
-                  <th className="px-4 py-3 text-center">{t.thStatus}</th>
-                  <th className="px-4 py-3">{t.thLastLogin}</th>
-                  <th className="px-4 py-3 text-center">{t.thActions}</th>
+                  <th className="px-4 py-3">{d.thUser}</th>
+                  <th className="px-4 py-3">{d.thDepartment}</th>
+                  <th className="px-4 py-3">{d.thRole}</th>
+                  <th className="px-4 py-3 text-center">{d.thTier}</th>
+                  <th className="px-4 py-3 text-center">{d.thStatus}</th>
+                  <th className="px-4 py-3">{d.thLastLogin}</th>
+                  <th className="px-4 py-3 text-center">{d.thActions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-light text-slate-700 dark:text-slate-300">
                 {loading ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-slate-400 font-light">
-                      {lang === 'tr' ? 'Kullanıcı listesi yükleniyor...' : 'Loading personnel roster...'}
+                      {common.loading}
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-slate-400 font-light">
-                      {lang === 'tr' ? 'Kriterlere uygun personel bulunamadı.' : 'No personnel found.'}
+                      {lang === 'tr' ? 'Kriterlere uygun personel bulunamadı.' : 'No personnel matching filter criteria.'}
                     </td>
                   </tr>
                 ) : (
@@ -583,7 +539,7 @@ export default function UserManagementWorkspace({
                               <div className="font-bold text-slate-900 dark:text-white">
                                 {u.full_name}
                               </div>
-                              <div className="text-[11px] font-mono text-slate-400">
+                              <div className="text-[11px] font-mono font-light text-slate-400">
                                 {u.email}
                               </div>
                             </div>
@@ -598,7 +554,7 @@ export default function UserManagementWorkspace({
                           <div className="font-bold text-blue-600 dark:text-blue-400">
                             {roleMeta ? (lang === 'tr' ? roleMeta.titleTr : roleMeta.titleEn) : u.role}
                           </div>
-                          <div className="text-[10px] font-mono text-slate-400">
+                          <div className="text-[10px] font-mono font-light text-slate-400">
                             {u.role}
                           </div>
                         </td>
@@ -616,22 +572,22 @@ export default function UserManagementWorkspace({
                         <td className="px-4 py-3 text-center">
                           {u.account_status === 'ACTIVE' && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400">
-                              ✓ {u.account_status}
+                              ✓ {d.statusActive}
                             </span>
                           )}
                           {u.account_status === 'INVITED' && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
-                              ⏳ {u.account_status}
+                              ⏳ {d.statusInvited}
                             </span>
                           )}
                           {u.account_status === 'SUSPENDED' && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400">
-                              ✕ {u.account_status}
+                              ✕ {d.statusSuspended}
                             </span>
                           )}
                         </td>
-                        <td className="px-4 py-3 font-mono text-[11px] text-slate-500">
-                          {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString('tr-TR') : '-'}
+                        <td className="px-4 py-3 font-mono font-light text-[11px] text-slate-500">
+                          {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString(lang === 'tr' ? 'tr-TR' : 'en-US') : '-'}
                         </td>
                         <td className="px-4 py-3 text-center">
                           {isManageable ? (
@@ -644,7 +600,7 @@ export default function UserManagementWorkspace({
                                     : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-400'
                                 }`}
                               >
-                                {u.account_status === 'ACTIVE' ? t.btnSuspend : t.btnActivate}
+                                {u.account_status === 'ACTIVE' ? d.btnSuspend : d.btnActivate}
                               </button>
                               <button
                                 onClick={() => {
@@ -653,7 +609,7 @@ export default function UserManagementWorkspace({
                                 }}
                                 className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors"
                               >
-                                {t.btnChangeRole}
+                                {d.btnChangeRole}
                               </button>
                             </div>
                           ) : (
@@ -675,18 +631,18 @@ export default function UserManagementWorkspace({
             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
               <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold uppercase text-[10px] text-slate-400 tracking-wider">
                 <tr>
-                  <th className="px-4 py-3">{t.thInvitee}</th>
-                  <th className="px-4 py-3">{t.thTargetRole}</th>
-                  <th className="px-4 py-3">{t.thExpiresIn}</th>
-                  <th className="px-4 py-3 text-center">{t.thInviteStatus}</th>
-                  <th className="px-4 py-3 text-center">{t.thActions}</th>
+                  <th className="px-4 py-3">{d.thInvitee}</th>
+                  <th className="px-4 py-3">{d.thTargetRole}</th>
+                  <th className="px-4 py-3">{d.thExpiresIn}</th>
+                  <th className="px-4 py-3 text-center">{d.thInviteStatus}</th>
+                  <th className="px-4 py-3 text-center">{d.thActions}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-light text-slate-700 dark:text-slate-300">
                 {loading ? (
                   <tr>
                     <td colSpan={5} className="px-4 py-8 text-center text-slate-400 font-light">
-                      {lang === 'tr' ? 'Davet listesi yükleniyor...' : 'Loading invitations...'}
+                      {common.loading}
                     </td>
                   </tr>
                 ) : filteredInvitations.length === 0 ? (
@@ -705,7 +661,7 @@ export default function UserManagementWorkspace({
                           <div className="font-bold text-slate-900 dark:text-white">
                             {inv.full_name}
                           </div>
-                          <div className="text-[11px] font-mono text-slate-400">
+                          <div className="text-[11px] font-mono font-light text-slate-400">
                             {inv.email}
                           </div>
                         </td>
@@ -713,7 +669,7 @@ export default function UserManagementWorkspace({
                           <div className="font-bold text-blue-600 dark:text-blue-400">
                             {ROLE_METADATA[inv.target_role]?.titleTr || inv.target_role}
                           </div>
-                          <div className="text-[10px] uppercase font-mono text-slate-400">
+                          <div className="text-[10px] uppercase font-mono font-light text-slate-400">
                             {inv.target_department} • Tier {inv.target_tier}
                           </div>
                         </td>
@@ -736,9 +692,9 @@ export default function UserManagementWorkspace({
                                 <button
                                   onClick={() => handleResendInvite(inv.invitation_id)}
                                   className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900 transition-colors"
-                                  title="48 saatlik süreyi sıfırla ve yeni link üret"
+                                  title={lang === 'tr' ? '48 saatlik süreyi sıfırla ve yeni link üret' : 'Reset 48h clock and generate new link'}
                                 >
-                                  {t.btnResend}
+                                  {d.btnResend}
                                 </button>
                               )}
                               {inv.status === 'PENDING' && (
@@ -746,7 +702,7 @@ export default function UserManagementWorkspace({
                                   onClick={() => handleRevokeInvite(inv.invitation_id)}
                                   className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-900 transition-colors"
                                 >
-                                  {t.btnRevoke}
+                                  {d.btnRevoke}
                                 </button>
                               )}
                             </div>
@@ -773,10 +729,10 @@ export default function UserManagementWorkspace({
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase">
-                  {t.modalInviteTitle}
+                  {d.modalInviteTitle}
                 </h3>
                 <p className="text-xs font-light text-slate-400">
-                  Delegatör: {currentRole}
+                  {lang === 'tr' ? 'Delegatör:' : 'Delegator:'} <span className="font-bold">{currentRole}</span>
                 </p>
               </div>
               <button
@@ -799,11 +755,11 @@ export default function UserManagementWorkspace({
                   <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                   </svg>
-                  <span>Davet oluşturuldu ve 48 saatlik aktivasyon bağlantısı hazır!</span>
+                  <span>{lang === 'tr' ? 'Davet oluşturuldu ve 48 saatlik aktivasyon bağlantısı hazır!' : 'Invitation generated and 48-hour secure link is ready!'}</span>
                 </div>
 
                 <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-900 flex items-center justify-between gap-2">
-                  <span className="font-mono text-[11px] text-slate-700 dark:text-slate-300 truncate">
+                  <span className="font-mono font-light text-[11px] text-slate-700 dark:text-slate-300 truncate">
                     {inviteSuccessUrl}
                   </span>
                   <button
@@ -814,7 +770,7 @@ export default function UserManagementWorkspace({
                     }}
                     className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold whitespace-nowrap"
                   >
-                    {copiedLink ? t.copyLinkSuccess : t.btnCopy}
+                    {copiedLink ? d.copySuccess : d.btnCopy}
                   </button>
                 </div>
 
@@ -826,7 +782,7 @@ export default function UserManagementWorkspace({
                     }}
                     className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold"
                   >
-                    {t.btnCancel}
+                    {common.close}
                   </button>
                 </div>
               </div>
@@ -834,7 +790,7 @@ export default function UserManagementWorkspace({
               <form onSubmit={handleCreateInvite} className="space-y-3.5">
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                    {t.lblFullName}
+                    {d.lblFullName}
                   </label>
                   <input
                     type="text"
@@ -848,7 +804,7 @@ export default function UserManagementWorkspace({
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                    {t.lblEmail}
+                    {d.lblEmail}
                   </label>
                   <input
                     type="email"
@@ -856,13 +812,13 @@ export default function UserManagementWorkspace({
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     placeholder="ahmet@caesar-projects.com"
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
                   />
                 </div>
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                    {t.lblTargetRole}
+                    {d.lblTargetRole}
                   </label>
                   <select
                     required
@@ -881,12 +837,12 @@ export default function UserManagementWorkspace({
                 {inviteRole && (
                   <div className="p-3 bg-blue-50/50 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-900 text-xs">
                     <span className="text-[10px] font-bold text-slate-400 uppercase block">
-                      {t.lblDepartmentAuto}
+                      {d.lblDepartmentAuto}
                     </span>
                     <span className="font-bold text-blue-600 dark:text-blue-400">
                       {ROLE_METADATA[inviteRole as RoleTier]?.department}
                     </span>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    <p className="text-[11px] font-light text-slate-500 dark:text-slate-400 mt-1">
                       {ROLE_METADATA[inviteRole as RoleTier]?.descriptionTr}
                     </p>
                   </div>
@@ -894,7 +850,7 @@ export default function UserManagementWorkspace({
 
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                    {t.lblAllowedProjects}
+                    {d.lblAllowedProjects}
                   </label>
                   <div className="max-h-28 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-300 dark:border-slate-700 space-y-1">
                     {portfolioProjects.map((p) => (
@@ -912,7 +868,7 @@ export default function UserManagementWorkspace({
                           className="rounded border-slate-300 dark:border-slate-700 text-blue-600"
                         />
                         <span className="font-bold text-slate-800 dark:text-slate-200">
-                          {p.project_name} ({p.project_id})
+                          {p.project_name} <span className="font-light">({p.project_id})</span>
                         </span>
                       </label>
                     ))}
@@ -925,14 +881,14 @@ export default function UserManagementWorkspace({
                     onClick={() => setIsInviteModalOpen(false)}
                     className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold"
                   >
-                    {t.btnCancel}
+                    {common.cancel}
                   </button>
                   <button
                     type="submit"
                     disabled={inviteSubmitting || !inviteRole}
                     className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs"
                   >
-                    {inviteSubmitting ? 'Oluşturuluyor...' : t.btnSendInvite}
+                    {inviteSubmitting ? (lang === 'tr' ? 'Oluşturuluyor...' : 'Generating...') : d.btnSendInvite}
                   </button>
                 </div>
               </form>
@@ -949,15 +905,15 @@ export default function UserManagementWorkspace({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-sm bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4">
             <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase">
-              {t.btnChangeRole}: {editingUser.full_name}
+              {d.btnChangeRole}: {editingUser.full_name}
             </h3>
-            <p className="text-xs font-mono text-slate-400">
+            <p className="text-xs font-mono font-light text-slate-400">
               {editingUser.email}
             </p>
 
             <div>
               <label className="block text-[11px] font-bold uppercase text-slate-500 mb-1">
-                Yeni Rol
+                {d.lblNewRole}
               </label>
               <select
                 value={editRole}
@@ -978,7 +934,7 @@ export default function UserManagementWorkspace({
                 onClick={() => setEditingUser(null)}
                 className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold"
               >
-                {t.btnCancel}
+                {common.cancel}
               </button>
               <button
                 type="button"
@@ -986,7 +942,7 @@ export default function UserManagementWorkspace({
                 disabled={editSubmitting || !editRole}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold"
               >
-                {editSubmitting ? 'Kaydediliyor...' : 'Kaydet'}
+                {editSubmitting ? (lang === 'tr' ? 'Kaydediliyor...' : 'Saving...') : common.save}
               </button>
             </div>
           </div>

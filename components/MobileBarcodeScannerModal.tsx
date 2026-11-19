@@ -13,6 +13,7 @@ import {
   PackagingUnitType
 } from '@/types/requisition';
 import { supabase } from '@/lib/supabaseClient';
+import { DICTIONARY } from '@/lib/i18n';
 
 interface DetectedItemInfo {
   rawValue: string;
@@ -49,6 +50,9 @@ export default function MobileBarcodeScannerModal({
   onQuickAction,
   onItemRegistered,
 }: MobileBarcodeScannerModalProps) {
+  const d = DICTIONARY[lang].scanner;
+  const common = DICTIONARY[lang].common;
+
   // Camera & Device State
   const [cameraActive, setCameraActive] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -70,10 +74,10 @@ export default function MobileBarcodeScannerModal({
   const [regLegacyCode, setRegLegacyCode] = useState<string>('');
   const [regNameTr, setRegNameTr] = useState<string>('');
   const [regNameEn, setRegNameEn] = useState<string>('');
-  const [regCategory, setRegCategory] = useState<string>('Mekanik & İklimlendirme');
+  const [regCategory, setRegCategory] = useState<string>(d.categories[0] || 'Mekanik & İklimlendirme');
   const [regSubcategory, setRegSubcategory] = useState<string>('');
   const [regSpec, setRegSpec] = useState<string>('');
-  const [regUnit, setRegUnit] = useState<string>('adet');
+  const [regUnit, setRegUnit] = useState<string>(d.units[0] || 'adet');
   const [regPackagingType, setRegPackagingType] = useState<PackagingUnitType>('SINGLE_ITEM');
   const [regPieceCount, setRegPieceCount] = useState<number>(1);
   const [regIsTrackable, setRegIsTrackable] = useState<boolean>(false);
@@ -94,69 +98,6 @@ export default function MobileBarcodeScannerModal({
   const scanLoopRef = useRef<number | null>(null);
   const detectorRef = useRef<ZXingBarcodeDetector | null>(null);
   const lastScannedTimeRef = useRef<number>(0);
-
-  const t = {
-    title: lang === 'tr' ? 'Evrensel Barkod & Seri No Tarayıcı' : 'Universal Barcode & Serial Scanner',
-    subTitle: lang === 'tr' 
-      ? 'ZXing WebAssembly Motoru • Çift-Yönlü Ayna Çözümleyici & Doğrudan Veri Tabanı Kaydı' 
-      : 'ZXing WebAssembly Engine • Dual-Pass Mirror Resolver & Direct Database Registry',
-    close: lang === 'tr' ? 'Kapat' : 'Close',
-    cameraUnavailable: lang === 'tr' 
-      ? 'Kamera erişimi sağlanamadı. Lütfen manuel barkod girişini kullanınız.' 
-      : 'Camera access unavailable. Please use manual barcode entry.',
-    manualPlaceholder: lang === 'tr' ? 'Barkod EAN, Seri No (S/N) veya Kod girin...' : 'Enter Barcode EAN, Serial No (S/N) or SKU...',
-    btnSearch: lang === 'tr' ? 'Sorgula' : 'Lookup',
-    itemFound: lang === 'tr' ? 'Malzeme / Varlık Eşleşti' : 'Item / Asset Matched',
-    detectedInFrame: lang === 'tr' ? 'Kamerada Algılanan Barkodlar:' : 'Barcodes in Camera View:',
-    dualDetected: lang === 'tr' ? 'İkili Barkod Eşleşmesi (Ürün EAN + Seri No S/N)' : 'Dual Barcodes Paired (Product EAN + Serial S/N)',
-    sku: lang === 'tr' ? 'Malzeme Kodu' : 'SKU Code',
-    packaging: lang === 'tr' ? 'Ambalaj Tipi' : 'Packaging Unit',
-    atomicSet: lang === 'tr' ? 'ATOMIC SET' : 'ATOMIC SET',
-    singleItem: lang === 'tr' ? 'TEKİL ÜRÜN' : 'SINGLE ITEM',
-    pieceCount: lang === 'tr' ? 'Parça' : 'Pcs',
-    stockOnHand: lang === 'tr' ? 'Depodaki Stok' : 'Stock On Hand',
-    baseCost: lang === 'tr' ? 'Birim Maliyet' : 'Unit Cost',
-    valuedCost: lang === 'tr' ? 'Değerlenmiş Fiyat' : 'Valued Cost',
-    assetTag: lang === 'tr' ? 'Varlık Etiketi' : 'Asset Tag',
-    serialNo: lang === 'tr' ? 'Seri Numarası' : 'Serial Number',
-    custody: lang === 'tr' ? 'Zimmet Durumu' : 'Custody Status',
-    location: lang === 'tr' ? 'Konum' : 'Location',
-    btnInbound: lang === 'tr' ? '+ Malzeme Girişi Yap' : '+ Log Inbound Receipt',
-    btnOutbound: lang === 'tr' ? '+ Şantiyeye Çıkış Yap' : '+ Issue Outbound Handover',
-    btnRegisterAsset: lang === 'tr' ? '+ Seri No Kaydı Aç' : '+ Register Serialized Asset',
-    quickPresets: lang === 'tr' ? 'Hızlı Test Kodları:' : 'Quick Test Barcodes:',
-    
-    // Unregistered Prompt
-    unregisteredTitle: lang === 'tr' ? 'Kayıtsız Barkod Algılandı' : 'Unregistered Barcode Detected',
-    unregisteredDesc: (code: string) => lang === 'tr' 
-      ? `"${code}" barkodu sistemde kayıtlı değil. Bu malzemeyi veri tabanına ekleyip şantiye mal kabulünü hemen yapabilirsiniz.`
-      : `Barcode "${code}" is not registered in the database. Would you like to register it now?`,
-    btnOpenRegistry: lang === 'tr' ? '+ Yeni Malzeme / Varlık Kaydı Aç' : '+ Register New Item / Asset',
-
-    // Registry Form
-    formTitle: lang === 'tr' ? 'Yeni Malzeme / Varlık Veri Tabanı Kaydı' : 'Register New Material / Asset in Database',
-    lblBarcode: lang === 'tr' ? 'Barkod (EAN / UPC / QR) *' : 'Barcode (EAN / UPC / QR) *',
-    lblLegacyCode: lang === 'tr' ? 'Malzeme Referans Kodu *' : 'Material Reference Code (SKU) *',
-    lblNameTr: lang === 'tr' ? 'Malzeme Adı (Türkçe) *' : 'Material Name (Turkish) *',
-    lblNameEn: lang === 'tr' ? 'Malzeme Adı (İngilizce)' : 'Material Name (English)',
-    lblCategory: lang === 'tr' ? 'Ticari Kategori *' : 'Trade Category *',
-    lblSubcategory: lang === 'tr' ? 'Alt Kategori' : 'Subcategory',
-    lblSpecification: lang === 'tr' ? 'Teknik Özellik / Standart' : 'Technical Specification',
-    lblUnit: lang === 'tr' ? 'Birim *' : 'Unit of Measure *',
-    lblPackaging: lang === 'tr' ? 'Ambalaj Tipi *' : 'Packaging Type *',
-    lblPieces: lang === 'tr' ? 'Set Parça Sayısı' : 'Set Piece Count',
-    lblTrackable: lang === 'tr' ? 'Seri Numaralı Varlık Takibi (Asset Register)' : 'Track as Serialized Asset',
-    lblSerial: lang === 'tr' ? 'Üretici Seri Numarası (S/N)' : 'Manufacturer Serial Number (S/N)',
-    lblWarranty: lang === 'tr' ? 'Garanti Bitiş Tarihi' : 'Warranty Expiry Date',
-    lblCost: lang === 'tr' ? 'Birim Maliyet (€) *' : 'Unit Cost (€) *',
-    lblMarkup: lang === 'tr' ? 'Ticari Kâr Marjı (%)' : 'Commercial Markup (%)',
-    lblInitialQty: lang === 'tr' ? 'Depoya Giriş Miktarı *' : 'Initial Intake Quantity *',
-    lblIrsaliye: lang === 'tr' ? 'İrsaliye Numarası (Boş ise eksik evrak uyarısı verir)' : 'Delivery Note / Dispatch No',
-    lblSupplier: lang === 'tr' ? 'Tedarikçi Firma' : 'Supplier Name',
-    btnSaveAndIntake: lang === 'tr' ? 'Kaydet & Mal Kabulünü Tamamla' : 'Save & Ingest into Depot',
-    btnCancel: lang === 'tr' ? 'İptal' : 'Cancel',
-    cameraSelect: lang === 'tr' ? 'Kamera Seç:' : 'Select Camera:',
-  };
 
   // Web Audio Synth Beep
   const playBeep = () => {
@@ -240,7 +181,7 @@ export default function MobileBarcodeScannerModal({
     setCameraError(null);
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('Camera API not supported in this browser.');
+        throw new Error(d.cameraUnavailable);
       }
 
       if (streamRef.current) {
@@ -266,10 +207,10 @@ export default function MobileBarcodeScannerModal({
       await refreshCameras();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setCameraError(msg || t.cameraUnavailable);
+      setCameraError(msg || d.cameraUnavailable);
       setCameraActive(false);
     }
-  }, [refreshCameras, t.cameraUnavailable]);
+  }, [d.cameraUnavailable, refreshCameras]);
 
   // Stop Camera Stream
   const stopCamera = useCallback(() => {
@@ -323,11 +264,11 @@ export default function MobileBarcodeScannerModal({
         // Configure ZXing WebAssembly to load from local Next.js public directory
         await prepareZXingModule({
           overrides: {
-            locateFile: (path: string, prefix: string) => {
+            locateFile: (path: string) => {
               if (path.endsWith('.wasm')) {
                 return '/wasm/zxing_reader.wasm';
               }
-              return prefix + path;
+              return path;
             },
           },
           fireImmediately: true,
@@ -469,7 +410,7 @@ export default function MobileBarcodeScannerModal({
                   overlayCtx.fillStyle = isFlippedMatch ? '#0891b2' : '#059669';
                   overlayCtx.fillRect(labelX, Math.max(0, labelY - 24), tagText.length * 8 + 12, 22);
                   overlayCtx.fillStyle = '#ffffff';
-                  overlayCtx.font = 'bold 11px monospace';
+                  overlayCtx.font = 'bold 11px Oswald, sans-serif';
                   overlayCtx.fillText(tagText, labelX + 6, Math.max(14, labelY - 8));
                 }
               }
@@ -545,7 +486,7 @@ export default function MobileBarcodeScannerModal({
       legacy_code: regLegacyCode.trim() || `SKU-${Date.now()}`,
       item_name_tr: regNameTr.trim(),
       item_name_en: regNameEn.trim() || regNameTr.trim(),
-      specification: regSpec.trim() || 'Hızlı barkod kaydı',
+      specification: regSpec.trim() || (lang === 'tr' ? 'Hızlı barkod kaydı' : 'Quick barcode registration'),
       category: regCategory.trim(),
       subcategory: regSubcategory.trim() || null,
       unit_of_measure: regUnit.trim() || 'adet',
@@ -592,7 +533,9 @@ export default function MobileBarcodeScannerModal({
       delivery_confirmed: true,
       confirmed_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
-      notes: `Hızlı barkod tarayıcıdan sisteme kaydedildi (${regNameTr.trim()}).`,
+      notes: lang === 'tr'
+        ? `Hızlı barkod tarayıcıdan sisteme kaydedildi (${regNameTr.trim()}).`
+        : `Ingested from Universal Barcode Scanner (${regNameEn.trim() || regNameTr.trim()}).`,
       catalog_item: newCatalogItem,
     };
 
@@ -609,7 +552,7 @@ export default function MobileBarcodeScannerModal({
         custody_status: 'IN_DEPOT',
         inbound_transaction_id: newTx.transaction_id,
         warranty_expiry_date: regWarrantyDate || null,
-        notes: `Mal kabul esnasında seri numarası bağlandı.`,
+        notes: lang === 'tr' ? 'Mal kabul esnasında seri numarası bağlandı.' : 'Serial number attached during barcode intake.',
         created_at: new Date().toISOString(),
         catalog_item: newCatalogItem,
       };
@@ -657,13 +600,16 @@ export default function MobileBarcodeScannerModal({
   const markupPct = matchedCatalogItem?.commercial_markup_pct ?? 15;
   const valuedCost = Number((baseCost * (1 + markupPct / 100)).toFixed(2));
 
-  // Existing categories for dropdown
-  const categoryOptions = Array.from(
-    new Set(catalogItems.map((c) => c.category).filter(Boolean))
-  ) as string[];
+  // Merge available categories
+  const dynamicCategories = Array.from(
+    new Set([
+      ...d.categories,
+      ...catalogItems.map((c) => c.category).filter((cat): cat is string => Boolean(cat)),
+    ])
+  );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in font-sans">
       <div className="relative w-full max-w-2xl bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
         
         {/* Modal Header */}
@@ -677,36 +623,36 @@ export default function MobileBarcodeScannerModal({
             <div>
               <div className="flex items-center space-x-2">
                 <h2 className="text-base font-bold text-slate-900 dark:text-white uppercase tracking-wide">
-                  {t.title}
+                  {d.title}
                 </h2>
                 {engineStatus === 'READY' && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     WASM Ready
                   </span>
                 )}
                 {engineStatus === 'INITIALIZING' && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300 dark:border-amber-800 flex items-center gap-1">
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300 dark:border-amber-800 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-spin" />
                     Loading WASM...
                   </span>
                 )}
                 {engineStatus === 'ERROR' && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-300 dark:border-rose-800 flex items-center gap-1">
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-300 dark:border-rose-800 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                     WASM Error
                   </span>
                 )}
               </div>
               <p className="text-[11px] font-light text-slate-500 dark:text-slate-400">
-                {t.subTitle}
+                {d.subtitle}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            title={t.close}
+            title={common.close}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -722,7 +668,7 @@ export default function MobileBarcodeScannerModal({
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs font-light text-slate-500">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {videoDevices.length > 1 ? t.cameraSelect : 'Kamera Aktif:'}
+                  {videoDevices.length > 1 ? d.cameraSelect : (lang === 'tr' ? 'Kamera Aktif:' : 'Active Camera:')}
                 </span>
                 {videoDevices.length > 1 && (
                   <select
@@ -730,9 +676,9 @@ export default function MobileBarcodeScannerModal({
                     onChange={(e) => handleCameraChange(e.target.value)}
                     className="text-xs font-bold bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-800 dark:text-slate-200 focus:outline-hidden"
                   >
-                    {videoDevices.map((d, idx) => (
-                      <option key={d.deviceId || idx} value={d.deviceId}>
-                        {d.label || `Kamera ${idx + 1}`}
+                    {videoDevices.map((dev, idx) => (
+                      <option key={dev.deviceId || idx} value={dev.deviceId}>
+                        {dev.label || (lang === 'tr' ? `Kamera ${idx + 1}` : `Camera ${idx + 1}`)}
                       </option>
                     ))}
                   </select>
@@ -763,7 +709,7 @@ export default function MobileBarcodeScannerModal({
                     <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_8px_#f59e0b] animate-bounce" />
                     <div className="absolute -top-6 left-0 right-0 text-center">
                       <span className="text-[9px] font-bold uppercase tracking-widest text-amber-300 bg-slate-900/80 px-2 py-0.5 rounded-md">
-                        {lang === 'tr' ? 'HER TÜRLÜ AÇIDAN BARKOD HİZALAYIN' : 'ALIGN BARCODE FROM ANY ANGLE'}
+                        {d.alignHelp}
                       </span>
                     </div>
                   </div>
@@ -776,7 +722,7 @@ export default function MobileBarcodeScannerModal({
                       {cameraError}
                     </span>
                     <p className="text-xs text-slate-400 max-w-sm">
-                      {t.cameraUnavailable}
+                      {d.cameraUnavailable}
                     </p>
                   </div>
                 )}
@@ -786,8 +732,10 @@ export default function MobileBarcodeScannerModal({
               {detectedBarcodes.length > 0 && (
                 <div className="bg-slate-100 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-1.5">
                   <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                    <span>{t.detectedInFrame}</span>
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400">{detectedBarcodes.length} Algılandı</span>
+                    <span>{d.detectedInFrame}</span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                      {detectedBarcodes.length} {lang === 'tr' ? 'Algılandı' : 'Detected'}
+                    </span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {detectedBarcodes.map((item, idx) => (
@@ -801,7 +749,7 @@ export default function MobileBarcodeScannerModal({
                             : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:border-blue-400'
                         }`}
                       >
-                        <span className="text-[9px] opacity-70 uppercase font-sans">{item.format}</span>
+                        <span className="text-[9px] opacity-70 uppercase font-sans font-normal">{item.format}</span>
                         <span>{item.rawValue}</span>
                       </button>
                     ))}
@@ -818,14 +766,14 @@ export default function MobileBarcodeScannerModal({
                 type="text"
                 value={manualInput}
                 onChange={(e) => setManualInput(e.target.value)}
-                placeholder={t.manualPlaceholder}
+                placeholder={d.manualPlaceholder}
                 className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
               <button
                 type="submit"
                 className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
               >
-                {t.btnSearch}
+                {d.btnSearch}
               </button>
             </form>
           )}
@@ -834,7 +782,7 @@ export default function MobileBarcodeScannerModal({
           {!isRegistering && (
             <div className="pt-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                {t.quickPresets}
+                {d.quickPresets}
               </span>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -849,21 +797,21 @@ export default function MobileBarcodeScannerModal({
                   onClick={() => handleResolveCode('SN-VRF-884920')}
                   className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-mono font-bold border border-slate-200 dark:border-slate-700"
                 >
-                  SN-VRF-884920 (Seri No)
+                  SN-VRF-884920 (S/N)
                 </button>
                 <button
                   type="button"
                   onClick={() => handleResolveCode('8690987654321')}
                   className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-mono font-bold border border-slate-200 dark:border-slate-700"
                 >
-                  8690987654321 (Gömme Rezervuar)
+                  8690987654321 (Rezervuar)
                 </button>
                 <button
                   type="button"
                   onClick={() => handleResolveCode('8700216605830')}
                   className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-mono font-bold border border-amber-300 dark:border-amber-800"
                 >
-                  8700216605830 (Test Kayıtsız EAN)
+                  8700216605830 (Test EAN)
                 </button>
               </div>
             </div>
@@ -887,7 +835,7 @@ export default function MobileBarcodeScannerModal({
                   <div className="flex items-center space-x-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
                     <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-                      {t.itemFound}
+                      {d.itemFound}
                     </span>
                     <span className="text-[10px] font-mono text-slate-400">
                       [{scannedCode}]
@@ -903,11 +851,11 @@ export default function MobileBarcodeScannerModal({
 
                 {matchedCatalogItem.packaging_unit_type === 'ATOMIC_SET' ? (
                   <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
-                    {t.atomicSet} ({matchedCatalogItem.set_piece_count || 1} {t.pieceCount})
+                    {d.atomicSet} ({matchedCatalogItem.set_piece_count || 1} {d.pieceCount})
                   </span>
                 ) : (
                   <span className="px-2.5 py-1 rounded-lg text-xs font-light bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    {t.singleItem}
+                    {d.singleItem}
                   </span>
                 )}
               </div>
@@ -915,26 +863,26 @@ export default function MobileBarcodeScannerModal({
               {/* SKU & Price Breakdown */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-emerald-500/20">
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">{t.sku}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">{d.sku}</span>
                   <p className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
                     {matchedCatalogItem.legacy_code}
                   </p>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">{t.stockOnHand}</span>
-                  <p className="text-xs font-bold text-slate-900 dark:text-white">
-                    {currentStockQty} {matchedCatalogItem.unit_of_measure}
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">{d.stockOnHand}</span>
+                  <p className="text-xs font-light text-slate-900 dark:text-white">
+                    <span className="font-bold">{currentStockQty}</span> {matchedCatalogItem.unit_of_measure}
                   </p>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">{t.baseCost}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">{d.baseCost}</span>
                   <p className="text-xs font-light text-slate-700 dark:text-slate-300">
                     €{baseCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">{t.valuedCost}</span>
-                  <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">{d.valuedCost}</span>
+                  <p className="text-xs font-light text-emerald-600 dark:text-emerald-400">
                     €{valuedCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
@@ -945,7 +893,7 @@ export default function MobileBarcodeScannerModal({
                 <div className="bg-white/60 dark:bg-slate-900/60 rounded-xl p-3 border border-purple-300 dark:border-purple-900/50 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-purple-700 dark:text-purple-400">
-                      Zimmetli Varlık Bilgisi:
+                      {lang === 'tr' ? 'Zimmetli Varlık Bilgisi:' : 'Custody Asset Info:'}
                     </span>
                     <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
                       {matchedAsset.asset_tag}
@@ -953,11 +901,11 @@ export default function MobileBarcodeScannerModal({
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-[10px] text-slate-400 block">{t.serialNo}</span>
+                      <span className="text-[10px] text-slate-400 block">{d.serialNo}</span>
                       <span className="font-mono font-bold text-slate-900 dark:text-white">{matchedAsset.serial_number}</span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 block">{t.custody}</span>
+                      <span className="text-[10px] text-slate-400 block">{d.custody}</span>
                       <span className="font-bold text-amber-600 dark:text-amber-400">{matchedAsset.custody_status}</span>
                     </div>
                   </div>
@@ -973,7 +921,7 @@ export default function MobileBarcodeScannerModal({
                   }}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
                 >
-                  {t.btnInbound}
+                  {d.btnInbound}
                 </button>
                 <button
                   onClick={() => {
@@ -982,7 +930,7 @@ export default function MobileBarcodeScannerModal({
                   }}
                   className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
                 >
-                  {t.btnOutbound}
+                  {d.btnOutbound}
                 </button>
                 {matchedCatalogItem.is_trackable_asset && !matchedAsset && (
                   <button
@@ -992,7 +940,7 @@ export default function MobileBarcodeScannerModal({
                     }}
                     className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
                   >
-                    {t.btnRegisterAsset}
+                    {d.btnRegisterAsset}
                   </button>
                 )}
               </div>
@@ -1005,11 +953,11 @@ export default function MobileBarcodeScannerModal({
               <div className="flex items-center space-x-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
                 <h4 className="text-sm font-bold text-amber-800 dark:text-amber-400 uppercase">
-                  {t.unregisteredTitle}
+                  {d.unregisteredTitle}
                 </h4>
               </div>
-              <p className="text-xs text-slate-600 dark:text-slate-300">
-                {t.unregisteredDesc(scannedCode)}
+              <p className="text-xs font-light text-slate-600 dark:text-slate-300">
+                {d.unregisteredDesc(scannedCode)}
               </p>
               <div className="flex items-center space-x-2 pt-1">
                 <button
@@ -1017,7 +965,7 @@ export default function MobileBarcodeScannerModal({
                   onClick={() => setIsRegistering(true)}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center space-x-1.5"
                 >
-                  <span>{t.btnOpenRegistry}</span>
+                  <span>{d.btnOpenRegistry}</span>
                 </button>
               </div>
             </div>
@@ -1031,10 +979,10 @@ export default function MobileBarcodeScannerModal({
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
                 <div>
                   <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase">
-                    {t.formTitle}
+                    {d.formTitle}
                   </h4>
-                  <p className="text-[11px] font-mono text-slate-400">
-                    EAN: {regBarcode}
+                  <p className="text-[11px] font-mono font-light text-slate-400">
+                    EAN: <span className="font-bold">{regBarcode}</span>
                   </p>
                 </div>
                 <button
@@ -1042,7 +990,7 @@ export default function MobileBarcodeScannerModal({
                   onClick={() => setIsRegistering(false)}
                   className="text-slate-400 hover:text-slate-600 text-xs font-bold"
                 >
-                  ✕ {t.btnCancel}
+                  ✕ {common.cancel}
                 </button>
               </div>
 
@@ -1051,7 +999,7 @@ export default function MobileBarcodeScannerModal({
                 
                 {/* Barcode & SKU Code */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblBarcode}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblBarcode}</label>
                   <input
                     type="text"
                     required
@@ -1062,7 +1010,7 @@ export default function MobileBarcodeScannerModal({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblLegacyCode}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblLegacyCode}</label>
                   <input
                     type="text"
                     required
@@ -1074,7 +1022,7 @@ export default function MobileBarcodeScannerModal({
 
                 {/* Names */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblNameTr}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblNameTr}</label>
                   <input
                     type="text"
                     required
@@ -1086,7 +1034,7 @@ export default function MobileBarcodeScannerModal({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblNameEn}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblNameEn}</label>
                   <input
                     type="text"
                     value={regNameEn}
@@ -1098,93 +1046,83 @@ export default function MobileBarcodeScannerModal({
 
                 {/* Category & Subcategory */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblCategory}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblCategory}</label>
                   <select
                     value={regCategory}
                     onChange={(e) => setRegCategory(e.target.value)}
                     className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   >
-                    {categoryOptions.map((cat) => (
+                    {dynamicCategories.map((cat) => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
-                    <option value="Mekanik & İklimlendirme">Mekanik & İklimlendirme</option>
-                    <option value="Sıhhi Tesisat & Vitrifiye">Sıhhi Tesisat & Vitrifiye</option>
-                    <option value="Elektrik & Altyapı">Elektrik & Altyapı</option>
-                    <option value="İnce Yapı & Kaplama">İnce Yapı & Kaplama</option>
-                    <option value="Kaba Yapı & Betonarme">Kaba Yapı & Betonarme</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblSubcategory}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblSubcategory}</label>
                   <input
                     type="text"
                     value={regSubcategory}
                     onChange={(e) => setRegSubcategory(e.target.value)}
-                    placeholder="Örn: Isı Pompası / Seramik"
+                    placeholder={d.placeholderSubcategory}
                     className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
                 {/* Unit of Measure & Technical Spec */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblUnit}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblUnit}</label>
                   <select
                     value={regUnit}
                     onChange={(e) => setRegUnit(e.target.value)}
                     className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   >
-                    <option value="adet">adet</option>
-                    <option value="set">set</option>
-                    <option value="m2">m2</option>
-                    <option value="m3">m3</option>
-                    <option value="kg">kg</option>
-                    <option value="ton">ton</option>
-                    <option value="mt">mt</option>
-                    <option value="paket">paket</option>
+                    {d.units.map((u) => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblSpecification}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblSpecification}</label>
                   <input
                     type="text"
                     value={regSpec}
                     onChange={(e) => setRegSpec(e.target.value)}
-                    placeholder="Örn: R32 Inverter, 400V, CE Onaylı"
+                    placeholder={d.placeholderSpec}
                     className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
                 {/* Packaging Type & Piece Count */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblPackaging}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblPackaging}</label>
                   <select
                     value={regPackagingType}
                     onChange={(e) => setRegPackagingType(e.target.value as PackagingUnitType)}
                     className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   >
-                    <option value="SINGLE_ITEM">{t.singleItem}</option>
-                    <option value="ATOMIC_SET">{t.atomicSet} (Parça Seti)</option>
+                    <option value="SINGLE_ITEM">{d.singleItem}</option>
+                    <option value="ATOMIC_SET">{d.atomicSet} ({lang === 'tr' ? 'Parça Seti' : 'Pack Set'})</option>
                   </select>
                 </div>
 
                 {regPackagingType === 'ATOMIC_SET' && (
                   <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblPieces}</label>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblPieces}</label>
                     <input
                       type="number"
                       min="2"
                       value={regPieceCount}
                       onChange={(e) => setRegPieceCount(Number(e.target.value))}
-                      className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                      className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                     />
                   </div>
                 )}
 
                 {/* Cost and Commercial Markup */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblCost}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblCost}</label>
                   <input
                     type="number"
                     step="0.01"
@@ -1196,7 +1134,7 @@ export default function MobileBarcodeScannerModal({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblMarkup}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblMarkup}</label>
                   <input
                     type="number"
                     step="0.5"
@@ -1208,19 +1146,19 @@ export default function MobileBarcodeScannerModal({
 
                 {/* Intake Quantity & Delivery Note */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblInitialQty}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblInitialQty}</label>
                   <input
                     type="number"
                     min="1"
                     required
                     value={regInitialQty}
                     onChange={(e) => setRegInitialQty(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblIrsaliye}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblIrsaliye}</label>
                   <input
                     type="text"
                     value={regIrsaliye}
@@ -1231,13 +1169,13 @@ export default function MobileBarcodeScannerModal({
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblSupplier}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblSupplier}</label>
                   <input
                     type="text"
                     value={regSupplier}
                     onChange={(e) => setRegSupplier(e.target.value)}
-                    placeholder="Örn: Daikin Kıbrıs / Çimko Çimento"
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    placeholder={lang === 'tr' ? 'Örn: Daikin Kıbrıs / Çimko Çimento' : 'e.g. Daikin Cyprus / Lafarge'}
+                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
@@ -1251,14 +1189,14 @@ export default function MobileBarcodeScannerModal({
                       className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-blue-500"
                     />
                     <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                      {t.lblTrackable}
+                      {d.lblTrackable}
                     </span>
                   </label>
 
                   {regIsTrackable && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-6">
                       <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblSerial}</label>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblSerial}</label>
                         <input
                           type="text"
                           value={regSerialNo}
@@ -1268,12 +1206,12 @@ export default function MobileBarcodeScannerModal({
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{t.lblWarranty}</label>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblWarranty}</label>
                         <input
                           type="date"
                           value={regWarrantyDate}
                           onChange={(e) => setRegWarrantyDate(e.target.value)}
-                          className="w-full px-3 py-2 text-xs font-mono rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                          className="w-full px-3 py-2 text-xs font-mono font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                         />
                       </div>
                     </div>
@@ -1289,14 +1227,14 @@ export default function MobileBarcodeScannerModal({
                   onClick={() => setIsRegistering(false)}
                   className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold"
                 >
-                  {t.btnCancel}
+                  {common.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={regSubmitting || !regNameTr.trim()}
                   className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1.5"
                 >
-                  <span>{regSubmitting ? 'Kaydediliyor...' : t.btnSaveAndIntake}</span>
+                  <span>{regSubmitting ? (lang === 'tr' ? 'Kaydediliyor...' : 'Saving...') : d.btnSaveAndIntake}</span>
                 </button>
               </div>
             </form>
@@ -1306,14 +1244,14 @@ export default function MobileBarcodeScannerModal({
 
         {/* Modal Footer */}
         <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
-          <div className="text-[10px] font-mono text-slate-400">
+          <div className="text-[10px] font-mono font-bold text-slate-400">
             {activeDepotId}
           </div>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors"
           >
-            {t.close}
+            {common.close}
           </button>
         </div>
 
