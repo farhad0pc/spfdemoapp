@@ -603,7 +603,7 @@ export default function DepoManagementWorkspace({
           
           {/* Left: Title & Subtitle without Redundant Clutter Badges */}
           <div className="space-y-0.5 min-w-0">
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase truncate">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase ">
               {t.title}
             </h1>
             <p className="text-xs font-light text-slate-500 dark:text-slate-400 truncate">
