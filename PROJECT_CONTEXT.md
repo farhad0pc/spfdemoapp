@@ -1,9 +1,9 @@
 # Caesar Purchasing Sub-Ledger & Procurement Ecosystem — Project Context
-**Version:** v2.8.0 (Hard Auth Gate & Stealth Fail-Safe, Depot Manual Registry & Barcode Auto-Fill, Full Item Details/Edit Modal & Brand/Header Polish)  
-**Last Updated:** 2026-11-20  
+**Version:** v2.8.1 (Structured Attributes Key-Value Matrix, Uniform `h-10` Form Control Heights, Missing-Docs Compliance Thresholds & Subsystem Header/Badge Polish)  
+**Last Updated:** 2026-11-23  
 **Lead Systems Architect:** Farhad Mokhtari  
 **Stack:** Next.js 16 (App Router), React 19, Tailwind CSS v4, Supabase (PostgreSQL 15)  
-**Status:** Compilation Clean (Exit Code 0: 0 errors, 0 warnings) — Milestone 2.8.0 Production Ready  
+**Status:** Compilation Clean (Exit Code 0: 0 errors, 0 warnings) — Milestone 2.8.1 Production Ready  
 
 ---
 
@@ -70,7 +70,7 @@ Houses authoritative construction material definitions (`DEPOT-PRJ02-CONST`), fu
 - `source_unit_price` (NUMERIC, Original quoted price in source currency)
 - `product_url` (TEXT, Supplier / manufacturer reference link)
 - `lifecycle_status` (TEXT, Product lifecycle stage)
-- `attributes` (JSONB, Flexible dimensional specifications)
+- `attributes` (JSONB, Structured snake_case dimensional specifications + locked migration provenance keys)
 
 ### B. public.depot_locations
 - `depot_id` (TEXT, Primary Key, e.g. `DEPOT-PRJ02-MAIN`, `DEPOT-PRJ02-CONST`)
@@ -140,7 +140,7 @@ spfdemoapp/
 │   ├── layout.tsx                     # Global HTML metadata, Oswald font loader
 │   ├── page.tsx                       # Live authenticated session binding, hard sign-out navigation
 │   ├── login/
-│   │   └── page.tsx                   # Clean single-form production login (CAESAR OPERATIONS v2.8.0)
+│   │   └── page.tsx                   # Clean single-form production login (CAESAR OPERATIONS)
 │   ├── auth/
 │   │   └── accept-invite/
 │   │       └── page.tsx               # Self-service onboarding & password creation (<Suspense> wrapped)
@@ -160,22 +160,23 @@ spfdemoapp/
 │       ├── requisition/route.ts       # Purchase requisition intake API
 │       └── approve/route.ts           # Requisition approval state engine
 ├── components/
+│   ├── AttributesEditor.tsx           # Structured snake_case Key-Value matrix, domain quick-chips & locked provenance pills
 │   ├── CorporateHeader.tsx            # CONTROL CENTER / KONTROL MERKEZİ header, role badge, red Sign Out button
-│   ├── DesktopSidebar.tsx             # CAESAR OPERATIONS v2.8.0 vertically aligned brand block & grouped navigation
+│   ├── DesktopSidebar.tsx             # CAESAR OPERATIONS v2.8.1 vertically aligned brand block, pill NEW/YENİ badge & grouped navigation
 │   ├── StickyControlsFAB.tsx          # Fixed bottom-left action buttons (bottom-4 left-4 z-40)
 │   ├── Toast.tsx                      # Non-intrusive notification toast for module & catalog alerts
 │   ├── TechnicalIntakeModule.tsx      # Full-screen 3-tier cascading location & predictive volume intake engine
 │   ├── RequisitionWorkspace.tsx       # Sub-ledger table with O(1) canonical portfolio lookup, batch controls, drawer
 │   ├── ExecutiveTelemetryStrip.tsx    # Board-level fiduciary KPI metrics strip (Executive only)
-│   ├── MobileBarcodeScannerModal.tsx  # Dual-mode (Scan/Lookup & Manual Add) ZXing WASM scanner + external auto-fill
-│   ├── ItemDetailsModal.tsx           # Full 30+ column item inspection, movement/asset history & Tier 0-2 edit mode
-│   ├── DepoManagementWorkspace.tsx    # Clickable stock rows, unified filters popover, category-aware KPIs
+│   ├── MobileBarcodeScannerModal.tsx  # Dual-mode (Scan/Lookup & Manual Add) ZXing WASM scanner + external auto-fill + AttributesEditor
+│   ├── ItemDetailsModal.tsx           # Full 30+ column item inspection, compliance banner, AttributesEditor & Tier 0-2 edit mode
+│   ├── DepoManagementWorkspace.tsx    # Clickable stock rows, unified filters popover with compliance toggle, 2-tier alert KPI & pill return button
 │   └── UserManagementWorkspace.tsx    # Personnel roster, 48h invitation countdown table, developer role preview switcher (Tier 0 only)
 ├── types/
 │   └── requisition.ts                 # Schema interfaces (InventoryCatalogItem extended, Portfolio, Requisition, Depot, Assets, 2D RBAC)
 ├── lib/
 │   ├── authSession.ts                 # Server-side HMAC-SHA256 session cookie signing & verification
-│   ├── i18n.ts                        # Centralized symmetric TR/EN dictionary with clean UTF-8 Turkish diacritics
+│   ├── i18n.ts                        # Centralized symmetric TR/EN dictionary (v2.8.1) with clean UTF-8 Turkish diacritics
 │   ├── supabaseClient.ts              # Client-safe Supabase anon instance
 │   ├── supabaseAdmin.ts               # Server-isolated service-role Supabase admin instance
 │   ├── rbac.ts                        # 2D RBAC delegation matrix, role metadata, permission helper functions
@@ -189,10 +190,9 @@ spfdemoapp/
 
 ## 5. Current System State & Milestone Verification
 
-Milestone v2.8.0 is completed and verified clean:
-- **Hard Auth Gate & Stealth Fail-Safe (`proxy.ts`, `/api/auth/login`, `/api/auth/logout`, `app/login/page.tsx`):** COMPLETED. Unauthenticated requests to `/` and protected `/api/*` routes are strictly gated. Bypass button (`← Portala Geri Dön`) and `God-Tier` UI tabs/toasts removed from `/login`. Stealth fail-safe credentials silently authenticate as `SYSTEM_ADMIN` via HTTP-only signed session cookie.
-- **Public Barcode Auto-Fill Proxy (`/api/depot/barcode-lookup`):** COMPLETED. Read-only server proxy queries UPCitemdb with a 3-second timeout fallback to Open Products Facts, suggesting `name`, `brand_model`, and `specification` (badged as `"External Suggestion"`) without mutating Supabase.
-- **Dual-Mode Scanner & Manual Item Registry (`MobileBarcodeScannerModal.tsx`, `POST /api/depot/catalog`):** COMPLETED. Hardcoded test barcodes removed. Mode switcher (`Scan / Lookup` vs. `Manual Add`) checks live Supabase first, falls back to external suggestion on miss, and persists new catalog items + initial depot stock balances with deterministic `MAT-XXX` / `WH-XXX` / `DEP-XXX` codes.
-- **Clickable Stock Rows & Tier 0–2 Details/Edit Modal (`ItemDetailsModal.tsx`, `PATCH /api/depot/catalog`, `DepoManagementWorkspace.tsx`):** COMPLETED. Every row in `Live Stock Balances` opens the full database record + item transaction/asset history modal (`Issue` button isolated with `e.stopPropagation()`). Edit mode is strictly gated to Tiers 0–2 (`SYSTEM_ADMIN`, `EXECUTIVE`, `TECH_OFFICE_MANAGER`, `DEPOT_MANAGER`) on both UI and server (`403 Forbidden` for Tiers 3–4), with explicit save confirmation.
-- **Header, Sidebar & Sticky FAB Visual Polish:** COMPLETED. Removed green `Supabase Realtime Live` indicator; updated header to `CONTROL CENTER` / `Procurement & Inventory` (`KONTROL MERKEZİ` / `Satın Alma & Envanter`) with red Sign Out button; updated sidebar lockup to `CAESAR OPERATIONS` / `Internal Operations` (`Dahili Operasyonlar`) with vertically stacked `v2.8.0` badge matching the emblem height; relocated Sticky FAB to `bottom-4 left-4 z-40`.
+Milestone v2.8.1 is completed and verified clean:
+- **Structured Attributes Key-Value Matrix (`components/AttributesEditor.tsx`, `ItemDetailsModal.tsx`, `MobileBarcodeScannerModal.tsx`):** COMPLETED. Eliminated all raw JSON `<textarea>` / `<pre>` editing for end users. Locks system migration provenance keys (`source_workbook`, `source_sheet`, `raw_ozellik`) as read-only pills, provides domain-aware 1-click quick-chips (`CONSTRUCTION_MATERIALS` vs `FURNISHING_AND_EQUIPMENT`), sanitizes custom keys to `snake_case`, trims values, and renders clean read-only attribute cards.
+- **Uniform `h-10` Form Control Height Standardization (`ItemDetailsModal.tsx`, `MobileBarcodeScannerModal.tsx`, `DepoManagementWorkspace.tsx`, `AttributesEditor.tsx`):** COMPLETED. All standard `<input>` and `<select>` form controls share the unified `h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900` invariant; compact inline toolbar selects (`RECORD STATUS`, camera selector) are normalized to `h-9 px-3 rounded-lg text-xs`.
+- **Missing-Docs & Catalog Compliance Threshold Protocol (`DepoManagementWorkspace.tsx`, `ItemDetailsModal.tsx`):** COMPLETED. Exported deterministic `getItemComplianceIssues(item)` (`UNPRICED`, `MISSING_METADATA`, `REVIEW_REQUIRED`) combined with movement document alerts (`INBOUND_RECEIPT` missing dispatch/invoice, `OUTBOUND_HANDOVER` missing recipient/target). Surfaced on KPI Card 4 (`DOC & COMPLIANCE ALERTS` with `Incomplete SKUs · Missing Docs` breakdown), inside the unified `Filters` popover (`Incomplete / Missing Docs Only` toggle counted in active filter badge), as amber SKU badges in `Live Stock Balances`, and as a detailed alert banner in `ItemDetailsModal.tsx`.
+- **Subsystem Return Pill & Sidebar Badge Polish (`DepoManagementWorkspace.tsx`, `DesktopSidebar.tsx`, `lib/i18n.ts`):** COMPLETED. Upgraded `← Requisitions` (`← Talepler`) to a bordered pill button; standardized `Personnel & RBAC` `NEW` (`YENİ`) badge to `text-[9px] font-bold px-2 py-0.5 rounded-full tracking-wider uppercase`; bumped version to `v2.8.1` with clean UTF-8 Turkish diacritics.
 - **Workspace Hygiene:** COMPLETED. 0 unauthorized physical markdown files on disk. Compilation clean with 0 errors and 0 warnings.

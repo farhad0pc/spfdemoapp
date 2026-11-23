@@ -11,6 +11,7 @@ import {
   PackagingUnitType,
 } from '@/types/requisition';
 import { DICTIONARY } from '@/lib/i18n';
+import AttributesEditor from '@/components/AttributesEditor';
 
 const TIER_0_TO_2_EDIT_ROLES: RoleTier[] = [
   'SYSTEM_ADMIN',
@@ -18,6 +19,57 @@ const TIER_0_TO_2_EDIT_ROLES: RoleTier[] = [
   'TECH_OFFICE_MANAGER',
   'DEPOT_MANAGER',
 ];
+
+const CONTROL_CLASS =
+  'w-full h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
+
+export type ItemComplianceIssue =
+  | 'UNPRICED'
+  | 'MISSING_METADATA'
+  | 'REVIEW_REQUIRED';
+
+export function getItemComplianceIssues(
+  item: InventoryCatalogItem | null | undefined
+): ItemComplianceIssue[] {
+  if (!item) return [];
+  const issues: ItemComplianceIssue[] = [];
+
+  if (
+    item.base_cost_eur == null ||
+    Number(item.base_cost_eur) <= 0 ||
+    item.lifecycle_status === 'UNPRICED_REVIEW'
+  ) {
+    issues.push('UNPRICED');
+  }
+
+  if (
+    !item.category?.trim() ||
+    !item.unit_of_measure?.trim() ||
+    (item.product_domain === 'FURNISHING_AND_EQUIPMENT' &&
+      !item.supplier_name?.trim())
+  ) {
+    issues.push('MISSING_METADATA');
+  }
+
+  if (
+    item.lifecycle_status === 'REVIEW_REQUIRED' ||
+    item.review_status === 'pending'
+  ) {
+    issues.push('REVIEW_REQUIRED');
+  }
+
+  return issues;
+}
+
+export function getComplianceIssueLabel(
+  issue: ItemComplianceIssue,
+  lang: 'tr' | 'en'
+): string {
+  const t = DICTIONARY[lang].itemDetails;
+  if (issue === 'UNPRICED') return t.complianceUnpriced;
+  if (issue === 'MISSING_METADATA') return t.complianceMissingMetadata;
+  return t.complianceReviewRequired;
+}
 
 interface ItemDetailsModalProps {
   isOpen: boolean;
@@ -92,7 +144,9 @@ export default function ItemDetailsModal({
   const [formRecordStatus, setFormRecordStatus] = useState<string>('active');
   const [formMinThreshold, setFormMinThreshold] = useState<number>(5);
   const [formSpecification, setFormSpecification] = useState<string>('');
-  const [formAttributesJson, setFormAttributesJson] = useState<string>('');
+  const [formAttributes, setFormAttributes] = useState<Record<string, unknown>>(
+    {}
+  );
 
   const itemTransactions = useMemo(() => {
     if (!item) return [];
@@ -103,6 +157,11 @@ export default function ItemDetailsModal({
     if (!item) return [];
     return assets.filter((a) => a.catalog_item_id === item.item_id);
   }, [assets, item]);
+
+  const complianceIssues = useMemo(
+    () => getItemComplianceIssues(item),
+    [item]
+  );
 
   if (!isOpen || !item) return null;
 
@@ -116,7 +175,9 @@ export default function ItemDetailsModal({
     setFormProductDomain(item.product_domain || 'CONSTRUCTION_MATERIALS');
     setFormCategory(item.category || '');
     setFormSubcategory(item.subcategory || '');
-    setFormDepotId(balance?.depot_id || depotLocations[0]?.depot_id || 'DEPOT-PRJ02-MAIN');
+    setFormDepotId(
+      balance?.depot_id || depotLocations[0]?.depot_id || 'DEPOT-PRJ02-MAIN'
+    );
     setFormBaseCostEur(Number(item.base_cost_eur || 0));
     setFormSourcePrice(
       Number(item.source_unit_price ?? item.base_cost_eur ?? 0)
@@ -134,8 +195,10 @@ export default function ItemDetailsModal({
     setFormRecordStatus(item.record_status || 'active');
     setFormMinThreshold(Number(balance?.min_stock_threshold ?? 5));
     setFormSpecification(item.specification || '');
-    setFormAttributesJson(
-      item.attributes ? JSON.stringify(item.attributes, null, 2) : ''
+    setFormAttributes(
+      item.attributes && typeof item.attributes === 'object'
+        ? { ...item.attributes }
+        : {}
     );
     setErrorMessage(null);
     setShowConfirmPrompt(false);
@@ -160,24 +223,10 @@ export default function ItemDetailsModal({
     setSaving(true);
     setErrorMessage(null);
 
-    let parsedAttributes: Record<string, unknown> | null = null;
-    if (formAttributesJson.trim()) {
-      try {
-        parsedAttributes = JSON.parse(formAttributesJson.trim()) as Record<
-          string,
-          unknown
-        >;
-      } catch {
-        setErrorMessage(
-          lang === 'tr'
-            ? 'Ek Nitelikler (JSON) formatı geçersiz.'
-            : 'Attributes JSON format is invalid.'
-        );
-        setSaving(false);
-        setShowConfirmPrompt(false);
-        return;
-      }
-    }
+    const serializedAttributes =
+      formAttributes && Object.keys(formAttributes).length > 0
+        ? formAttributes
+        : null;
 
     try {
       const res = await fetch('/api/depot/catalog', {
@@ -214,7 +263,7 @@ export default function ItemDetailsModal({
           record_status: formRecordStatus.trim() || 'active',
           min_stock_threshold: Number(formMinThreshold) || 0,
           specification: formSpecification.trim() || null,
-          attributes: parsedAttributes,
+          attributes: serializedAttributes,
         }),
       });
 
@@ -270,6 +319,11 @@ export default function ItemDetailsModal({
               {!canEditCatalog && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                   {t.readOnlyBadge}
+                </span>
+              )}
+              {complianceIssues.length > 0 && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                  {td.incompleteSkuBadge} ({complianceIssues.length})
                 </span>
               )}
             </div>
@@ -381,6 +435,33 @@ export default function ItemDetailsModal({
             </div>
           )}
 
+          {/* Compliance Alert Banner */}
+          {activeTab === 'RECORD' && complianceIssues.length > 0 && (
+            <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800/80 space-y-1.5">
+              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                <svg
+                  className="w-4 h-4 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+                <span>{t.complianceBannerTitle}</span>
+              </div>
+              <ul className="list-disc pl-5 space-y-0.5 text-xs font-light text-amber-900 dark:text-amber-200">
+                {complianceIssues.map((issue) => (
+                  <li key={issue}>{getComplianceIssueLabel(issue, lang)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {/* Explicit Save Confirmation Banner / Dialog */}
           {showConfirmPrompt && isEditing && (
             <div className="p-4 bg-amber-50 dark:bg-amber-950/70 border-2 border-amber-400 dark:border-amber-700 rounded-2xl space-y-3 shadow-lg">
@@ -414,7 +495,7 @@ export default function ItemDetailsModal({
             </div>
           )}
 
-          {/* TAB 1: FULL DATABASE RECORD (READ OR EDIT) */}
+          {/* TAB 1: FULL DATABASE RECORD (READ MODE) */}
           {activeTab === 'RECORD' && !isEditing && (
             <div className="space-y-5 text-xs select-text">
               {/* 1. Live Stock Summary Strip */}
@@ -713,7 +794,7 @@ export default function ItemDetailsModal({
                 </div>
               </div>
 
-              {/* 3. Specification, Notes & Attributes */}
+              {/* 3. Specification, Notes & Structured Attributes (Read-Only) */}
               <div className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 border-b border-slate-100 dark:border-slate-800 pb-1.5">
                   {t.secSpecs}
@@ -728,12 +809,16 @@ export default function ItemDetailsModal({
                 </div>
                 {item.attributes && Object.keys(item.attributes).length > 0 && (
                   <div>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1.5">
                       {t.lblAttributes}
                     </span>
-                    <pre className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[11px] font-mono text-slate-700 dark:text-slate-300 overflow-x-auto">
-                      {JSON.stringify(item.attributes, null, 2)}
-                    </pre>
+                    <AttributesEditor
+                      value={item.attributes}
+                      onChange={() => {}}
+                      productDomain={item.product_domain || undefined}
+                      readOnly
+                      lang={lang}
+                    />
                   </div>
                 )}
               </div>
@@ -752,7 +837,7 @@ export default function ItemDetailsModal({
                     type="text"
                     value={formLegacyCode}
                     onChange={(e) => setFormLegacyCode(e.target.value)}
-                    className="w-full px-3 py-2 font-mono font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} font-mono`}
                   />
                 </div>
                 <div>
@@ -763,7 +848,7 @@ export default function ItemDetailsModal({
                     type="text"
                     value={formBarcodeEan}
                     onChange={(e) => setFormBarcodeEan(e.target.value)}
-                    className="w-full px-3 py-2 font-mono font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} font-mono`}
                   />
                 </div>
                 <div>
@@ -774,7 +859,7 @@ export default function ItemDetailsModal({
                     type="text"
                     value={formManufacturerArticle}
                     onChange={(e) => setFormManufacturerArticle(e.target.value)}
-                    className="w-full px-3 py-2 font-mono font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} font-mono`}
                   />
                 </div>
               </div>
@@ -789,7 +874,7 @@ export default function ItemDetailsModal({
                     required
                     value={formNameTr}
                     onChange={(e) => setFormNameTr(e.target.value)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
                 <div>
@@ -800,7 +885,7 @@ export default function ItemDetailsModal({
                     type="text"
                     value={formNameEn}
                     onChange={(e) => setFormNameEn(e.target.value)}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
               </div>
@@ -813,7 +898,7 @@ export default function ItemDetailsModal({
                   <select
                     value={formProductDomain}
                     onChange={(e) => setFormProductDomain(e.target.value)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} cursor-pointer`}
                   >
                     <option value="CONSTRUCTION_MATERIALS">
                       CONSTRUCTION_MATERIALS
@@ -830,7 +915,7 @@ export default function ItemDetailsModal({
                   <select
                     value={formDepotId}
                     onChange={(e) => setFormDepotId(e.target.value)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} cursor-pointer`}
                   >
                     {depotLocations.map((dl) => (
                       <option key={dl.depot_id} value={dl.depot_id}>
@@ -848,7 +933,7 @@ export default function ItemDetailsModal({
                     list="catalog-categories-list"
                     value={formCategory}
                     onChange={(e) => setFormCategory(e.target.value)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                   <datalist id="catalog-categories-list">
                     {availableCategories.map((c) => (
@@ -864,7 +949,7 @@ export default function ItemDetailsModal({
                     type="text"
                     value={formSubcategory}
                     onChange={(e) => setFormSubcategory(e.target.value)}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
               </div>
@@ -879,7 +964,7 @@ export default function ItemDetailsModal({
                     step="0.01"
                     value={formBaseCostEur}
                     onChange={(e) => setFormBaseCostEur(Number(e.target.value))}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
                 <div>
@@ -891,7 +976,7 @@ export default function ItemDetailsModal({
                     step="0.01"
                     value={formSourcePrice}
                     onChange={(e) => setFormSourcePrice(Number(e.target.value))}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
                 <div>
@@ -901,7 +986,7 @@ export default function ItemDetailsModal({
                   <select
                     value={formSourceCurrency}
                     onChange={(e) => setFormSourceCurrency(e.target.value)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} cursor-pointer`}
                   >
                     <option value="EUR">EUR</option>
                     <option value="USD">USD</option>
@@ -918,7 +1003,7 @@ export default function ItemDetailsModal({
                     step="0.5"
                     value={formMarkupPct}
                     onChange={(e) => setFormMarkupPct(Number(e.target.value))}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
               </div>
@@ -932,7 +1017,7 @@ export default function ItemDetailsModal({
                     type="text"
                     value={formSupplierName}
                     onChange={(e) => setFormSupplierName(e.target.value)}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
                 <div>
@@ -943,7 +1028,7 @@ export default function ItemDetailsModal({
                     type="text"
                     value={formBrandModel}
                     onChange={(e) => setFormBrandModel(e.target.value)}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
                 <div>
@@ -954,7 +1039,7 @@ export default function ItemDetailsModal({
                     type="text"
                     value={formProductUrl}
                     onChange={(e) => setFormProductUrl(e.target.value)}
-                    className="w-full px-3 py-2 font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
               </div>
@@ -968,7 +1053,7 @@ export default function ItemDetailsModal({
                     type="text"
                     value={formUnitOfMeasure}
                     onChange={(e) => setFormUnitOfMeasure(e.target.value)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
                 <div>
@@ -980,7 +1065,7 @@ export default function ItemDetailsModal({
                     onChange={(e) =>
                       setFormPackagingType(e.target.value as PackagingUnitType)
                     }
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} cursor-pointer`}
                   >
                     <option value="SINGLE_ITEM">SINGLE_ITEM</option>
                     <option value="ATOMIC_SET">ATOMIC_SET</option>
@@ -997,7 +1082,7 @@ export default function ItemDetailsModal({
                     onChange={(e) =>
                       setFormSetPieceCount(Number(e.target.value))
                     }
-                    className="w-full px-3 py-2 font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
                 <div>
@@ -1011,7 +1096,7 @@ export default function ItemDetailsModal({
                     onChange={(e) =>
                       setFormMinThreshold(Number(e.target.value))
                     }
-                    className="w-full px-3 py-2 font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
                 <div>
@@ -1022,13 +1107,14 @@ export default function ItemDetailsModal({
                     type="text"
                     value={formLifecycleStatus}
                     onChange={(e) => setFormLifecycleStatus(e.target.value)}
-                    className="w-full px-3 py-2 font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
               </div>
 
-              <div className="flex items-center space-x-4 pt-1">
-                <label className="flex items-center space-x-2 cursor-pointer">
+              {/* Compact Inline Toolbar Row (Matched h-9 Heights) */}
+              <div className="flex flex-wrap items-center gap-3 pt-1">
+                <label className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 inline-flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formIsTrackableAsset}
@@ -1047,7 +1133,7 @@ export default function ItemDetailsModal({
                   <select
                     value={formRecordStatus}
                     onChange={(e) => setFormRecordStatus(e.target.value)}
-                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className="h-9 px-3 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="active">active</option>
                     <option value="archived">archived</option>
@@ -1063,20 +1149,20 @@ export default function ItemDetailsModal({
                   rows={2}
                   value={formSpecification}
                   onChange={(e) => setFormSpecification(e.target.value)}
-                  className="w-full px-3 py-2 font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  className="w-full px-3.5 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1.5">
                   {t.lblAttributes}
                 </label>
-                <textarea
-                  rows={3}
-                  value={formAttributesJson}
-                  onChange={(e) => setFormAttributesJson(e.target.value)}
-                  placeholder='{"dimensions": "120x60cm"}'
-                  className="w-full px-3 py-2 font-mono text-[11px] rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                <AttributesEditor
+                  key={`${item.item_id}-edit`}
+                  value={formAttributes}
+                  onChange={setFormAttributes}
+                  productDomain={formProductDomain}
+                  lang={lang}
                 />
               </div>
 

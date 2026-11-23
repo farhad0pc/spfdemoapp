@@ -15,7 +15,26 @@ import {
 import { canEditDepotStock, canConfirmDepotHandover } from '@/lib/rbac';
 import { DICTIONARY } from '@/lib/i18n';
 import MobileBarcodeScannerModal from '@/components/MobileBarcodeScannerModal';
-import ItemDetailsModal from '@/components/ItemDetailsModal';
+import ItemDetailsModal, {
+  getItemComplianceIssues,
+  getComplianceIssueLabel,
+} from '@/components/ItemDetailsModal';
+
+const CONTROL_CLASS =
+  'w-full h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
+
+function hasMovementDocAlert(tx: DepotTransaction): boolean {
+  if (tx.movement_type === 'INBOUND_RECEIPT') {
+    return !tx.irsaliye_number?.trim() || !tx.invoice_number?.trim();
+  }
+  if (tx.movement_type === 'OUTBOUND_HANDOVER') {
+    const recipient = (
+      tx as DepotTransaction & { recipient_name?: string | null }
+    ).recipient_name;
+    return !recipient?.trim() && !tx.target_building_id?.trim();
+  }
+  return Boolean(tx.has_missing_docs);
+}
 
 interface DepoManagementWorkspaceProps {
   currentRole: RoleTier;
@@ -265,7 +284,7 @@ export default function DepoManagementWorkspace({
     return text.toLowerCase().trim();
   }, []);
 
-  // Filtered Balances (Multi-Dimensional Scope)
+  // Filtered Balances (Multi-Dimensional Scope + Compliance Filter)
   const filteredBalances = useMemo(() => {
     const query = normalizeText(filterText);
     const allowedDepotIdsForProject =
@@ -290,6 +309,12 @@ export default function DepoManagementWorkspace({
       if (
         filterCategory !== 'ALL' &&
         b.catalog_item?.category !== filterCategory
+      ) {
+        return false;
+      }
+      if (
+        missingDocsOnly &&
+        getItemComplianceIssues(b.catalog_item).length === 0
       ) {
         return false;
       }
@@ -319,6 +344,7 @@ export default function DepoManagementWorkspace({
     filterProject,
     filterDepot,
     filterCategory,
+    missingDocsOnly,
     depotLocations,
   ]);
 
@@ -344,7 +370,7 @@ export default function DepoManagementWorkspace({
       if (filterDepot !== 'ALL' && tItem.depot_id !== filterDepot) {
         return false;
       }
-      if (missingDocsOnly && !tItem.has_missing_docs) {
+      if (missingDocsOnly && !hasMovementDocAlert(tItem)) {
         return false;
       }
 
@@ -405,7 +431,7 @@ export default function DepoManagementWorkspace({
     });
   }, [assets, balances, filterText, normalizeText, filterDepot]);
 
-  // Dynamic Category-Aware KPIs
+  // Dynamic Category-Aware KPIs & 2-Tier Compliance Telemetry
   const kpis = useMemo(() => {
     const activeSkus = filteredBalances.length;
     const distinctCategories = new Set(
@@ -415,6 +441,7 @@ export default function DepoManagementWorkspace({
     let inStockCount = 0;
     let lowOrZeroStockCount = 0;
     let totalValuedEur = 0;
+    let catalogIncompleteCount = 0;
 
     filteredBalances.forEach((b) => {
       const minThreshold = b.min_stock_threshold || 10;
@@ -424,6 +451,10 @@ export default function DepoManagementWorkspace({
         lowOrZeroStockCount++;
       }
 
+      if (getItemComplianceIssues(b.catalog_item).length > 0) {
+        catalogIncompleteCount++;
+      }
+
       const item = b.catalog_item;
       const cost = item?.base_cost_eur || 0;
       const markup = item?.commercial_markup_pct ?? 15;
@@ -431,9 +462,11 @@ export default function DepoManagementWorkspace({
       totalValuedEur += b.quantity_on_hand * itemValuedPrice;
     });
 
-    const missingDocsCount = transactions.filter(
-      (tx) => tx.has_missing_docs
+    const missingMovementDocsCount = transactions.filter((tx) =>
+      hasMovementDocAlert(tx)
     ).length;
+    const totalComplianceAlerts =
+      catalogIncompleteCount + missingMovementDocsCount;
     const assetCount = assets.length;
 
     return {
@@ -442,7 +475,9 @@ export default function DepoManagementWorkspace({
       inStockCount,
       lowOrZeroStockCount,
       totalValuedEur,
-      missingDocsCount,
+      catalogIncompleteCount,
+      missingMovementDocsCount,
+      totalComplianceAlerts,
       assetCount,
     };
   }, [filteredBalances, transactions, assets]);
@@ -452,13 +487,15 @@ export default function DepoManagementWorkspace({
     if (filterProject !== 'ALL') count++;
     if (filterDepot !== 'ALL') count++;
     if (filterCategory !== 'ALL') count++;
+    if (missingDocsOnly) count++;
     return count;
-  }, [filterProject, filterDepot, filterCategory]);
+  }, [filterProject, filterDepot, filterCategory, missingDocsOnly]);
 
   const handleResetFilters = () => {
     setFilterProject('ALL');
     setFilterDepot('ALL');
     setFilterCategory('ALL');
+    setMissingDocsOnly(false);
     setFilterText('');
   };
 
@@ -835,12 +872,12 @@ export default function DepoManagementWorkspace({
 
   return (
     <div className="space-y-5 animate-fade-in pb-16 select-none font-sans">
-      {/* External Top Return Navigation Link */}
+      {/* External Top Return Navigation Pill Button */}
       {onBackToRequisitions && (
         <div className="flex items-center justify-between">
           <button
             onClick={onBackToRequisitions}
-            className="inline-flex items-center space-x-1.5 text-xs font-bold text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-2xs hover:border-blue-400 hover:text-blue-600 transition-colors cursor-pointer"
           >
             <span>
               {t.btnBackToRequisitions ||
@@ -990,29 +1027,41 @@ export default function DepoManagementWorkspace({
           </div>
         </div>
 
-        {/* KPI 4: Document & Serialized Asset Alerts */}
+        {/* KPI 4: Doc & Compliance Alerts (Catalog Incomplete SKUs + Missing Movement Docs) */}
         <div
           onClick={() => {
-            setActiveTab('MOVEMENTS');
-            setMissingDocsOnly(true);
+            if (
+              kpis.catalogIncompleteCount === 0 &&
+              kpis.missingMovementDocsCount > 0
+            ) {
+              setActiveTab('MOVEMENTS');
+              setMissingDocsOnly(true);
+            } else {
+              setActiveTab('BALANCES');
+              setMissingDocsOnly((prev) => !prev);
+            }
           }}
-          className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs cursor-pointer hover:border-amber-400 transition-colors"
+          className={`bg-white dark:bg-[#0f172a] rounded-2xl border p-4 shadow-xs cursor-pointer transition-colors ${
+            missingDocsOnly
+              ? 'border-amber-400 dark:border-amber-600 ring-1 ring-amber-400/40'
+              : 'border-slate-200 dark:border-slate-800 hover:border-amber-400'
+          }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
               {t.kpiAlerts}
             </span>
-            {kpis.missingDocsCount > 0 && (
+            {kpis.totalComplianceAlerts > 0 && (
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
             )}
           </div>
-          <div className="mt-2 flex items-baseline space-x-2">
+          <div className="mt-2 flex items-baseline space-x-2 flex-wrap">
             <span className="text-2xl font-light text-amber-600 dark:text-amber-400">
-              {kpis.missingDocsCount}
+              {kpis.totalComplianceAlerts}
             </span>
             <span className="text-xs font-light text-slate-400">
-              {lang === 'tr' ? 'Eksik Evrak' : 'Missing Docs'} •{' '}
-              {kpis.assetCount} {lang === 'tr' ? 'Demirbaş' : 'Assets'}
+              {kpis.catalogIncompleteCount} {t.incompleteSkusLabel} ·{' '}
+              {kpis.missingMovementDocsCount} {t.missingDocsLabel}
             </span>
           </div>
         </div>
@@ -1025,10 +1074,7 @@ export default function DepoManagementWorkspace({
           {/* Tabs */}
           <div className="flex space-x-2">
             <button
-              onClick={() => {
-                setActiveTab('BALANCES');
-                setMissingDocsOnly(false);
-              }}
+              onClick={() => setActiveTab('BALANCES')}
               className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'BALANCES'
                   ? 'bg-blue-600 text-white shadow-xs'
@@ -1047,18 +1093,15 @@ export default function DepoManagementWorkspace({
               }`}
             >
               {t.tabMovements} ({transactions.length})
-              {kpis.missingDocsCount > 0 && (
-                <span className="ml-1.5 px-1.5 py-0.2 rounded-full text-[9px] bg-amber-500 text-white font-bold">
-                  {kpis.missingDocsCount}
+              {kpis.missingMovementDocsCount > 0 && (
+                <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] bg-amber-500 text-white font-bold">
+                  {kpis.missingMovementDocsCount}
                 </span>
               )}
             </button>
 
             <button
-              onClick={() => {
-                setActiveTab('ASSETS');
-                setMissingDocsOnly(false);
-              }}
+              onClick={() => setActiveTab('ASSETS')}
               className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'ASSETS'
                   ? 'bg-blue-600 text-white shadow-xs'
@@ -1080,8 +1123,7 @@ export default function DepoManagementWorkspace({
                     : 'bg-slate-50 dark:bg-slate-900 text-slate-500 border-slate-200 dark:border-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
-                ⚠️{' '}
-                {lang === 'tr' ? 'Yalnızca Eksik Evraklılar' : 'Missing Docs Only'}
+                ⚠️ {t.filterIncompleteOnly}
               </button>
             )}
 
@@ -1145,7 +1187,7 @@ export default function DepoManagementWorkspace({
                       <select
                         value={filterProject}
                         onChange={(e) => setFilterProject(e.target.value)}
-                        className="w-full text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
+                        className={`${CONTROL_CLASS} cursor-pointer`}
                       >
                         <option value="ALL">
                           {t.allProjects || 'Tüm Projeler'}
@@ -1166,7 +1208,7 @@ export default function DepoManagementWorkspace({
                       <select
                         value={filterDepot}
                         onChange={(e) => setFilterDepot(e.target.value)}
-                        className="w-full text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
+                        className={`${CONTROL_CLASS} cursor-pointer`}
                       >
                         <option value="ALL">
                           {t.allDepots || 'Tüm Depolar / Alanlar'}
@@ -1187,7 +1229,7 @@ export default function DepoManagementWorkspace({
                       <select
                         value={filterCategory}
                         onChange={(e) => setFilterCategory(e.target.value)}
-                        className="w-full text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
+                        className={`${CONTROL_CLASS} cursor-pointer`}
                       >
                         <option value="ALL">
                           {t.allCategories || 'Tüm Kategoriler'}
@@ -1198,6 +1240,21 @@ export default function DepoManagementWorkspace({
                           </option>
                         ))}
                       </select>
+                    </div>
+
+                    {/* Dimension 4: Incomplete / Missing Docs Compliance Toggle */}
+                    <div className="pt-1">
+                      <label className="h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center space-x-2.5 cursor-pointer hover:border-amber-400 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={missingDocsOnly}
+                          onChange={(e) => setMissingDocsOnly(e.target.checked)}
+                          className="rounded border-slate-300 dark:border-slate-700 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                          {t.filterIncompleteOnly}
+                        </span>
+                      </label>
                     </div>
 
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
@@ -1222,10 +1279,10 @@ export default function DepoManagementWorkspace({
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             placeholder={t.searchPlaceholder}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sans"
+            className="w-full h-10 pl-10 pr-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sans"
           />
           <svg
-            className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5"
+            className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -1293,6 +1350,7 @@ export default function DepoManagementWorkspace({
                     );
                     const isLowStock =
                       b.quantity_on_hand <= b.min_stock_threshold;
+                    const complianceIssues = getItemComplianceIssues(item);
 
                     return (
                       <tr
@@ -1315,10 +1373,25 @@ export default function DepoManagementWorkspace({
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-bold text-slate-900 dark:text-slate-100">
-                            {lang === 'tr'
-                              ? item?.item_name_tr
-                              : item?.item_name_en || item?.item_name_tr}
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-slate-900 dark:text-slate-100">
+                              {lang === 'tr'
+                                ? item?.item_name_tr
+                                : item?.item_name_en || item?.item_name_tr}
+                            </span>
+                            {complianceIssues.length > 0 && (
+                              <span
+                                title={complianceIssues
+                                  .map((issue) =>
+                                    getComplianceIssueLabel(issue, lang)
+                                  )
+                                  .join(' • ')}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800 shrink-0"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                {t.incompleteSkuBadge}
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] font-light text-slate-400">
                             {item?.category}{' '}
@@ -1473,7 +1546,7 @@ export default function DepoManagementWorkspace({
                           </div>
                           <div className="mt-1">
                             <span
-                              className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold ${
                                 tx.movement_type === 'INBOUND_RECEIPT'
                                   ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400'
                                   : 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400'
@@ -1586,7 +1659,7 @@ export default function DepoManagementWorkspace({
                               )}
                             </div>
 
-                            {tx.has_missing_docs && (
+                            {hasMovementDocAlert(tx) && (
                               <button
                                 onClick={() => handleOpenDocDrawer(tx)}
                                 className="mt-1 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 rounded-md hover:bg-amber-100 transition-colors w-fit cursor-pointer"
@@ -1874,7 +1947,7 @@ export default function DepoManagementWorkspace({
                     value={docDrawerIrsaliye}
                     onChange={(e) => setDocDrawerIrsaliye(e.target.value)}
                     placeholder="IRS-2026-XXXX"
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -1887,7 +1960,7 @@ export default function DepoManagementWorkspace({
                     value={docDrawerInvoice}
                     onChange={(e) => setDocDrawerInvoice(e.target.value)}
                     placeholder="FAT-2026-XXXX"
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -1900,7 +1973,7 @@ export default function DepoManagementWorkspace({
                     value={docDrawerSupplier}
                     onChange={(e) => setDocDrawerSupplier(e.target.value)}
                     placeholder="Tedarikçi Firma Adı"
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className={CONTROL_CLASS}
                   />
                 </div>
               </div>
@@ -1956,7 +2029,7 @@ export default function DepoManagementWorkspace({
                 <select
                   value={inboundDepotId}
                   onChange={(e) => setInboundDepotId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden cursor-pointer"
+                  className={`${CONTROL_CLASS} cursor-pointer`}
                 >
                   {depotLocations.map((d) => (
                     <option key={d.depot_id} value={d.depot_id}>
@@ -1983,7 +2056,7 @@ export default function DepoManagementWorkspace({
                     if (selected?.base_cost_eur)
                       setInboundCostEur(selected.base_cost_eur);
                   }}
-                  className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden cursor-pointer"
+                  className={`${CONTROL_CLASS} cursor-pointer`}
                 >
                   <option value="">
                     {lang === 'tr'
@@ -2013,7 +2086,7 @@ export default function DepoManagementWorkspace({
                     onChange={(e) =>
                       setInboundQty(Math.max(1, Number(e.target.value)))
                     }
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -2026,7 +2099,7 @@ export default function DepoManagementWorkspace({
                     step="0.01"
                     value={inboundCostEur}
                     onChange={(e) => setInboundCostEur(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className={CONTROL_CLASS}
                   />
                 </div>
               </div>
@@ -2042,7 +2115,7 @@ export default function DepoManagementWorkspace({
                     value={inboundIrsaliye}
                     onChange={(e) => setInboundIrsaliye(e.target.value)}
                     placeholder="IRS-2026-XXXX"
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -2055,7 +2128,7 @@ export default function DepoManagementWorkspace({
                     value={inboundInvoice}
                     onChange={(e) => setInboundInvoice(e.target.value)}
                     placeholder="FAT-2026-XXXX"
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className={CONTROL_CLASS}
                   />
                 </div>
               </div>
@@ -2069,7 +2142,7 @@ export default function DepoManagementWorkspace({
                   value={inboundSupplier}
                   onChange={(e) => setInboundSupplier(e.target.value)}
                   placeholder="Daikin / Ege Vitrifiye"
-                  className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                  className={CONTROL_CLASS}
                 />
               </div>
 
@@ -2084,7 +2157,7 @@ export default function DepoManagementWorkspace({
                     value={inboundSerials}
                     onChange={(e) => setInboundSerials(e.target.value)}
                     placeholder="SN-2026-001, SN-2026-002..."
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className="w-full px-3.5 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               )}
@@ -2141,7 +2214,7 @@ export default function DepoManagementWorkspace({
                 <select
                   value={outboundDepotId}
                   onChange={(e) => setOutboundDepotId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden cursor-pointer"
+                  className={`${CONTROL_CLASS} cursor-pointer`}
                 >
                   {depotLocations.map((d) => (
                     <option key={d.depot_id} value={d.depot_id}>
@@ -2169,7 +2242,7 @@ export default function DepoManagementWorkspace({
                       setOutboundDepotId(resolveItemDepot(nextId));
                     }
                   }}
-                  className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden cursor-pointer"
+                  className={`${CONTROL_CLASS} cursor-pointer`}
                 >
                   <option value="">
                     {lang === 'tr'
@@ -2199,7 +2272,7 @@ export default function DepoManagementWorkspace({
                   <select
                     value={outboundBuildingId}
                     onChange={(e) => setOutboundBuildingId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden cursor-pointer"
+                    className={`${CONTROL_CLASS} cursor-pointer`}
                   >
                     <option value="">
                       {lang === 'tr'
@@ -2223,7 +2296,7 @@ export default function DepoManagementWorkspace({
                     value={outboundUnitLabel}
                     onChange={(e) => setOutboundUnitLabel(e.target.value)}
                     placeholder="Daire 104 / 3. Kat"
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className={CONTROL_CLASS}
                   />
                 </div>
               </div>
@@ -2240,7 +2313,7 @@ export default function DepoManagementWorkspace({
                     onChange={(e) =>
                       setOutboundQty(Math.max(1, Number(e.target.value)))
                     }
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -2253,7 +2326,7 @@ export default function DepoManagementWorkspace({
                     value={outboundReqId}
                     onChange={(e) => setOutboundReqId(e.target.value)}
                     placeholder="REQ-2026-XXXX"
-                    className="w-full px-3 py-2 text-xs font-mono font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className={`${CONTROL_CLASS} font-mono`}
                   />
                 </div>
               </div>
@@ -2268,7 +2341,7 @@ export default function DepoManagementWorkspace({
                   value={outboundIrsaliye}
                   onChange={(e) => setOutboundIrsaliye(e.target.value)}
                   placeholder="IRS-2026-XXXX"
-                  className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                  className={CONTROL_CLASS}
                 />
               </div>
             </div>

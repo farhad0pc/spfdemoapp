@@ -17,6 +17,10 @@ import {
 } from '@/types/requisition';
 import { supabase } from '@/lib/supabaseClient';
 import { DICTIONARY } from '@/lib/i18n';
+import AttributesEditor from '@/components/AttributesEditor';
+
+const CONTROL_CLASS =
+  'w-full h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
 
 interface DetectedItemInfo {
   rawValue: string;
@@ -131,6 +135,10 @@ export default function MobileBarcodeScannerModal({
   const [regWarrantyDate, setRegWarrantyDate] = useState<string>('');
   const [regProductUrl, setRegProductUrl] = useState<string>('');
   const [regSpec, setRegSpec] = useState<string>('');
+  const [regAttributes, setRegAttributes] = useState<Record<string, unknown>>(
+    {}
+  );
+  const [regFormKey, setRegFormKey] = useState<number>(0);
   const [regInitialQty, setRegInitialQty] = useState<number>(1);
   const [regIrsaliye, setRegIrsaliye] = useState<string>('');
   const [regSubmitting, setRegSubmitting] = useState<boolean>(false);
@@ -288,6 +296,8 @@ export default function MobileBarcodeScannerModal({
         setRegNameEn('');
         setRegBrandModel('');
         setRegSpec('');
+        setRegAttributes({});
+        setRegFormKey((k) => k + 1);
         if (secondarySerial) {
           setRegIsTrackable(true);
           setRegSerialNo(secondarySerial);
@@ -404,6 +414,7 @@ export default function MobileBarcodeScannerModal({
       setRegSuccessMessage(null);
       setRegError(null);
       setExternalSuggestionSource(null);
+      setRegAttributes({});
     }
 
     return () => {
@@ -751,6 +762,11 @@ export default function MobileBarcodeScannerModal({
           ? 'DEPOT-PRJ02-CONST'
           : 'DEPOT-PRJ02-MAIN';
 
+      const serializedAttributes =
+        regAttributes && Object.keys(regAttributes).length > 0
+          ? regAttributes
+          : null;
+
       const res = await fetch('/api/depot/catalog', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -785,6 +801,7 @@ export default function MobileBarcodeScannerModal({
           warranty_expiry_date: regWarrantyDate || null,
           product_url: regProductUrl.trim() || null,
           specification: regSpec.trim() || null,
+          attributes: serializedAttributes,
           initial_qty: Math.max(0, Number(regInitialQty) || 0),
           irsaliye_number: regIrsaliye.trim() || null,
         }),
@@ -827,6 +844,8 @@ export default function MobileBarcodeScannerModal({
       setMatchedCatalogItem(createdItem);
       if (createdAsset) setMatchedAsset(createdAsset);
       setScannedCode(createdItem.barcode_ean || createdItem.legacy_code);
+      setRegAttributes({});
+      setRegFormKey((k) => k + 1);
       setIsRegistering(false);
       setActiveMode('SCAN_LOOKUP');
     } catch (err: unknown) {
@@ -968,7 +987,7 @@ export default function MobileBarcodeScannerModal({
                   <select
                     value={selectedDeviceId}
                     onChange={(e) => handleCameraChange(e.target.value)}
-                    className="text-xs font-bold bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-800 dark:text-slate-200 focus:outline-hidden"
+                    className="h-9 px-3 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-hidden cursor-pointer"
                   >
                     {videoDevices.map((dev, idx) => (
                       <option key={dev.deviceId || idx} value={dev.deviceId}>
@@ -1068,11 +1087,11 @@ export default function MobileBarcodeScannerModal({
                 value={manualInput}
                 onChange={(e) => setManualInput(e.target.value)}
                 placeholder={d.manualPlaceholder}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs font-mono font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                className="flex-1 h-10 px-3.5 py-2 rounded-xl text-xs font-light font-mono border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                className="h-10 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
               >
                 {d.btnSearch}
               </button>
@@ -1311,7 +1330,7 @@ export default function MobileBarcodeScannerModal({
                   <select
                     value={regProjectId}
                     onChange={(e) => setRegProjectId(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} cursor-pointer`}
                   >
                     {projectOptions.map((p) => (
                       <option key={p.project_id} value={p.project_id}>
@@ -1328,7 +1347,7 @@ export default function MobileBarcodeScannerModal({
                   <select
                     value={regProductDomain}
                     onChange={(e) => setRegProductDomain(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} cursor-pointer`}
                   >
                     <option value="CONSTRUCTION_MATERIALS">
                       {d.domainConstruction}
@@ -1346,7 +1365,7 @@ export default function MobileBarcodeScannerModal({
                   <select
                     value={regCategory}
                     onChange={(e) => setRegCategory(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} cursor-pointer`}
                   >
                     {dynamicCategories.map((cat) => (
                       <option key={cat} value={cat}>
@@ -1370,7 +1389,7 @@ export default function MobileBarcodeScannerModal({
                     value={regNameTr}
                     onChange={(e) => setRegNameTr(e.target.value)}
                     placeholder="Örn: 24kW Inverter VRF Klima Dış Ünite"
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -1383,7 +1402,7 @@ export default function MobileBarcodeScannerModal({
                     value={regNameEn}
                     onChange={(e) => setRegNameEn(e.target.value)}
                     placeholder="e.g. 24kW Inverter VRF Outdoor Unit"
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -1395,7 +1414,7 @@ export default function MobileBarcodeScannerModal({
                   <select
                     value={regUnit}
                     onChange={(e) => setRegUnit(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} cursor-pointer`}
                   >
                     {d.units.map((u) => (
                       <option key={u} value={u}>
@@ -1414,7 +1433,7 @@ export default function MobileBarcodeScannerModal({
                     value={regSubcategory}
                     onChange={(e) => setRegSubcategory(e.target.value)}
                     placeholder={d.placeholderSubcategory}
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -1445,7 +1464,7 @@ export default function MobileBarcodeScannerModal({
                         ? 'Boş bırakılırsa otomatik üretilir'
                         : 'Auto-generated if left blank'
                     }
-                    className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} font-mono`}
                   />
                 </div>
 
@@ -1458,7 +1477,7 @@ export default function MobileBarcodeScannerModal({
                     value={regLegacyCode}
                     onChange={(e) => setRegLegacyCode(e.target.value)}
                     placeholder="MAT-XXXX / WH-XXXX"
-                    className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} font-mono`}
                   />
                 </div>
 
@@ -1472,7 +1491,7 @@ export default function MobileBarcodeScannerModal({
                     value={regBrandModel}
                     onChange={(e) => setRegBrandModel(e.target.value)}
                     placeholder="Daikin / Grohe / Vitra"
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -1489,7 +1508,7 @@ export default function MobileBarcodeScannerModal({
                         ? 'Örn: Daikin Kıbrıs / Çimko'
                         : 'e.g. Daikin Cyprus / Lafarge'
                     }
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -1507,12 +1526,12 @@ export default function MobileBarcodeScannerModal({
                       onChange={(e) =>
                         setRegBaseCostEur(Number(e.target.value))
                       }
-                      className="flex-1 px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                      className="flex-1 h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     />
                     <select
                       value={regSourceCurrency}
                       onChange={(e) => setRegSourceCurrency(e.target.value)}
-                      className="w-20 px-2 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                      className="w-24 h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
                     >
                       <option value="EUR">EUR</option>
                       <option value="USD">USD</option>
@@ -1531,7 +1550,7 @@ export default function MobileBarcodeScannerModal({
                     step="0.5"
                     value={regMarkupPct}
                     onChange={(e) => setRegMarkupPct(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -1545,7 +1564,7 @@ export default function MobileBarcodeScannerModal({
                     onChange={(e) =>
                       setRegPackagingType(e.target.value as PackagingUnitType)
                     }
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} cursor-pointer`}
                   >
                     <option value="SINGLE_ITEM">{d.singleItem}</option>
                     <option value="ATOMIC_SET">{d.atomicSet}</option>
@@ -1564,7 +1583,7 @@ export default function MobileBarcodeScannerModal({
                       onChange={(e) =>
                         setRegPieceCount(Number(e.target.value))
                       }
-                      className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                      className={CONTROL_CLASS}
                     />
                   </div>
                 ) : (
@@ -1577,7 +1596,7 @@ export default function MobileBarcodeScannerModal({
                       value={regProductUrl}
                       onChange={(e) => setRegProductUrl(e.target.value)}
                       placeholder="https://..."
-                      className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                      className={CONTROL_CLASS}
                     />
                   </div>
                 )}
@@ -1592,7 +1611,7 @@ export default function MobileBarcodeScannerModal({
                     min="0"
                     value={regInitialQty}
                     onChange={(e) => setRegInitialQty(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
                   />
                 </div>
 
@@ -1605,7 +1624,7 @@ export default function MobileBarcodeScannerModal({
                     value={regIrsaliye}
                     onChange={(e) => setRegIrsaliye(e.target.value)}
                     placeholder="IRS-2026-..."
-                    className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={`${CONTROL_CLASS} font-mono`}
                   />
                 </div>
 
@@ -1619,7 +1638,21 @@ export default function MobileBarcodeScannerModal({
                     value={regSpec}
                     onChange={(e) => setRegSpec(e.target.value)}
                     placeholder={d.placeholderSpec}
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    className={CONTROL_CLASS}
+                  />
+                </div>
+
+                {/* Structured Attributes Matrix */}
+                <div className="sm:col-span-2">
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1.5">
+                    {d.lblAttributes}
+                  </label>
+                  <AttributesEditor
+                    key={`reg-attrs-${regFormKey}`}
+                    value={regAttributes}
+                    onChange={setRegAttributes}
+                    productDomain={regProductDomain}
+                    lang={lang}
                   />
                 </div>
 
@@ -1648,7 +1681,7 @@ export default function MobileBarcodeScannerModal({
                           value={regSerialNo}
                           onChange={(e) => setRegSerialNo(e.target.value)}
                           placeholder="SN-XXXX-YYYY"
-                          className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                          className={`${CONTROL_CLASS} font-mono`}
                         />
                       </div>
                       <div>
@@ -1659,7 +1692,7 @@ export default function MobileBarcodeScannerModal({
                           type="date"
                           value={regWarrantyDate}
                           onChange={(e) => setRegWarrantyDate(e.target.value)}
-                          className="w-full px-3 py-2 text-xs font-mono font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                          className={`${CONTROL_CLASS} font-mono`}
                         />
                       </div>
                     </div>
