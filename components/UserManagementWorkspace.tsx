@@ -20,6 +20,8 @@ interface UserManagementWorkspaceProps {
   currentUserEmail?: string;
   lang: 'tr' | 'en';
   portfolioProjects?: PortfolioProject[];
+  onRolePreviewChange?: (role: RoleTier) => void;
+  authenticatedRole?: RoleTier;
 }
 
 function subscribeToClock(callback: () => void) {
@@ -40,6 +42,8 @@ export default function UserManagementWorkspace({
   currentUserEmail,
   lang,
   portfolioProjects = [],
+  onRolePreviewChange,
+  authenticatedRole,
 }: UserManagementWorkspaceProps) {
   const currentClockSec = useSyncExternalStore(subscribeToClock, getClockSnapshot, getServerSnapshot);
   const d = DICTIONARY[lang].personnel;
@@ -362,7 +366,7 @@ export default function UserManagementWorkspace({
                 setInviteFullName('');
                 setInviteRole(assignableRoles[0] || '');
               }}
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center space-x-2"
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center space-x-2 cursor-pointer"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
@@ -372,6 +376,45 @@ export default function UserManagementWorkspace({
           )}
         </div>
       </div>
+
+      {/* Developer Role Preview Switcher Bar (Exclusive to SYSTEM_ADMIN Tier 0) */}
+      {authenticatedRole === 'SYSTEM_ADMIN' && onRolePreviewChange && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl p-4 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center space-x-3">
+              <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                </svg>
+              </span>
+              <div>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-200">
+                  {d.devPreviewTitle}
+                </h2>
+                <p className="text-[11px] font-light text-amber-700 dark:text-amber-400">
+                  {d.devPreviewDesc}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 shrink-0">
+              <select
+                value={currentRole}
+                onChange={(e) => onRolePreviewChange(e.target.value as RoleTier)}
+                className="text-xs font-bold bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700 focus:outline-hidden focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-xs"
+              >
+                {(Object.keys(ROLE_METADATA) as RoleTier[]).map((r) => {
+                  const m = ROLE_METADATA[r];
+                  return (
+                    <option key={r} value={r}>
+                      [{m.department}] {lang === 'tr' ? m.titleTr : m.titleEn} (Tier {m.tier})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 4-Stat Telemetry Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -438,7 +481,7 @@ export default function UserManagementWorkspace({
           <div className="flex space-x-2">
             <button
               onClick={() => setActiveTab('ROSTER')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'ROSTER'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -449,7 +492,7 @@ export default function UserManagementWorkspace({
 
             <button
               onClick={() => setActiveTab('INVITATIONS')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all relative ${
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all relative cursor-pointer ${
                 activeTab === 'INVITATIONS'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -469,7 +512,7 @@ export default function UserManagementWorkspace({
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-hidden"
+              className="text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
             >
               <option value="ALL">{d.allDepartments}</option>
               <option value="SYSTEM">SYSTEM</option>
@@ -594,7 +637,7 @@ export default function UserManagementWorkspace({
                             <div className="flex items-center justify-center space-x-1.5">
                               <button
                                 onClick={() => handleToggleUserStatus(u)}
-                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
                                   u.account_status === 'ACTIVE'
                                     ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-400'
                                     : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-400'
@@ -607,7 +650,7 @@ export default function UserManagementWorkspace({
                                   setEditingUser(u);
                                   setEditRole(u.role);
                                 }}
-                                className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors"
+                                className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors cursor-pointer"
                               >
                                 {d.btnChangeRole}
                               </button>
@@ -691,7 +734,7 @@ export default function UserManagementWorkspace({
                               {inv.status === 'PENDING' && (
                                 <button
                                   onClick={() => handleResendInvite(inv.invitation_id)}
-                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900 transition-colors"
+                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900 transition-colors cursor-pointer"
                                   title={lang === 'tr' ? '48 saatlik süreyi sıfırla ve yeni link üret' : 'Reset 48h clock and generate new link'}
                                 >
                                   {d.btnResend}
@@ -700,7 +743,7 @@ export default function UserManagementWorkspace({
                               {inv.status === 'PENDING' && (
                                 <button
                                   onClick={() => handleRevokeInvite(inv.invitation_id)}
-                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-900 transition-colors"
+                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-900 transition-colors cursor-pointer"
                                 >
                                   {d.btnRevoke}
                                 </button>
@@ -737,7 +780,7 @@ export default function UserManagementWorkspace({
               </div>
               <button
                 onClick={() => setIsInviteModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 ✕
               </button>
@@ -768,7 +811,7 @@ export default function UserManagementWorkspace({
                       setCopiedLink(true);
                       setTimeout(() => setCopiedLink(false), 2000);
                     }}
-                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold whitespace-nowrap"
+                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer"
                   >
                     {copiedLink ? d.copySuccess : d.btnCopy}
                   </button>
@@ -780,7 +823,7 @@ export default function UserManagementWorkspace({
                       setIsInviteModalOpen(false);
                       setInviteSuccessUrl(null);
                     }}
-                    className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold"
+                    className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
                   >
                     {common.close}
                   </button>
@@ -824,7 +867,7 @@ export default function UserManagementWorkspace({
                     required
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as RoleTier)}
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden cursor-pointer"
                   >
                     {assignableRoles.map((role) => (
                       <option key={role} value={role}>
@@ -879,14 +922,14 @@ export default function UserManagementWorkspace({
                   <button
                     type="button"
                     onClick={() => setIsInviteModalOpen(false)}
-                    className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold"
+                    className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
                   >
                     {common.cancel}
                   </button>
                   <button
                     type="submit"
                     disabled={inviteSubmitting || !inviteRole}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs"
+                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
                   >
                     {inviteSubmitting ? (lang === 'tr' ? 'Oluşturuluyor...' : 'Generating...') : d.btnSendInvite}
                   </button>
@@ -918,7 +961,7 @@ export default function UserManagementWorkspace({
               <select
                 value={editRole}
                 onChange={(e) => setEditRole(e.target.value as RoleTier)}
-                className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white cursor-pointer"
               >
                 {assignableRoles.map((role) => (
                   <option key={role} value={role}>
@@ -932,7 +975,7 @@ export default function UserManagementWorkspace({
               <button
                 type="button"
                 onClick={() => setEditingUser(null)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold"
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
               >
                 {common.cancel}
               </button>
@@ -940,7 +983,7 @@ export default function UserManagementWorkspace({
                 type="button"
                 onClick={handleSaveUserRole}
                 disabled={editSubmitting || !editRole}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
               >
                 {editSubmitting ? (lang === 'tr' ? 'Kaydediliyor...' : 'Saving...') : common.save}
               </button>

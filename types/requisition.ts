@@ -41,6 +41,16 @@ export interface InventoryCatalogItem {
   packaging_unit_type?: PackagingUnitType | null;
   set_piece_count?: number | null;
   commercial_markup_pct?: number | null;
+  // Milestone v2.7.0 Universal Inventory Taxonomy parameters
+  product_domain?: 'CONSTRUCTION_MATERIALS' | 'FURNISHING_AND_EQUIPMENT' | string | null;
+  supplier_name?: string | null;
+  brand_model?: string | null;
+  manufacturer_article?: string | null;
+  source_currency?: string | null;
+  source_unit_price?: number | null;
+  product_url?: string | null;
+  lifecycle_status?: string | null;
+  attributes?: Record<string, unknown> | null;
 }
 
 export interface PortfolioProject {
@@ -114,7 +124,7 @@ export interface RequisitionApprovalLog {
 // ==========================================
 
 export interface DepotLocation {
-  depot_id: string; // e.g. 'DEPOT-PRJ02-MAIN'
+  depot_id: string; // e.g. 'DEPOT-PRJ02-MAIN', 'DEPOT-PRJ02-CONST'
   project_id: string; // e.g. 'PRJ-02'
   depot_name: string;
   depot_category: string;

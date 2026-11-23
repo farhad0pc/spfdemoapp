@@ -1,14 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import { 
-  InventoryCatalogItem, 
-  PurchaseRequisition, 
-  RoleTier, 
-  PortfolioProject, 
-  PortfolioBuilding 
+import {
+  InventoryCatalogItem,
+  PurchaseRequisition,
+  RoleTier,
+  PortfolioProject,
+  PortfolioBuilding,
 } from '@/types/requisition';
 import CorporateHeader from '@/components/CorporateHeader';
 import DesktopSidebar from '@/components/DesktopSidebar';
@@ -20,20 +19,30 @@ import UserManagementWorkspace from '@/components/UserManagementWorkspace';
 import Toast from '@/components/Toast';
 
 export default function PurchasingPortalPage() {
-  const router = useRouter();
-  const [view, setView] = useState<'WORKSPACE' | 'TECHNICAL_INTAKE' | 'DEPOT_WORKSPACE' | 'USER_MANAGEMENT'>('WORKSPACE');
+  const [view, setView] = useState<
+    'WORKSPACE' | 'TECHNICAL_INTAKE' | 'DEPOT_WORKSPACE' | 'USER_MANAGEMENT'
+  >('WORKSPACE');
   const [currentRole, setCurrentRole] = useState<RoleTier>('TECH_OFFICE_USER');
+  const [authenticatedRole, setAuthenticatedRole] =
+    useState<RoleTier>('TECH_OFFICE_USER');
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [catalogItems, setCatalogItems] = useState<InventoryCatalogItem[]>([]);
   const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>([]);
-  const [portfolioProjects, setPortfolioProjects] = useState<PortfolioProject[]>([]);
-  const [portfolioBuildings, setPortfolioBuildings] = useState<PortfolioBuilding[]>([]);
+  const [portfolioProjects, setPortfolioProjects] = useState<
+    PortfolioProject[]
+  >([]);
+  const [portfolioBuildings, setPortfolioBuildings] = useState<
+    PortfolioBuilding[]
+  >([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [lang, setLang] = useState<'tr' | 'en'>('tr');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastState, setToastState] = useState<{
+    message: string;
+    subMessage?: string;
+  } | null>(null);
 
   // Synchronize document DOM language dynamically to prevent CSS uppercase dotted 'İ' in English
   useEffect(() => {
@@ -72,8 +81,25 @@ export default function PurchasingPortalPage() {
 
   const checkSession = useCallback(async () => {
     try {
-      // 1. Supabase Auth session check
-      const { data: { session } } = await supabase.auth.getSession();
+      // 1. Primary server-verified HTTP-only session check
+      const res = await fetch('/api/auth/login', { method: 'GET' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.authenticated && data.email) {
+          setCurrentUserEmail(data.email);
+          setIsLoggedIn(true);
+          if (data.role) {
+            setCurrentRole(data.role as RoleTier);
+            setAuthenticatedRole(data.role as RoleTier);
+          }
+          return;
+        }
+      }
+
+      // 2. Fallback client Supabase Auth session check
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session?.user?.email) {
         setCurrentUserEmail(session.user.email);
         setIsLoggedIn(true);
@@ -86,20 +112,14 @@ export default function PurchasingPortalPage() {
 
         if (profile?.role) {
           setCurrentRole(profile.role as RoleTier);
+          setAuthenticatedRole(profile.role as RoleTier);
         }
         return;
       }
 
-      // 2. God-Tier fail-safe session check via /api/users
-      const res = await fetch('/api/users');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.isFailsafeActive) {
-          setCurrentRole('SYSTEM_ADMIN');
-          setCurrentUserEmail('admin@caesargroup.com (Root God-Tier)');
-          setIsLoggedIn(true);
-        }
-      }
+      // 3. Hard redirect if unauthenticated
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = '/login';
     } catch (err) {
       console.error('Session hydration error:', err);
     }
@@ -108,14 +128,16 @@ export default function PurchasingPortalPage() {
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
-      await fetch('/api/auth/failsafe-login', { method: 'DELETE' });
+      await fetch('/api/auth/logout', { method: 'POST' });
     } catch (err) {
       console.error('Logout error:', err);
     } finally {
       setCurrentUserEmail(null);
       setIsLoggedIn(false);
       setCurrentRole('TECH_OFFICE_USER');
-      router.push('/login');
+      setAuthenticatedRole('TECH_OFFICE_USER');
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = '/login';
     }
   };
 
@@ -128,26 +150,22 @@ export default function PurchasingPortalPage() {
       void init();
     }
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user?.email) {
-        setCurrentUserEmail(session.user.email);
-        setIsLoggedIn(true);
-      } else {
-        void checkSession();
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (session?.user?.email) {
+          setCurrentUserEmail(session.user.email);
+          setIsLoggedIn(true);
+        }
       }
-    });
+    );
 
     const channel = supabase
-      .channel('schema-db-changes')
+      .channel('public:purchase_requisitions_realtime')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'purchase_requisitions',
-        },
+        { event: '*', schema: 'public', table: 'purchase_requisitions' },
         () => {
-          fetchData();
+          void fetchData();
         }
       )
       .subscribe();
@@ -155,9 +173,13 @@ export default function PurchasingPortalPage() {
     return () => {
       ignore = true;
       authListener?.subscription.unsubscribe();
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }, [fetchData, checkSession]);
+
+  const toggleLang = () => {
+    setLang((prev) => (prev === 'tr' ? 'en' : 'tr'));
+  };
 
   const toggleTheme = () => {
     const nextTheme = theme === 'light' ? 'dark' : 'light';
@@ -169,15 +191,25 @@ export default function PurchasingPortalPage() {
     }
   };
 
-  const toggleLang = () => {
-    setLang((prev) => (prev === 'tr' ? 'en' : 'tr'));
-  };
-
   const handleUpcomingClick = (title: string) => {
-    setToastMessage(title);
+    setToastState({
+      message:
+        lang === 'tr'
+          ? 'BİLGİ: Modül Geliştirme Aşamasında'
+          : 'INFO: Feature Roadmap',
+      subMessage: `${title} ${
+        lang === 'tr'
+          ? 'yakında aktif edilecektir.'
+          : 'will be available in the upcoming release.'
+      }`,
+    });
   };
 
-  const handleSubmitTicket = async (payload: {
+  const handleShowToast = useCallback((message: string, subMessage?: string) => {
+    setToastState({ message, subMessage });
+  }, []);
+
+  const handleSubmitTicket = async (newTicket: {
     location_block_id: string;
     catalog_item_id: string;
     target_volume: number;
@@ -185,32 +217,55 @@ export default function PurchasingPortalPage() {
     tech_approved_budget_eur: number;
     custom_technical_specs: Record<string, unknown>;
   }) => {
-    const ticketId = `REQ-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.random().toString(16).substring(2, 6).toUpperCase()}`;
-
     const { data: users } = await supabase
       .from('corporate_users')
       .select('id')
       .eq('role', currentRole)
       .limit(1);
 
-    const requestingPartyUuid = users?.[0]?.id || '00000000-0000-0000-0000-000000000000';
-    const initialStatus = currentRole === 'TECH_OFFICE_USER' ? 'DRAFTING' : 'PURCHASING_SOURCING';
+    const userUuid =
+      users?.[0]?.id || '00000000-0000-0000-0000-000000000000';
+    const hex = Math.random().toString(16).substring(2, 6).toUpperCase();
+    const dateStr = new Date().toISOString().slice(0, 7).replace('-', '');
+    const ticketId = `REQ-${dateStr}-${hex}`;
 
-    const { error } = await supabase.from('purchase_requisitions').insert([
-      {
-        ticket_id: ticketId,
-        location_block_id: payload.location_block_id,
-        requesting_party_uuid: requestingPartyUuid,
-        handover_recipient_role: 'PURCHASING_AGENT',
-        catalog_item_id: payload.catalog_item_id,
-        custom_technical_specs: payload.custom_technical_specs,
-        tech_approved_budget_eur: payload.tech_approved_budget_eur,
-        live_status: initialStatus,
-      },
-    ]);
+    const { data, error } = await supabase
+      .from('purchase_requisitions')
+      .insert([
+        {
+          ticket_id: ticketId,
+          location_block_id: newTicket.location_block_id,
+          requesting_party_uuid: userUuid,
+          handover_recipient_role: 'TECH_OFFICE_USER',
+          catalog_item_id: newTicket.catalog_item_id,
+          custom_technical_specs: newTicket.custom_technical_specs,
+          tech_approved_budget_eur: newTicket.tech_approved_budget_eur,
+          live_status: 'TECH_REVIEW',
+        },
+      ])
+      .select();
 
-    if (error) throw error;
+    if (error) {
+      alert('Error creating ticket: ' + error.message);
+      return;
+    }
+
+    if (data && data[0]) {
+      await supabase.from('requisition_approvals').insert([
+        {
+          requisition_id: data[0].id,
+          actor_uuid: userUuid,
+          action: 'TICKET_CREATED_TECH_OFFICE',
+          new_payload: {
+            status: 'TECH_REVIEW',
+            budget: newTicket.tech_approved_budget_eur,
+          },
+        },
+      ]);
+    }
+
     await fetchData();
+    setView('WORKSPACE');
   };
 
   const handleApproveByTechManager = async (id: string) => {
@@ -220,7 +275,8 @@ export default function PurchasingPortalPage() {
       .eq('role', currentRole)
       .limit(1);
 
-    const managerUuid = users?.[0]?.id || '00000000-0000-0000-0000-000000000000';
+    const mgrUuid =
+      users?.[0]?.id || '00000000-0000-0000-0000-000000000000';
 
     const { error } = await supabase
       .from('purchase_requisitions')
@@ -238,8 +294,8 @@ export default function PurchasingPortalPage() {
     await supabase.from('requisition_approvals').insert([
       {
         requisition_id: id,
-        actor_uuid: managerUuid,
-        action: 'BUDGET_LOCKED_HANDOVER_TO_PURCHASING',
+        actor_uuid: mgrUuid,
+        action: 'TECH_OFFICE_MANAGER_APPROVED',
         new_payload: { status: 'PURCHASING_SOURCING' },
       },
     ]);
@@ -248,11 +304,11 @@ export default function PurchasingPortalPage() {
   };
 
   const handleUpdateQuota = async (
-    id: string, 
-    quotaEur: number, 
-    supplierName: string, 
+    id: string,
+    quotaEur: number,
+    supplierName: string,
     purchasingNotes: string,
-    escalateToExec: boolean = false
+    escalateToExec?: boolean
   ) => {
     const { data: users } = await supabase
       .from('corporate_users')
@@ -260,10 +316,14 @@ export default function PurchasingPortalPage() {
       .eq('role', currentRole)
       .limit(1);
 
-    const agentUuid = users?.[0]?.id || '00000000-0000-0000-0000-000000000000';
+    const agentUuid =
+      users?.[0]?.id || '00000000-0000-0000-0000-000000000000';
     const currentReq = requisitions.find((r) => r.id === id);
     const existingSpecs = currentReq?.custom_technical_specs || {};
-    const nextStatus = escalateToExec || quotaEur > 15000 ? 'EXECUTIVE_RATIFICATION' : 'APPROVED';
+    const nextStatus =
+      escalateToExec || quotaEur > 15000
+        ? 'EXECUTIVE_RATIFICATION'
+        : 'APPROVED';
 
     const { error } = await supabase
       .from('purchase_requisitions')
@@ -274,7 +334,8 @@ export default function PurchasingPortalPage() {
           ...existingSpecs,
           supplier_name: supplierName,
           purchasing_notes: purchasingNotes,
-          quota_overrun: quotaEur > (currentReq?.tech_approved_budget_eur || 0),
+          quota_overrun:
+            quotaEur > (currentReq?.tech_approved_budget_eur || 0),
         },
         updated_at: new Date().toISOString(),
       })
@@ -289,11 +350,13 @@ export default function PurchasingPortalPage() {
       {
         requisition_id: id,
         actor_uuid: agentUuid,
-        action: escalateToExec ? 'ESCALATED_TO_EXECUTIVE' : 'SUPPLIER_QUOTA_FINALIZED',
-        new_payload: { 
-          quota_eur: quotaEur, 
+        action: escalateToExec
+          ? 'ESCALATED_TO_EXECUTIVE'
+          : 'SUPPLIER_QUOTA_FINALIZED',
+        new_payload: {
+          quota_eur: quotaEur,
           supplier: supplierName,
-          status: nextStatus 
+          status: nextStatus,
         },
       },
     ]);
@@ -301,14 +364,18 @@ export default function PurchasingPortalPage() {
     await fetchData();
   };
 
-  const handleExecutiveAction = async (id: string, action: 'APPROVED' | 'REJECTED') => {
+  const handleExecutiveAction = async (
+    id: string,
+    action: 'APPROVED' | 'REJECTED'
+  ) => {
     const { data: users } = await supabase
       .from('corporate_users')
       .select('id')
       .eq('role', currentRole)
       .limit(1);
 
-    const execUuid = users?.[0]?.id || '00000000-0000-0000-0000-000000000000';
+    const execUuid =
+      users?.[0]?.id || '00000000-0000-0000-0000-000000000000';
 
     const { error } = await supabase
       .from('purchase_requisitions')
@@ -335,14 +402,18 @@ export default function PurchasingPortalPage() {
     await fetchData();
   };
 
-  const handleBatchAction = async (ids: string[], action: 'APPROVED' | 'REJECTED') => {
+  const handleBatchAction = async (
+    ids: string[],
+    action: 'APPROVED' | 'REJECTED'
+  ) => {
     const { data: users } = await supabase
       .from('corporate_users')
       .select('id')
       .eq('role', currentRole)
       .limit(1);
 
-    const actorUuid = users?.[0]?.id || '00000000-0000-0000-0000-000000000000';
+    const actorUuid =
+      users?.[0]?.id || '00000000-0000-0000-0000-000000000000';
 
     const { error } = await supabase
       .from('purchase_requisitions')
@@ -420,12 +491,18 @@ export default function PurchasingPortalPage() {
               portfolioBuildings={portfolioBuildings}
               currentRole={currentRole}
               lang={lang}
-              onNavigateToRequisitions={() => setView('WORKSPACE')}
-              onRegisterCatalogItem={(newItem) => setCatalogItems((prev) => [newItem, ...prev])}
+              onBackToRequisitions={() => setView('WORKSPACE')}
+              onItemRegistered={(newItem) =>
+                setCatalogItems((prev) => [newItem, ...prev])
+              }
+              onCatalogUpdated={fetchData}
+              onShowToast={handleShowToast}
             />
           ) : view === 'USER_MANAGEMENT' ? (
             <UserManagementWorkspace
               currentRole={currentRole}
+              authenticatedRole={authenticatedRole}
+              onRolePreviewChange={setCurrentRole}
               currentUserEmail={currentUserEmail || undefined}
               lang={lang}
               portfolioProjects={portfolioProjects}
@@ -447,16 +524,16 @@ export default function PurchasingPortalPage() {
         </main>
       </div>
 
-      {/* Teaser Toast Notification */}
-      {toastMessage && (
+      {/* Toast Notification */}
+      {toastState && (
         <Toast
-          message={lang === 'tr' ? 'BİLGİ: Modül Geliştirme Aşamasında' : 'INFO: Feature Roadmap'}
-          subMessage={`${toastMessage} ${lang === 'tr' ? 'yakında aktif edilecektir.' : 'will be available in the upcoming release.'}`}
-          onClose={() => setToastMessage(null)}
+          message={toastState.message}
+          subMessage={toastState.subMessage}
+          onClose={() => setToastState(null)}
         />
       )}
 
-      {/* Fixed Language & Theme Switcher Controls */}
+      {/* Fixed Language & Theme Switcher Controls (Bottom-Left) */}
       <StickyControlsFAB
         lang={lang}
         onToggleLang={toggleLang}

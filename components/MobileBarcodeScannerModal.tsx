@@ -1,16 +1,19 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
+import {
   BarcodeDetector as ZXingBarcodeDetector,
-  prepareZXingModule 
+  prepareZXingModule,
 } from 'barcode-detector/ponyfill';
-import { 
-  InventoryCatalogItem, 
-  DepotStockBalance, 
+import {
+  InventoryCatalogItem,
+  DepotStockBalance,
   AssetRegisterItem,
   DepotTransaction,
-  PackagingUnitType
+  PackagingUnitType,
+  PortfolioProject,
+  DepotLocation,
+  RoleTier,
 } from '@/types/requisition';
 import { supabase } from '@/lib/supabaseClient';
 import { DICTIONARY } from '@/lib/i18n';
@@ -29,14 +32,23 @@ interface MobileBarcodeScannerModalProps {
   catalogItems: InventoryCatalogItem[];
   stockBalances: DepotStockBalance[];
   assetRegister: AssetRegisterItem[];
+  portfolioProjects?: PortfolioProject[];
+  depotLocations?: DepotLocation[];
+  currentRole?: RoleTier;
   lang: 'tr' | 'en';
-  onQuickAction?: (item: InventoryCatalogItem, action: 'INBOUND' | 'OUTBOUND' | 'REGISTER_ASSET', asset?: AssetRegisterItem) => void;
+  onQuickAction?: (
+    item: InventoryCatalogItem,
+    action: 'INBOUND' | 'OUTBOUND' | 'REGISTER_ASSET',
+    asset?: AssetRegisterItem
+  ) => void;
   onItemRegistered?: (
     newCatalogItem: InventoryCatalogItem,
     newBalance: DepotStockBalance,
-    newTx: DepotTransaction,
-    newAsset?: AssetRegisterItem
+    newTx?: DepotTransaction | null,
+    newAsset?: AssetRegisterItem | null
   ) => void;
+  onCatalogRefresh?: () => Promise<void> | void;
+  onShowToast?: (message: string, subMessage?: string) => void;
 }
 
 export default function MobileBarcodeScannerModal({
@@ -46,50 +58,86 @@ export default function MobileBarcodeScannerModal({
   catalogItems,
   stockBalances,
   assetRegister,
+  portfolioProjects = [],
+  depotLocations = [],
+  currentRole = 'DEPOT_MANAGER',
   lang,
   onQuickAction,
   onItemRegistered,
+  onCatalogRefresh,
+  onShowToast,
 }: MobileBarcodeScannerModalProps) {
   const d = DICTIONARY[lang].scanner;
   const common = DICTIONARY[lang].common;
+
+  // Dual-Mode Switcher: 'SCAN_LOOKUP' vs 'MANUAL_ADD'
+  const [activeMode, setActiveMode] = useState<'SCAN_LOOKUP' | 'MANUAL_ADD'>(
+    'SCAN_LOOKUP'
+  );
 
   // Camera & Device State
   const [cameraActive, setCameraActive] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
-  const [engineStatus, setEngineStatus] = useState<'INITIALIZING' | 'READY' | 'ERROR'>('INITIALIZING');
-  
+  const [engineStatus, setEngineStatus] = useState<
+    'INITIALIZING' | 'READY' | 'ERROR'
+  >('INITIALIZING');
+
   // Scanning & Detection State
   const [manualInput, setManualInput] = useState<string>('');
   const [scannedCode, setScannedCode] = useState<string | null>(null);
-  const [matchedCatalogItem, setMatchedCatalogItem] = useState<InventoryCatalogItem | null>(null);
-  const [matchedAsset, setMatchedAsset] = useState<AssetRegisterItem | null>(null);
+  const [matchedCatalogItem, setMatchedCatalogItem] =
+    useState<InventoryCatalogItem | null>(null);
+  const [matchedAsset, setMatchedAsset] = useState<AssetRegisterItem | null>(
+    null
+  );
   const [scanFlash, setScanFlash] = useState<boolean>(false);
-  const [detectedBarcodes, setDetectedBarcodes] = useState<DetectedItemInfo[]>([]);
-  
-  // Unregistered Item Registry Form State
+  const [detectedBarcodes, setDetectedBarcodes] = useState<DetectedItemInfo[]>(
+    []
+  );
+
+  // External Lookup State
+  const [externalLookingUp, setExternalLookingUp] = useState<boolean>(false);
+  const [externalSuggestionSource, setExternalSuggestionSource] = useState<
+    string | null
+  >(null);
+
+  // Registration Form State
   const [isRegistering, setIsRegistering] = useState<boolean>(false);
-  const [regBarcode, setRegBarcode] = useState<string>('');
-  const [regLegacyCode, setRegLegacyCode] = useState<string>('');
+  const [regProjectId, setRegProjectId] = useState<string>('PRJ-02');
+  const [regProductDomain, setRegProductDomain] = useState<string>(
+    'CONSTRUCTION_MATERIALS'
+  );
+  const [regCategory, setRegCategory] = useState<string>(
+    d.categories[0] || 'Mekanik & İklimlendirme'
+  );
+  const [regSubcategory, setRegSubcategory] = useState<string>('');
   const [regNameTr, setRegNameTr] = useState<string>('');
   const [regNameEn, setRegNameEn] = useState<string>('');
-  const [regCategory, setRegCategory] = useState<string>(d.categories[0] || 'Mekanik & İklimlendirme');
-  const [regSubcategory, setRegSubcategory] = useState<string>('');
-  const [regSpec, setRegSpec] = useState<string>('');
   const [regUnit, setRegUnit] = useState<string>(d.units[0] || 'adet');
-  const [regPackagingType, setRegPackagingType] = useState<PackagingUnitType>('SINGLE_ITEM');
+  const [regBarcode, setRegBarcode] = useState<string>('');
+  const [regLegacyCode, setRegLegacyCode] = useState<string>('');
+  const [regBrandModel, setRegBrandModel] = useState<string>('');
+  const [regSupplier, setRegSupplier] = useState<string>('');
+  const [regBaseCostEur, setRegBaseCostEur] = useState<number>(0);
+  const [regSourceCurrency, setRegSourceCurrency] = useState<string>('EUR');
+  const [regMarkupPct, setRegMarkupPct] = useState<number>(15);
+  const [regPackagingType, setRegPackagingType] =
+    useState<PackagingUnitType>('SINGLE_ITEM');
   const [regPieceCount, setRegPieceCount] = useState<number>(1);
   const [regIsTrackable, setRegIsTrackable] = useState<boolean>(false);
   const [regSerialNo, setRegSerialNo] = useState<string>('');
   const [regWarrantyDate, setRegWarrantyDate] = useState<string>('');
-  const [regBaseCostEur, setRegBaseCostEur] = useState<number>(0);
-  const [regMarkupPct, setRegMarkupPct] = useState<number>(30);
+  const [regProductUrl, setRegProductUrl] = useState<string>('');
+  const [regSpec, setRegSpec] = useState<string>('');
   const [regInitialQty, setRegInitialQty] = useState<number>(1);
   const [regIrsaliye, setRegIrsaliye] = useState<string>('');
-  const [regSupplier, setRegSupplier] = useState<string>('');
   const [regSubmitting, setRegSubmitting] = useState<boolean>(false);
-  const [regSuccessMessage, setRegSuccessMessage] = useState<string | null>(null);
+  const [regError, setRegError] = useState<string | null>(null);
+  const [regSuccessMessage, setRegSuccessMessage] = useState<string | null>(
+    null
+  );
 
   // Refs
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -102,7 +150,10 @@ export default function MobileBarcodeScannerModal({
   // Web Audio Synth Beep
   const playBeep = () => {
     try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
       if (!AudioCtx) return;
       const audioCtx = new AudioCtx();
       const osc = audioCtx.createOscillator();
@@ -119,54 +170,143 @@ export default function MobileBarcodeScannerModal({
     }
   };
 
-  // Resolve Barcode Match
-  const handleResolveCode = useCallback((code: string, secondarySerial?: string) => {
-    const clean = code.trim();
-    if (!clean) return;
-
-    setScannedCode(clean);
-    playBeep();
-    setScanFlash(true);
-    setTimeout(() => setScanFlash(false), 250);
-
-    // Look up in Asset Register
-    const foundAsset = assetRegister.find(
-      (a) => a.serial_number.toLowerCase() === clean.toLowerCase() ||
-             a.asset_tag.toLowerCase() === clean.toLowerCase() ||
-             (a.barcode_ean && a.barcode_ean.toLowerCase() === clean.toLowerCase())
-    );
-
-    // Look up in Inventory Catalog
-    let foundCatalog = catalogItems.find(
-      (c) => (c.barcode_ean && c.barcode_ean.toLowerCase() === clean.toLowerCase()) ||
-             (c.legacy_code && c.legacy_code.toLowerCase() === clean.toLowerCase()) ||
-             c.item_id === clean
-    );
-
-    if (foundAsset && !foundCatalog) {
-      foundCatalog = catalogItems.find((c) => c.item_id === foundAsset.catalog_item_id);
-    }
-
-    setMatchedAsset(foundAsset || null);
-    setMatchedCatalogItem(foundCatalog || null);
-
-    // If not found, prepare registration form presets
-    if (!foundCatalog && !foundAsset) {
-      setRegBarcode(clean);
-      setRegLegacyCode(`MAT-NEW-${Math.random().toString(16).substring(2, 6).toUpperCase()}`);
-      if (secondarySerial) {
-        setRegIsTrackable(true);
-        setRegSerialNo(secondarySerial);
+  // Query External Public Barcode Lookup Proxy (Read-Only)
+  const triggerExternalLookup = useCallback(async (code: string) => {
+    setExternalLookingUp(true);
+    setExternalSuggestionSource(null);
+    try {
+      const res = await fetch(
+        `/api/depot/barcode-lookup?code=${encodeURIComponent(code)}`
+      );
+      if (res.ok) {
+        const data = (await res.json()) as {
+          found: boolean;
+          name?: string;
+          brand?: string;
+          specification?: string;
+          source?: string;
+        };
+        if (data.found) {
+          if (data.name) {
+            setRegNameTr(data.name);
+            setRegNameEn(data.name);
+          }
+          if (data.brand) {
+            setRegBrandModel(data.brand);
+          }
+          if (data.specification) {
+            setRegSpec(data.specification);
+          }
+          setExternalSuggestionSource(data.source || 'Public Directory');
+        }
       }
+    } catch {
+      // Ignore external lookup timeout or miss gracefully
+    } finally {
+      setExternalLookingUp(false);
     }
-  }, [assetRegister, catalogItems]);
+  }, []);
+
+  // Resolve Barcode Match: Always check live Supabase inventory_catalog & asset_register FIRST
+  const handleResolveCode = useCallback(
+    async (code: string, secondarySerial?: string) => {
+      const clean = code.trim();
+      if (!clean) return;
+
+      setScannedCode(clean);
+      setRegError(null);
+      setExternalSuggestionSource(null);
+      playBeep();
+      setScanFlash(true);
+      setTimeout(() => setScanFlash(false), 250);
+
+      // 1. Check in-memory props first
+      let foundAsset = assetRegister.find(
+        (a) =>
+          a.serial_number.toLowerCase() === clean.toLowerCase() ||
+          a.asset_tag.toLowerCase() === clean.toLowerCase() ||
+          (a.barcode_ean && a.barcode_ean.toLowerCase() === clean.toLowerCase())
+      );
+
+      let foundCatalog = catalogItems.find(
+        (c) =>
+          (c.barcode_ean &&
+            c.barcode_ean.toLowerCase() === clean.toLowerCase()) ||
+          (c.legacy_code &&
+            c.legacy_code.toLowerCase() === clean.toLowerCase()) ||
+          c.item_id === clean
+      );
+
+      // 2. Also verify directly against live Supabase tables if not in local cache
+      if (!foundCatalog && !foundAsset) {
+        try {
+          const { data: dbCatalog } = await supabase
+            .from('inventory_catalog')
+            .select('*')
+            .or(`barcode_ean.eq.${clean},legacy_code.ilike.${clean}`)
+            .limit(1)
+            .maybeSingle();
+
+          if (dbCatalog) {
+            foundCatalog = dbCatalog as InventoryCatalogItem;
+          } else {
+            const { data: dbAsset } = await supabase
+              .from('asset_register')
+              .select('*, catalog_item:inventory_catalog(*)')
+              .or(
+                `serial_number.ilike.${clean},asset_tag.ilike.${clean},barcode_ean.eq.${clean}`
+              )
+              .limit(1)
+              .maybeSingle();
+
+            if (dbAsset) {
+              foundAsset = dbAsset as AssetRegisterItem;
+              if (dbAsset.catalog_item) {
+                foundCatalog = dbAsset.catalog_item as InventoryCatalogItem;
+              }
+            }
+          }
+        } catch {
+          // Continue with local state if query fails
+        }
+      }
+
+      if (foundAsset && !foundCatalog) {
+        foundCatalog = catalogItems.find(
+          (c) => c.item_id === foundAsset?.catalog_item_id
+        );
+      }
+
+      setMatchedAsset(foundAsset || null);
+      setMatchedCatalogItem(foundCatalog || null);
+
+      // 3. If NOT found in Supabase, pre-populate registration form and call external barcode proxy
+      if (!foundCatalog && !foundAsset) {
+        setRegBarcode(clean);
+        setRegLegacyCode('');
+        setRegNameTr('');
+        setRegNameEn('');
+        setRegBrandModel('');
+        setRegSpec('');
+        if (secondarySerial) {
+          setRegIsTrackable(true);
+          setRegSerialNo(secondarySerial);
+        }
+        setIsRegistering(true);
+        void triggerExternalLookup(clean);
+      } else {
+        setIsRegistering(false);
+      }
+    },
+    [assetRegister, catalogItems, triggerExternalLookup]
+  );
 
   // Enumerate Cameras
   const refreshCameras = useCallback(async () => {
     if (!navigator.mediaDevices?.enumerateDevices) return;
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      const videoInputs = devices.filter((d) => d.kind === 'videoinput');
+      const videoInputs = devices.filter((dev) => dev.kind === 'videoinput');
       setVideoDevices(videoInputs);
       if (videoInputs.length > 0 && !selectedDeviceId) {
         setSelectedDeviceId(videoInputs[0].deviceId);
@@ -177,40 +317,51 @@ export default function MobileBarcodeScannerModal({
   }, [selectedDeviceId]);
 
   // Start Camera Stream
-  const startCamera = useCallback(async (deviceId?: string) => {
-    setCameraError(null);
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error(d.cameraUnavailable);
+  const startCamera = useCallback(
+    async (deviceId?: string) => {
+      setCameraError(null);
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error(d.cameraUnavailable);
+        }
+
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((track) => track.stop());
+        }
+
+        const constraints: MediaStreamConstraints = {
+          video: deviceId
+            ? {
+                deviceId: { exact: deviceId },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              }
+            : {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+          audio: false,
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        streamRef.current = stream;
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+          setCameraActive(true);
+        }
+
+        await refreshCameras();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        setCameraError(msg || d.cameraUnavailable);
+        setCameraActive(false);
       }
-
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-
-      const constraints: MediaStreamConstraints = {
-        video: deviceId
-          ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } }
-          : { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false,
-      };
-
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      streamRef.current = stream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraActive(true);
-      }
-
-      await refreshCameras();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      setCameraError(msg || d.cameraUnavailable);
-      setCameraActive(false);
-    }
-  }, [d.cameraUnavailable, refreshCameras]);
+    },
+    [d.cameraUnavailable, refreshCameras]
+  );
 
   // Stop Camera Stream
   const stopCamera = useCallback(() => {
@@ -234,24 +385,38 @@ export default function MobileBarcodeScannerModal({
     void startCamera(newDeviceId);
   };
 
-  // Manage Camera on Modal Open/Close
+  // Manage Camera on Modal Open/Close & Mode Switch
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && activeMode === 'SCAN_LOOKUP' && !isRegistering) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void startCamera(selectedDeviceId || undefined);
     } else {
       stopCamera();
+    }
+
+    if (!isOpen) {
       setScannedCode(null);
       setMatchedCatalogItem(null);
       setMatchedAsset(null);
       setDetectedBarcodes([]);
       setIsRegistering(false);
+      setActiveMode('SCAN_LOOKUP');
       setRegSuccessMessage(null);
+      setRegError(null);
+      setExternalSuggestionSource(null);
     }
+
     return () => {
       stopCamera();
     };
-  }, [isOpen, selectedDeviceId, startCamera, stopCamera]);
+  }, [
+    isOpen,
+    activeMode,
+    isRegistering,
+    selectedDeviceId,
+    startCamera,
+    stopCamera,
+  ]);
 
   // Initialize ZXing-WASM Ponyfill Detector with Local Next.js 16 WASM Serving
   useEffect(() => {
@@ -261,7 +426,6 @@ export default function MobileBarcodeScannerModal({
       try {
         setEngineStatus('INITIALIZING');
 
-        // Configure ZXing WebAssembly to load from local Next.js public directory
         await prepareZXingModule({
           overrides: {
             locateFile: (path: string) => {
@@ -276,15 +440,15 @@ export default function MobileBarcodeScannerModal({
 
         const detector = new ZXingBarcodeDetector({
           formats: [
-            'ean_13', 
-            'ean_8', 
-            'upc_a', 
-            'upc_e', 
-            'code_128', 
-            'code_39', 
-            'itf', 
-            'qr_code', 
-            'data_matrix'
+            'ean_13',
+            'ean_8',
+            'upc_a',
+            'upc_e',
+            'code_128',
+            'code_39',
+            'itf',
+            'qr_code',
+            'data_matrix',
           ],
         });
 
@@ -294,7 +458,10 @@ export default function MobileBarcodeScannerModal({
         }
       } catch (err) {
         if (isMounted) {
-          console.error('Failed to initialize ZXing WebAssembly detector:', err);
+          console.error(
+            'Failed to initialize ZXing WebAssembly detector:',
+            err
+          );
           setEngineStatus('ERROR');
         }
       }
@@ -309,14 +476,28 @@ export default function MobileBarcodeScannerModal({
 
   // Multi-Barcode Frame Detection Loop (Dual-Pass: Raw + Horizontal Un-Mirror)
   useEffect(() => {
-    if (!isOpen || !cameraActive || !videoRef.current) return;
+    if (
+      !isOpen ||
+      activeMode !== 'SCAN_LOOKUP' ||
+      isRegistering ||
+      !cameraActive ||
+      !videoRef.current
+    ) {
+      return;
+    }
 
     let isScanning = true;
     const offscreenCanvas = document.createElement('canvas');
-    const offscreenCtx = offscreenCanvas.getContext('2d', { willReadFrequently: true });
+    const offscreenCtx = offscreenCanvas.getContext('2d', {
+      willReadFrequently: true,
+    });
 
     const checkFrame = async () => {
-      if (!isScanning || !videoRef.current || videoRef.current.readyState < 2) {
+      if (
+        !isScanning ||
+        !videoRef.current ||
+        videoRef.current.readyState < 2
+      ) {
         scanLoopRef.current = requestAnimationFrame(checkFrame);
         return;
       }
@@ -325,12 +506,16 @@ export default function MobileBarcodeScannerModal({
       const overlayCanvas = canvasOverlayRef.current;
       const overlayCtx = overlayCanvas?.getContext('2d');
 
-      if (detectorRef.current && video.videoWidth > 0 && video.videoHeight > 0) {
+      if (
+        detectorRef.current &&
+        video.videoWidth > 0 &&
+        video.videoHeight > 0
+      ) {
         try {
           const vw = video.videoWidth;
           const vh = video.videoHeight;
 
-          // Pass 1: Raw capture for rear smartphone cameras / non-mirrored feeds
+          // Pass 1: Raw capture
           offscreenCanvas.width = vw;
           offscreenCanvas.height = vh;
           offscreenCtx?.drawImage(video, 0, 0, vw, vh);
@@ -338,7 +523,7 @@ export default function MobileBarcodeScannerModal({
           let barcodes = await detectorRef.current.detect(offscreenCanvas);
           let isFlippedMatch = false;
 
-          // Pass 2: If no barcodes found, capture horizontally flipped frame for mirrored front webcams
+          // Pass 2: Horizontally flipped frame for mirrored front webcams
           if ((!barcodes || barcodes.length === 0) && offscreenCtx) {
             offscreenCtx.save();
             offscreenCtx.translate(vw, 0);
@@ -346,7 +531,8 @@ export default function MobileBarcodeScannerModal({
             offscreenCtx.drawImage(video, 0, 0, vw, vh);
             offscreenCtx.restore();
 
-            const flippedBarcodes = await detectorRef.current.detect(offscreenCanvas);
+            const flippedBarcodes =
+              await detectorRef.current.detect(offscreenCanvas);
             if (flippedBarcodes && flippedBarcodes.length > 0) {
               barcodes = flippedBarcodes;
               isFlippedMatch = true;
@@ -356,19 +542,21 @@ export default function MobileBarcodeScannerModal({
           if (overlayCanvas && overlayCtx) {
             overlayCanvas.width = vw;
             overlayCanvas.height = vh;
-            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            overlayCtx.clearRect(
+              0,
+              0,
+              overlayCanvas.width,
+              overlayCanvas.height
+            );
           }
 
           if (barcodes && barcodes.length > 0) {
             const currentItems: DetectedItemInfo[] = [];
-
-            // Coordinate un-flipper function for visual bounding box alignment
             const mapX = (x: number) => (isFlippedMatch ? vw - x : x);
 
             barcodes.forEach((b) => {
               const raw = b.rawValue?.trim();
               if (raw) {
-                // Map coordinates back to visible camera space if detected on flipped canvas
                 const mappedCornerPoints = b.cornerPoints?.map((p) => ({
                   x: mapX(p.x),
                   y: p.y,
@@ -376,7 +564,9 @@ export default function MobileBarcodeScannerModal({
 
                 const mappedBoundingBox = b.boundingBox
                   ? new DOMRectReadOnly(
-                      isFlippedMatch ? vw - (b.boundingBox.x + b.boundingBox.width) : b.boundingBox.x,
+                      isFlippedMatch
+                        ? vw - (b.boundingBox.x + b.boundingBox.width)
+                        : b.boundingBox.x,
                       b.boundingBox.y,
                       b.boundingBox.width,
                       b.boundingBox.height
@@ -390,52 +580,109 @@ export default function MobileBarcodeScannerModal({
                   boundingBox: mappedBoundingBox,
                 });
 
-                // Draw live bounding box on overlay canvas
-                if (overlayCtx && mappedCornerPoints && mappedCornerPoints.length >= 4) {
+                if (
+                  overlayCtx &&
+                  mappedCornerPoints &&
+                  mappedCornerPoints.length >= 4
+                ) {
                   overlayCtx.beginPath();
-                  overlayCtx.moveTo(mappedCornerPoints[0].x, mappedCornerPoints[0].y);
-                  overlayCtx.lineTo(mappedCornerPoints[1].x, mappedCornerPoints[1].y);
-                  overlayCtx.lineTo(mappedCornerPoints[2].x, mappedCornerPoints[2].y);
-                  overlayCtx.lineTo(mappedCornerPoints[3].x, mappedCornerPoints[3].y);
+                  overlayCtx.moveTo(
+                    mappedCornerPoints[0].x,
+                    mappedCornerPoints[0].y
+                  );
+                  overlayCtx.lineTo(
+                    mappedCornerPoints[1].x,
+                    mappedCornerPoints[1].y
+                  );
+                  overlayCtx.lineTo(
+                    mappedCornerPoints[2].x,
+                    mappedCornerPoints[2].y
+                  );
+                  overlayCtx.lineTo(
+                    mappedCornerPoints[3].x,
+                    mappedCornerPoints[3].y
+                  );
                   overlayCtx.closePath();
                   overlayCtx.lineWidth = 4;
-                  overlayCtx.strokeStyle = isFlippedMatch ? '#06b6d4' : '#10b981';
+                  overlayCtx.strokeStyle = isFlippedMatch
+                    ? '#06b6d4'
+                    : '#10b981';
                   overlayCtx.stroke();
 
-                  // Format label tag with mirror detection badge
-                  const labelX = Math.min(mappedCornerPoints[0].x, mappedCornerPoints[1].x, mappedCornerPoints[2].x, mappedCornerPoints[3].x);
-                  const labelY = Math.min(mappedCornerPoints[0].y, mappedCornerPoints[1].y, mappedCornerPoints[2].y, mappedCornerPoints[3].y);
-                  const tagText = `${b.format.toUpperCase()}${isFlippedMatch ? ' (MIRRORED)' : ''}`;
+                  const labelX = Math.min(
+                    mappedCornerPoints[0].x,
+                    mappedCornerPoints[1].x,
+                    mappedCornerPoints[2].x,
+                    mappedCornerPoints[3].x
+                  );
+                  const labelY = Math.min(
+                    mappedCornerPoints[0].y,
+                    mappedCornerPoints[1].y,
+                    mappedCornerPoints[2].y,
+                    mappedCornerPoints[3].y
+                  );
+                  const tagText = `${b.format.toUpperCase()}${
+                    isFlippedMatch ? ' (MIRRORED)' : ''
+                  }`;
 
                   overlayCtx.fillStyle = isFlippedMatch ? '#0891b2' : '#059669';
-                  overlayCtx.fillRect(labelX, Math.max(0, labelY - 24), tagText.length * 8 + 12, 22);
+                  overlayCtx.fillRect(
+                    labelX,
+                    Math.max(0, labelY - 24),
+                    tagText.length * 8 + 12,
+                    22
+                  );
                   overlayCtx.fillStyle = '#ffffff';
                   overlayCtx.font = 'bold 11px Oswald, sans-serif';
-                  overlayCtx.fillText(tagText, labelX + 6, Math.max(14, labelY - 8));
+                  overlayCtx.fillText(
+                    tagText,
+                    labelX + 6,
+                    Math.max(14, labelY - 8)
+                  );
                 }
               }
             });
 
             setDetectedBarcodes(currentItems);
 
-            // Throttle auto-resolution
             const now = Date.now();
-            if (now - lastScannedTimeRef.current > 1500 && currentItems.length > 0) {
+            if (
+              now - lastScannedTimeRef.current > 1500 &&
+              currentItems.length > 0
+            ) {
               lastScannedTimeRef.current = now;
 
-              // Check if dual pair detected (EAN-13 + Code-128 / DataMatrix)
-              const eanBarcode = currentItems.find((i) => i.format.includes('ean') || i.format.includes('upc'));
-              const snBarcode = currentItems.find((i) => i.format.includes('code_128') || i.format.includes('data_matrix') || i.format.includes('code_39'));
+              const eanBarcode = currentItems.find(
+                (i) => i.format.includes('ean') || i.format.includes('upc')
+              );
+              const snBarcode = currentItems.find(
+                (i) =>
+                  i.format.includes('code_128') ||
+                  i.format.includes('data_matrix') ||
+                  i.format.includes('code_39')
+              );
 
-              if (eanBarcode && snBarcode && eanBarcode.rawValue !== snBarcode.rawValue) {
-                handleResolveCode(eanBarcode.rawValue, snBarcode.rawValue);
+              if (
+                eanBarcode &&
+                snBarcode &&
+                eanBarcode.rawValue !== snBarcode.rawValue
+              ) {
+                void handleResolveCode(
+                  eanBarcode.rawValue,
+                  snBarcode.rawValue
+                );
               } else {
-                handleResolveCode(currentItems[0].rawValue);
+                void handleResolveCode(currentItems[0].rawValue);
               }
             }
           } else {
             if (overlayCtx && overlayCanvas) {
-              overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+              overlayCtx.clearRect(
+                0,
+                0,
+                overlayCanvas.width,
+                overlayCanvas.height
+              );
             }
           }
         } catch {
@@ -457,142 +704,145 @@ export default function MobileBarcodeScannerModal({
         scanLoopRef.current = null;
       }
     };
-  }, [isOpen, cameraActive, handleResolveCode]);
+  }, [
+    isOpen,
+    activeMode,
+    isRegistering,
+    cameraActive,
+    handleResolveCode,
+  ]);
+
+  // Switch to Manual Add mode
+  const handleSwitchToManualAdd = () => {
+    setActiveMode('MANUAL_ADD');
+    setIsRegistering(true);
+    setMatchedCatalogItem(null);
+    setMatchedAsset(null);
+    setRegError(null);
+    setRegSuccessMessage(null);
+  };
+
+  // Switch to Scan / Lookup mode
+  const handleSwitchToScanLookup = () => {
+    setActiveMode('SCAN_LOOKUP');
+    setIsRegistering(false);
+    setRegError(null);
+  };
 
   // Handle Manual Form Search
   const handleManualSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualInput.trim()) return;
-    handleResolveCode(manualInput.trim());
+    void handleResolveCode(manualInput.trim());
   };
 
-  // Handle Submission of Unregistered Item Form
+  // Handle Submission of New Item Form via POST /api/depot/catalog
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!regNameTr.trim() || !regBarcode.trim()) return;
+    if (!regNameTr.trim() || !regUnit.trim() || !regCategory.trim()) return;
 
     setRegSubmitting(true);
+    setRegError(null);
     setRegSuccessMessage(null);
 
-    const newItemId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}`;
-    const costEur = Number(regBaseCostEur) || 0;
-    const markup = Number(regMarkupPct) || 15;
-    const valuedEur = Number((costEur * (1 + markup / 100)).toFixed(2));
-    const qty = Math.max(1, Number(regInitialQty) || 1);
-
-    // 1. New Inventory Catalog Item
-    const newCatalogItem: InventoryCatalogItem = {
-      item_id: newItemId,
-      legacy_code: regLegacyCode.trim() || `SKU-${Date.now()}`,
-      item_name_tr: regNameTr.trim(),
-      item_name_en: regNameEn.trim() || regNameTr.trim(),
-      specification: regSpec.trim() || (lang === 'tr' ? 'Hızlı barkod kaydı' : 'Quick barcode registration'),
-      category: regCategory.trim(),
-      subcategory: regSubcategory.trim() || null,
-      unit_of_measure: regUnit.trim() || 'adet',
-      base_cost_eur: costEur,
-      consumption_rate: 1.0,
-      consumption_metric: 'pcs_per_building',
-      record_status: 'active',
-      review_status: 'approved',
-      barcode_ean: regBarcode.trim(),
-      is_trackable_asset: regIsTrackable,
-      packaging_unit_type: regPackagingType,
-      set_piece_count: regPackagingType === 'ATOMIC_SET' ? Math.max(2, regPieceCount) : 1,
-      commercial_markup_pct: markup,
-    };
-
-    // 2. New Depot Stock Balance
-    const newBalance: DepotStockBalance = {
-      balance_id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `bal-${Date.now()}`,
-      depot_id: activeDepotId,
-      catalog_item_id: newItemId,
-      quantity_on_hand: qty,
-      quantity_reserved: 0,
-      min_stock_threshold: 5,
-      last_scanned_at: new Date().toISOString(),
-      catalog_item: newCatalogItem,
-    };
-
-    // 3. New Depot Transaction (Inbound Intake)
-    const txCode = `MOV-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${Math.random().toString(16).substring(2, 6).toUpperCase()}`;
-    const isMissing = !regIrsaliye.trim();
-
-    const newTx: DepotTransaction = {
-      transaction_id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `tx-${Date.now()}`,
-      transaction_code: txCode,
-      depot_id: activeDepotId,
-      catalog_item_id: newItemId,
-      movement_type: 'INBOUND_RECEIPT',
-      quantity: qty,
-      irsaliye_number: regIrsaliye.trim() || null,
-      supplier_name: regSupplier.trim() || null,
-      unit_cost_eur: costEur,
-      final_valued_cost_eur: valuedEur,
-      has_missing_docs: isMissing,
-      delivery_confirmed: true,
-      confirmed_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      notes: lang === 'tr'
-        ? `Hızlı barkod tarayıcıdan sisteme kaydedildi (${regNameTr.trim()}).`
-        : `Ingested from Universal Barcode Scanner (${regNameEn.trim() || regNameTr.trim()}).`,
-      catalog_item: newCatalogItem,
-    };
-
-    // 4. Optional Serialized Asset
-    let newAsset: AssetRegisterItem | undefined;
-    if (regIsTrackable && regSerialNo.trim()) {
-      newAsset = {
-        asset_id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `ast-${Date.now()}`,
-        asset_tag: `AST-${new Date().getFullYear()}-${Math.random().toString(16).substring(2, 6).toUpperCase()}`,
-        catalog_item_id: newItemId,
-        barcode_ean: regBarcode.trim(),
-        serial_number: regSerialNo.trim(),
-        current_depot_id: activeDepotId,
-        custody_status: 'IN_DEPOT',
-        inbound_transaction_id: newTx.transaction_id,
-        warranty_expiry_date: regWarrantyDate || null,
-        notes: lang === 'tr' ? 'Mal kabul esnasında seri numarası bağlandı.' : 'Serial number attached during barcode intake.',
-        created_at: new Date().toISOString(),
-        catalog_item: newCatalogItem,
-      };
-    }
-
-    // Persist to Supabase with PostgreSQL Generated Column Safety
     try {
-      await supabase.from('inventory_catalog').insert([newCatalogItem]);
-      await supabase.from('depot_stock_balances').upsert([newBalance]);
+      const targetDepot =
+        regProductDomain === 'CONSTRUCTION_MATERIALS'
+          ? 'DEPOT-PRJ02-CONST'
+          : 'DEPOT-PRJ02-MAIN';
 
-      // Exclude generated column has_missing_docs from insert payload
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { has_missing_docs, ...txPayload } = newTx;
-      await supabase.from('depot_transactions').insert([txPayload]);
+      const res = await fetch('/api/depot/catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actor_role: currentRole,
+          project_id: regProjectId,
+          product_domain: regProductDomain,
+          depot_id:
+            depotLocations.some((dl) => dl.depot_id === targetDepot)
+              ? targetDepot
+              : activeDepotId,
+          category: regCategory.trim(),
+          subcategory: regSubcategory.trim() || null,
+          item_name_tr: regNameTr.trim(),
+          item_name_en: regNameEn.trim() || regNameTr.trim(),
+          unit_of_measure: regUnit.trim(),
+          barcode_ean: regBarcode.trim() || null,
+          legacy_code: regLegacyCode.trim() || null,
+          brand_model: regBrandModel.trim() || null,
+          supplier_name: regSupplier.trim() || null,
+          base_cost_eur: Number(regBaseCostEur) || 0,
+          source_unit_price: Number(regBaseCostEur) || 0,
+          source_currency: regSourceCurrency.trim() || 'EUR',
+          commercial_markup_pct: Number(regMarkupPct) || 15,
+          packaging_unit_type: regPackagingType,
+          set_piece_count:
+            regPackagingType === 'ATOMIC_SET'
+              ? Math.max(2, Number(regPieceCount) || 2)
+              : 1,
+          is_trackable_asset: regIsTrackable,
+          serial_number: regSerialNo.trim() || null,
+          warranty_expiry_date: regWarrantyDate || null,
+          product_url: regProductUrl.trim() || null,
+          specification: regSpec.trim() || null,
+          initial_qty: Math.max(0, Number(regInitialQty) || 0),
+          irsaliye_number: regIrsaliye.trim() || null,
+        }),
+      });
 
-      if (newAsset) {
-        await supabase.from('asset_register').insert([newAsset]);
+      const data = await res.json();
+      if (!res.ok) {
+        setRegError(
+          data.error ||
+            (lang === 'tr'
+              ? 'Kayıt sırasında hata oluştu.'
+              : 'Failed to register item.')
+        );
+        setRegSubmitting(false);
+        return;
       }
-    } catch {
-      // Prototype state fallback
+
+      const createdItem = data.item as InventoryCatalogItem;
+      const createdBalance = data.balance as DepotStockBalance;
+      const createdTx = (data.transaction as DepotTransaction) || null;
+      const createdAsset = (data.asset as AssetRegisterItem) || null;
+
+      onItemRegistered?.(
+        createdItem,
+        createdBalance,
+        createdTx,
+        createdAsset
+      );
+      await onCatalogRefresh?.();
+
+      playBeep();
+      const successTitle =
+        lang === 'tr'
+          ? 'Malzeme Kataloğa ve Depoya Eklendi'
+          : 'Material Registered in Catalog & Depot';
+      const successSub = `${createdItem.legacy_code} • ${createdItem.item_name_tr}`;
+
+      onShowToast?.(successTitle, successSub);
+      setRegSuccessMessage(`${successTitle}: ${successSub}`);
+      setMatchedCatalogItem(createdItem);
+      if (createdAsset) setMatchedAsset(createdAsset);
+      setScannedCode(createdItem.barcode_ean || createdItem.legacy_code);
+      setIsRegistering(false);
+      setActiveMode('SCAN_LOOKUP');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setRegError(msg);
+    } finally {
+      setRegSubmitting(false);
     }
-
-    // Update parent workspace state immediately
-    onItemRegistered?.(newCatalogItem, newBalance, newTx, newAsset);
-
-    // Provide success feedback & set active item card
-    playBeep();
-    setRegSuccessMessage(lang === 'tr' ? 'Malzeme ve stok girişi başarıyla kaydedildi!' : 'Item & stock intake successfully registered!');
-    setMatchedCatalogItem(newCatalogItem);
-    if (newAsset) setMatchedAsset(newAsset);
-    setScannedCode(regBarcode.trim());
-    setRegSubmitting(false);
-    setIsRegistering(false);
   };
 
   if (!isOpen) return null;
 
-  // Resolve on-hand quantity for active matched item
-  const matchedBalance = matchedCatalogItem 
-    ? stockBalances.find((b) => b.catalog_item_id === matchedCatalogItem.item_id)
+  const matchedBalance = matchedCatalogItem
+    ? stockBalances.find(
+        (b) => b.catalog_item_id === matchedCatalogItem.item_id
+      )
     : null;
 
   const currentStockQty = matchedBalance ? matchedBalance.quantity_on_hand : 0;
@@ -600,24 +850,39 @@ export default function MobileBarcodeScannerModal({
   const markupPct = matchedCatalogItem?.commercial_markup_pct ?? 15;
   const valuedCost = Number((baseCost * (1 + markupPct / 100)).toFixed(2));
 
-  // Merge available categories
   const dynamicCategories = Array.from(
     new Set([
       ...d.categories,
-      ...catalogItems.map((c) => c.category).filter((cat): cat is string => Boolean(cat)),
+      ...catalogItems
+        .map((c) => c.category)
+        .filter((cat): cat is string => Boolean(cat)),
     ])
   );
+
+  const projectOptions =
+    portfolioProjects.length > 0
+      ? portfolioProjects
+      : [{ project_id: 'PRJ-02', project_name: 'Caesar Resort & Spa' }];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in font-sans">
       <div className="relative w-full max-w-2xl bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
-        
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
           <div className="flex items-center space-x-3">
             <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
+                />
               </svg>
             </div>
             <div>
@@ -631,18 +896,6 @@ export default function MobileBarcodeScannerModal({
                     WASM Ready
                   </span>
                 )}
-                {engineStatus === 'INITIALIZING' && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300 dark:border-amber-800 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-spin" />
-                    Loading WASM...
-                  </span>
-                )}
-                {engineStatus === 'ERROR' && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-300 dark:border-rose-800 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                    WASM Error
-                  </span>
-                )}
               </div>
               <p className="text-[11px] font-light text-slate-500 dark:text-slate-400">
                 {d.subtitle}
@@ -651,24 +904,65 @@ export default function MobileBarcodeScannerModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             title={common.close}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
+        {/* Top Dual-Mode Switcher: Scan / Lookup vs Manual Add */}
+        <div className="px-5 pt-3 bg-white dark:bg-[#0f172a]">
+          <div className="grid grid-cols-2 rounded-xl bg-slate-100 dark:bg-slate-900 p-1 border border-slate-200 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={handleSwitchToScanLookup}
+              className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                activeMode === 'SCAN_LOOKUP' && !isRegistering
+                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              {d.tabScanLookup}
+            </button>
+            <button
+              type="button"
+              onClick={handleSwitchToManualAdd}
+              className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                activeMode === 'MANUAL_ADD' || isRegistering
+                  ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              + {d.tabManualAdd}
+            </button>
+          </div>
+        </div>
+
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-          
-          {/* Camera Viewport & Multi-Lens Switcher */}
-          {!isRegistering && (
+          {/* Camera Viewport & Multi-Lens Switcher (Scan / Lookup mode) */}
+          {!isRegistering && activeMode === 'SCAN_LOOKUP' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs font-light text-slate-500">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {videoDevices.length > 1 ? d.cameraSelect : (lang === 'tr' ? 'Kamera Aktif:' : 'Active Camera:')}
+                  {videoDevices.length > 1
+                    ? d.cameraSelect
+                    : lang === 'tr'
+                    ? 'Kamera Aktif:'
+                    : 'Active Camera:'}
                 </span>
                 {videoDevices.length > 1 && (
                   <select
@@ -678,7 +972,10 @@ export default function MobileBarcodeScannerModal({
                   >
                     {videoDevices.map((dev, idx) => (
                       <option key={dev.deviceId || idx} value={dev.deviceId}>
-                        {dev.label || (lang === 'tr' ? `Kamera ${idx + 1}` : `Camera ${idx + 1}`)}
+                        {dev.label ||
+                          (lang === 'tr'
+                            ? `Kamera ${idx + 1}`
+                            : `Camera ${idx + 1}`)}
                       </option>
                     ))}
                   </select>
@@ -686,9 +983,13 @@ export default function MobileBarcodeScannerModal({
               </div>
 
               {/* Viewfinder Video Area with Live Overlay Canvas */}
-              <div className={`relative rounded-xl overflow-hidden aspect-video bg-black flex items-center justify-center border-2 transition-all ${
-                scanFlash ? 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.6)]' : 'border-slate-800'
-              }`}>
+              <div
+                className={`relative rounded-xl overflow-hidden aspect-video bg-black flex items-center justify-center border-2 transition-all ${
+                  scanFlash
+                    ? 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.6)]'
+                    : 'border-slate-800'
+                }`}
+              >
                 <video
                   ref={videoRef}
                   playsInline
@@ -697,13 +998,11 @@ export default function MobileBarcodeScannerModal({
                   className="w-full h-full object-cover"
                 />
 
-                {/* Canvas Overlay for Live Barcode Bounding Boxes */}
                 <canvas
                   ref={canvasOverlayRef}
                   className="absolute inset-0 w-full h-full pointer-events-none"
                 />
 
-                {/* Laser scan line overlay */}
                 <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
                   <div className="w-4/5 h-3/5 border border-dashed border-amber-400/50 rounded-xl relative">
                     <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_8px_#f59e0b] animate-bounce" />
@@ -715,7 +1014,6 @@ export default function MobileBarcodeScannerModal({
                   </div>
                 </div>
 
-                {/* Camera error badge if failed */}
                 {cameraError && (
                   <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center">
                     <span className="text-rose-400 font-bold text-sm mb-1">
@@ -728,13 +1026,14 @@ export default function MobileBarcodeScannerModal({
                 )}
               </div>
 
-              {/* Detected Barcodes in Current Frame (Interactive Chips) */}
+              {/* Detected Barcodes in Current Frame */}
               {detectedBarcodes.length > 0 && (
                 <div className="bg-slate-100 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-1.5">
                   <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400">
                     <span>{d.detectedInFrame}</span>
                     <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                      {detectedBarcodes.length} {lang === 'tr' ? 'Algılandı' : 'Detected'}
+                      {detectedBarcodes.length}{' '}
+                      {lang === 'tr' ? 'Algılandı' : 'Detected'}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
@@ -742,14 +1041,16 @@ export default function MobileBarcodeScannerModal({
                       <button
                         key={`${item.rawValue}-${idx}`}
                         type="button"
-                        onClick={() => handleResolveCode(item.rawValue)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all flex items-center space-x-1.5 ${
+                        onClick={() => void handleResolveCode(item.rawValue)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all flex items-center space-x-1.5 cursor-pointer ${
                           scannedCode === item.rawValue
                             ? 'bg-blue-600 text-white border-blue-500 shadow-xs'
                             : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:border-blue-400'
                         }`}
                       >
-                        <span className="text-[9px] opacity-70 uppercase font-sans font-normal">{item.format}</span>
+                        <span className="text-[9px] opacity-70 uppercase font-sans font-normal">
+                          {item.format}
+                        </span>
                         <span>{item.rawValue}</span>
                       </button>
                     ))}
@@ -759,8 +1060,8 @@ export default function MobileBarcodeScannerModal({
             </div>
           )}
 
-          {/* Manual Input Form / USB Scanner Barcode Field */}
-          {!isRegistering && (
+          {/* Manual Lookup Input / USB Barcode Scanner Field */}
+          {!isRegistering && activeMode === 'SCAN_LOOKUP' && (
             <form onSubmit={handleManualSearch} className="flex gap-2">
               <input
                 type="text"
@@ -771,57 +1072,28 @@ export default function MobileBarcodeScannerModal({
               />
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
               >
                 {d.btnSearch}
               </button>
             </form>
           )}
 
-          {/* Quick Test Barcodes Tray */}
-          {!isRegistering && (
-            <div className="pt-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                {d.quickPresets}
-              </span>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleResolveCode('8690123456789')}
-                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-mono font-bold border border-slate-200 dark:border-slate-700"
-                >
-                  8690123456789 (VRF Set)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleResolveCode('SN-VRF-884920')}
-                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-mono font-bold border border-slate-200 dark:border-slate-700"
-                >
-                  SN-VRF-884920 (S/N)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleResolveCode('8690987654321')}
-                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-mono font-bold border border-slate-200 dark:border-slate-700"
-                >
-                  8690987654321 (Rezervuar)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleResolveCode('8700216605830')}
-                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-mono font-bold border border-amber-300 dark:border-amber-800"
-                >
-                  8700216605830 (Test EAN)
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Success Banner if newly registered */}
           {regSuccessMessage && (
             <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-xl flex items-center space-x-2 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
-              <svg className="w-4 h-4 shrink-0 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              <svg
+                className="w-4 h-4 shrink-0 text-emerald-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
               <span>{regSuccessMessage}</span>
             </div>
@@ -842,7 +1114,10 @@ export default function MobileBarcodeScannerModal({
                     </span>
                   </div>
                   <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1">
-                    {lang === 'tr' ? matchedCatalogItem.item_name_tr : matchedCatalogItem.item_name_en}
+                    {lang === 'tr'
+                      ? matchedCatalogItem.item_name_tr
+                      : matchedCatalogItem.item_name_en ||
+                        matchedCatalogItem.item_name_tr}
                   </h3>
                   <p className="text-xs font-light text-slate-500 dark:text-slate-400">
                     {matchedCatalogItem.specification}
@@ -851,7 +1126,8 @@ export default function MobileBarcodeScannerModal({
 
                 {matchedCatalogItem.packaging_unit_type === 'ATOMIC_SET' ? (
                   <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
-                    {d.atomicSet} ({matchedCatalogItem.set_piece_count || 1} {d.pieceCount})
+                    {d.atomicSet} ({matchedCatalogItem.set_piece_count || 1}{' '}
+                    {d.pieceCount})
                   </span>
                 ) : (
                   <span className="px-2.5 py-1 rounded-lg text-xs font-light bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
@@ -863,37 +1139,54 @@ export default function MobileBarcodeScannerModal({
               {/* SKU & Price Breakdown */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-emerald-500/20">
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">{d.sku}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    {d.sku}
+                  </span>
                   <p className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
                     {matchedCatalogItem.legacy_code}
                   </p>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">{d.stockOnHand}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    {d.stockOnHand}
+                  </span>
                   <p className="text-xs font-light text-slate-900 dark:text-white">
-                    <span className="font-bold">{currentStockQty}</span> {matchedCatalogItem.unit_of_measure}
+                    <span className="font-bold">{currentStockQty}</span>{' '}
+                    {matchedCatalogItem.unit_of_measure}
                   </p>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">{d.baseCost}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    {d.baseCost}
+                  </span>
                   <p className="text-xs font-light text-slate-700 dark:text-slate-300">
-                    €{baseCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    €
+                    {baseCost.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                    })}
                   </p>
                 </div>
                 <div>
-                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">{d.valuedCost}</span>
+                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">
+                    {d.valuedCost}
+                  </span>
                   <p className="text-xs font-light text-emerald-600 dark:text-emerald-400">
-                    €{valuedCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    €
+                    {valuedCost.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                    })}
                   </p>
                 </div>
               </div>
 
-              {/* Matched Asset Details (if serialized) */}
+              {/* Matched Asset Details */}
               {matchedAsset && (
                 <div className="bg-white/60 dark:bg-slate-900/60 rounded-xl p-3 border border-purple-300 dark:border-purple-900/50 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-purple-700 dark:text-purple-400">
-                      {lang === 'tr' ? 'Zimmetli Varlık Bilgisi:' : 'Custody Asset Info:'}
+                      {lang === 'tr'
+                        ? 'Zimmetli Varlık Bilgisi:'
+                        : 'Custody Asset Info:'}
                     </span>
                     <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
                       {matchedAsset.asset_tag}
@@ -901,12 +1194,20 @@ export default function MobileBarcodeScannerModal({
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <span className="text-[10px] text-slate-400 block">{d.serialNo}</span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-white">{matchedAsset.serial_number}</span>
+                      <span className="text-[10px] text-slate-400 block">
+                        {d.serialNo}
+                      </span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                        {matchedAsset.serial_number}
+                      </span>
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-400 block">{d.custody}</span>
-                      <span className="font-bold text-amber-600 dark:text-amber-400">{matchedAsset.custody_status}</span>
+                      <span className="text-[10px] text-slate-400 block">
+                        {d.custody}
+                      </span>
+                      <span className="font-bold text-amber-600 dark:text-amber-400">
+                        {matchedAsset.custody_status}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -917,18 +1218,26 @@ export default function MobileBarcodeScannerModal({
                 <button
                   onClick={() => {
                     onClose();
-                    onQuickAction?.(matchedCatalogItem, 'INBOUND', matchedAsset || undefined);
+                    onQuickAction?.(
+                      matchedCatalogItem,
+                      'INBOUND',
+                      matchedAsset || undefined
+                    );
                   }}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
                 >
                   {d.btnInbound}
                 </button>
                 <button
                   onClick={() => {
                     onClose();
-                    onQuickAction?.(matchedCatalogItem, 'OUTBOUND', matchedAsset || undefined);
+                    onQuickAction?.(
+                      matchedCatalogItem,
+                      'OUTBOUND',
+                      matchedAsset || undefined
+                    );
                   }}
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
+                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
                 >
                   {d.btnOutbound}
                 </button>
@@ -938,7 +1247,7 @@ export default function MobileBarcodeScannerModal({
                       onClose();
                       onQuickAction?.(matchedCatalogItem, 'REGISTER_ASSET');
                     }}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
                   >
                     {d.btnRegisterAsset}
                   </button>
@@ -947,82 +1256,114 @@ export default function MobileBarcodeScannerModal({
             </div>
           )}
 
-          {/* Unregistered Barcode Found -> Prompt Quick Registry */}
-          {scannedCode && !matchedCatalogItem && !matchedAsset && !isRegistering && (
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 sm:p-5 space-y-3">
-              <div className="flex items-center space-x-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
-                <h4 className="text-sm font-bold text-amber-800 dark:text-amber-400 uppercase">
-                  {d.unregisteredTitle}
-                </h4>
-              </div>
-              <p className="text-xs font-light text-slate-600 dark:text-slate-300">
-                {d.unregisteredDesc(scannedCode)}
-              </p>
-              <div className="flex items-center space-x-2 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setIsRegistering(true)}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center space-x-1.5"
-                >
-                  <span>{d.btnOpenRegistry}</span>
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* ================================================= */}
-          {/* INLINE UNREGISTERED ITEM QUICK-REGISTRY FORM */}
+          {/* MANUAL / NEW ITEM REGISTRATION FORM */}
           {/* ================================================= */}
           {isRegistering && (
-            <form onSubmit={handleRegisterSubmit} className="bg-slate-50 dark:bg-slate-900/90 border border-blue-500/40 rounded-2xl p-4 sm:p-5 space-y-4">
+            <form
+              onSubmit={handleRegisterSubmit}
+              className="bg-slate-50 dark:bg-slate-900/90 border border-blue-500/40 rounded-2xl p-4 sm:p-5 space-y-4"
+            >
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
                 <div>
-                  <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase">
-                    {d.formTitle}
-                  </h4>
-                  <p className="text-[11px] font-mono font-light text-slate-400">
-                    EAN: <span className="font-bold">{regBarcode}</span>
-                  </p>
+                  <div className="flex items-center space-x-2">
+                    <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase">
+                      {d.formTitle}
+                    </h4>
+                    {externalLookingUp && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 animate-pulse">
+                        {d.lookingUpExternal}
+                      </span>
+                    )}
+                    {externalSuggestionSource && !externalLookingUp && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                        ✨ {d.externalSuggestion} ({externalSuggestionSource})
+                      </span>
+                    )}
+                  </div>
+                  {regBarcode && (
+                    <p className="text-[11px] font-mono font-light text-slate-400 mt-0.5">
+                      EAN: <span className="font-bold">{regBarcode}</span>
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsRegistering(false)}
-                  className="text-slate-400 hover:text-slate-600 text-xs font-bold"
+                  onClick={handleSwitchToScanLookup}
+                  className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
                 >
                   ✕ {common.cancel}
                 </button>
               </div>
 
-              {/* Form Grid */}
+              {regError && (
+                <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 rounded-xl text-xs font-bold text-rose-700 dark:text-rose-300">
+                  {regError}
+                </div>
+              )}
+
+              {/* Primary Classification Filters (Required) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white/70 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblProject}
+                  </label>
+                  <select
+                    value={regProjectId}
+                    onChange={(e) => setRegProjectId(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  >
+                    {projectOptions.map((p) => (
+                      <option key={p.project_id} value={p.project_id}>
+                        {p.project_name} ({p.project_id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblDepotDomain}
+                  </label>
+                  <select
+                    value={regProductDomain}
+                    onChange={(e) => setRegProductDomain(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  >
+                    <option value="CONSTRUCTION_MATERIALS">
+                      {d.domainConstruction}
+                    </option>
+                    <option value="FURNISHING_AND_EQUIPMENT">
+                      {d.domainFurnishing}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblCategory}
+                  </label>
+                  <select
+                    value={regCategory}
+                    onChange={(e) => setRegCategory(e.target.value)}
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  >
+                    {dynamicCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Core & Extended Fields Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                
-                {/* Barcode & SKU Code */}
+                {/* Item Name (Required) & English Name */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblBarcode}</label>
-                  <input
-                    type="text"
-                    required
-                    value={regBarcode}
-                    onChange={(e) => setRegBarcode(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblLegacyCode}</label>
-                  <input
-                    type="text"
-                    required
-                    value={regLegacyCode}
-                    onChange={(e) => setRegLegacyCode(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                {/* Names */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblNameTr}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblNameTr}
+                  </label>
                   <input
                     type="text"
                     required
@@ -1034,7 +1375,9 @@ export default function MobileBarcodeScannerModal({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblNameEn}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblNameEn}
+                  </label>
                   <input
                     type="text"
                     value={regNameEn}
@@ -1044,22 +1387,28 @@ export default function MobileBarcodeScannerModal({
                   />
                 </div>
 
-                {/* Category & Subcategory */}
+                {/* Unit of Measure (Required) & Subcategory */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblCategory}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblUnit}
+                  </label>
                   <select
-                    value={regCategory}
-                    onChange={(e) => setRegCategory(e.target.value)}
+                    value={regUnit}
+                    onChange={(e) => setRegUnit(e.target.value)}
                     className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   >
-                    {dynamicCategories.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
+                    {d.units.map((u) => (
+                      <option key={u} value={u}>
+                        {u}
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblSubcategory}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblSubcategory}
+                  </label>
                   <input
                     type="text"
                     value={regSubcategory}
@@ -1069,72 +1418,114 @@ export default function MobileBarcodeScannerModal({
                   />
                 </div>
 
-                {/* Unit of Measure & Technical Spec */}
+                {/* Optional Barcode / EAN & Optional Reference SKU */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblUnit}</label>
-                  <select
-                    value={regUnit}
-                    onChange={(e) => setRegUnit(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
-                  >
-                    {d.units.map((u) => (
-                      <option key={u} value={u}>{u}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblSpecification}</label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold uppercase text-slate-500">
+                      {d.lblBarcode}
+                    </label>
+                    {regBarcode.trim().length >= 6 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void triggerExternalLookup(regBarcode.trim())
+                        }
+                        className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      >
+                        {lang === 'tr' ? 'Rehberden Doldur' : 'Auto-Fill'}
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
-                    value={regSpec}
-                    onChange={(e) => setRegSpec(e.target.value)}
-                    placeholder={d.placeholderSpec}
+                    value={regBarcode}
+                    onChange={(e) => setRegBarcode(e.target.value)}
+                    placeholder={
+                      lang === 'tr'
+                        ? 'Boş bırakılırsa otomatik üretilir'
+                        : 'Auto-generated if left blank'
+                    }
+                    className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblLegacyCode}
+                  </label>
+                  <input
+                    type="text"
+                    value={regLegacyCode}
+                    onChange={(e) => setRegLegacyCode(e.target.value)}
+                    placeholder="MAT-XXXX / WH-XXXX"
+                    className="w-full px-3 py-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
+                </div>
+
+                {/* Brand / Model & Supplier */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblBrandModel}
+                  </label>
+                  <input
+                    type="text"
+                    value={regBrandModel}
+                    onChange={(e) => setRegBrandModel(e.target.value)}
+                    placeholder="Daikin / Grohe / Vitra"
                     className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
 
-                {/* Packaging Type & Piece Count */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblPackaging}</label>
-                  <select
-                    value={regPackagingType}
-                    onChange={(e) => setRegPackagingType(e.target.value as PackagingUnitType)}
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
-                  >
-                    <option value="SINGLE_ITEM">{d.singleItem}</option>
-                    <option value="ATOMIC_SET">{d.atomicSet} ({lang === 'tr' ? 'Parça Seti' : 'Pack Set'})</option>
-                  </select>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblSupplier}
+                  </label>
+                  <input
+                    type="text"
+                    value={regSupplier}
+                    onChange={(e) => setRegSupplier(e.target.value)}
+                    placeholder={
+                      lang === 'tr'
+                        ? 'Örn: Daikin Kıbrıs / Çimko'
+                        : 'e.g. Daikin Cyprus / Lafarge'
+                    }
+                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  />
                 </div>
 
-                {regPackagingType === 'ATOMIC_SET' && (
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblPieces}</label>
+                {/* Base Cost, Source Currency & Markup */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblCost}
+                  </label>
+                  <div className="flex space-x-2">
                     <input
                       type="number"
-                      min="2"
-                      value={regPieceCount}
-                      onChange={(e) => setRegPieceCount(Number(e.target.value))}
-                      className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                      step="0.01"
+                      min="0"
+                      value={regBaseCostEur}
+                      onChange={(e) =>
+                        setRegBaseCostEur(Number(e.target.value))
+                      }
+                      className="flex-1 px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                     />
+                    <select
+                      value={regSourceCurrency}
+                      onChange={(e) => setRegSourceCurrency(e.target.value)}
+                      className="w-20 px-2 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    >
+                      <option value="EUR">EUR</option>
+                      <option value="USD">USD</option>
+                      <option value="GBP">GBP</option>
+                      <option value="TRY">TRY</option>
+                    </select>
                   </div>
-                )}
-
-                {/* Cost and Commercial Markup */}
-                <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblCost}</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={regBaseCostEur}
-                    onChange={(e) => setRegBaseCostEur(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
-                  />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblMarkup}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblMarkup}
+                  </label>
                   <input
                     type="number"
                     step="0.5"
@@ -1144,13 +1535,61 @@ export default function MobileBarcodeScannerModal({
                   />
                 </div>
 
-                {/* Intake Quantity & Delivery Note */}
+                {/* Packaging Type & Piece Count */}
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblInitialQty}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblPackaging}
+                  </label>
+                  <select
+                    value={regPackagingType}
+                    onChange={(e) =>
+                      setRegPackagingType(e.target.value as PackagingUnitType)
+                    }
+                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  >
+                    <option value="SINGLE_ITEM">{d.singleItem}</option>
+                    <option value="ATOMIC_SET">{d.atomicSet}</option>
+                  </select>
+                </div>
+
+                {regPackagingType === 'ATOMIC_SET' ? (
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      {d.lblPieces}
+                    </label>
+                    <input
+                      type="number"
+                      min="2"
+                      value={regPieceCount}
+                      onChange={(e) =>
+                        setRegPieceCount(Number(e.target.value))
+                      }
+                      className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      {d.lblProductUrl}
+                    </label>
+                    <input
+                      type="url"
+                      value={regProductUrl}
+                      onChange={(e) => setRegProductUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                {/* Initial Quantity & Dispatch Note */}
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblInitialQty}
+                  </label>
                   <input
                     type="number"
-                    min="1"
-                    required
+                    min="0"
                     value={regInitialQty}
                     onChange={(e) => setRegInitialQty(Number(e.target.value))}
                     className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
@@ -1158,7 +1597,9 @@ export default function MobileBarcodeScannerModal({
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblIrsaliye}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblIrsaliye}
+                  </label>
                   <input
                     type="text"
                     value={regIrsaliye}
@@ -1168,13 +1609,16 @@ export default function MobileBarcodeScannerModal({
                   />
                 </div>
 
+                {/* Specification / Notes */}
                 <div className="sm:col-span-2">
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblSupplier}</label>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblSpecification}
+                  </label>
                   <input
                     type="text"
-                    value={regSupplier}
-                    onChange={(e) => setRegSupplier(e.target.value)}
-                    placeholder={lang === 'tr' ? 'Örn: Daikin Kıbrıs / Çimko Çimento' : 'e.g. Daikin Cyprus / Lafarge'}
+                    value={regSpec}
+                    onChange={(e) => setRegSpec(e.target.value)}
+                    placeholder={d.placeholderSpec}
                     className="w-full px-3 py-2 text-xs font-light rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
@@ -1196,7 +1640,9 @@ export default function MobileBarcodeScannerModal({
                   {regIsTrackable && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-6">
                       <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblSerial}</label>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                          {d.lblSerial}
+                        </label>
                         <input
                           type="text"
                           value={regSerialNo}
@@ -1206,7 +1652,9 @@ export default function MobileBarcodeScannerModal({
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">{d.lblWarranty}</label>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                          {d.lblWarranty}
+                        </label>
                         <input
                           type="date"
                           value={regWarrantyDate}
@@ -1217,29 +1665,33 @@ export default function MobileBarcodeScannerModal({
                     </div>
                   )}
                 </div>
-
               </div>
 
               {/* Form Action Buttons */}
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setIsRegistering(false)}
-                  className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold"
+                  onClick={handleSwitchToScanLookup}
+                  className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
                 >
                   {common.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={regSubmitting || !regNameTr.trim()}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1.5"
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1.5 cursor-pointer"
                 >
-                  <span>{regSubmitting ? (lang === 'tr' ? 'Kaydediliyor...' : 'Saving...') : d.btnSaveAndIntake}</span>
+                  <span>
+                    {regSubmitting
+                      ? lang === 'tr'
+                        ? 'Kaydediliyor...'
+                        : 'Saving...'
+                      : d.btnSaveAndIntake}
+                  </span>
                 </button>
               </div>
             </form>
           )}
-
         </div>
 
         {/* Modal Footer */}
@@ -1249,12 +1701,11 @@ export default function MobileBarcodeScannerModal({
           </div>
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors"
+            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
           >
             {common.close}
           </button>
         </div>
-
       </div>
     </div>
   );
