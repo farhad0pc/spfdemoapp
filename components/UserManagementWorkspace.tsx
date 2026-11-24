@@ -1,6 +1,7 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useSyncExternalStore } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, useSyncExternalStore } from 'react';
 import { 
   RoleTier, 
   CorporateUserProfile, 
@@ -14,6 +15,12 @@ import {
   getAssignableRoles 
 } from '@/lib/rbac';
 import { DICTIONARY } from '@/lib/i18n';
+import {
+  compressImageToWebP,
+  CompressedImageResult,
+  formatBytesLabel,
+} from '@/lib/imageCompression';
+import WebcamCaptureModal from '@/components/WebcamCaptureModal';
 
 interface UserManagementWorkspaceProps {
   currentRole: RoleTier;
@@ -22,6 +29,7 @@ interface UserManagementWorkspaceProps {
   portfolioProjects?: PortfolioProject[];
   onRolePreviewChange?: (role: RoleTier) => void;
   authenticatedRole?: RoleTier;
+  onCurrentUserAvatarUpdated?: (avatarUrl: string | null) => void;
 }
 
 function subscribeToClock(callback: () => void) {
@@ -44,10 +52,14 @@ export default function UserManagementWorkspace({
   portfolioProjects = [],
   onRolePreviewChange,
   authenticatedRole,
+  onCurrentUserAvatarUpdated,
 }: UserManagementWorkspaceProps) {
   const currentClockSec = useSyncExternalStore(subscribeToClock, getClockSnapshot, getServerSnapshot);
   const d = DICTIONARY[lang].personnel;
   const common = DICTIONARY[lang].common;
+
+  // Strictly Tiers 0-1 (SYSTEM_ADMIN, EXECUTIVE) can upload/change/delete user profile avatars
+  const canManageAvatars = currentRole === 'SYSTEM_ADMIN' || currentRole === 'EXECUTIVE';
 
   // Data State
   const [users, setUsers] = useState<CorporateUserProfile[]>([]);
@@ -72,6 +84,24 @@ export default function UserManagementWorkspace({
   const [editingUser, setEditingUser] = useState<CorporateUserProfile | null>(null);
   const [editRole, setEditRole] = useState<RoleTier | ''>('');
   const [editSubmitting, setEditSubmitting] = useState(false);
+
+  // Milestone v2.9.4 Profile Avatar Modal State (Tier 0-1 Only)
+  const [avatarEditingUser, setAvatarEditingUser] = useState<CorporateUserProfile | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<CompressedImageResult | null>(null);
+  const [avatarCompressing, setAvatarCompressing] = useState(false);
+  const [avatarSaving, setAvatarSaving] = useState(false);
+  const [avatarRemoving, setAvatarRemoving] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [isAvatarCameraOpen, setIsAvatarCameraOpen] = useState(false);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview?.previewUrl) {
+        URL.revokeObjectURL(avatarPreview.previewUrl);
+      }
+    };
+  }, [avatarPreview]);
 
   // Fetch Users & Invites
   const fetchPersonnelData = useCallback(async () => {
@@ -331,6 +361,139 @@ export default function UserManagementWorkspace({
     }
   };
 
+  // Milestone v2.9.4 Avatar Modal Handlers
+  const openAvatarModal = (user: CorporateUserProfile) => {
+    if (!canManageAvatars) return;
+    if (avatarPreview?.previewUrl) {
+      URL.revokeObjectURL(avatarPreview.previewUrl);
+    }
+    setAvatarPreview(null);
+    setAvatarError(null);
+    setAvatarEditingUser(user);
+  };
+
+  const closeAvatarModal = () => {
+    if (avatarPreview?.previewUrl) {
+      URL.revokeObjectURL(avatarPreview.previewUrl);
+    }
+    setAvatarPreview(null);
+    setAvatarError(null);
+    setAvatarEditingUser(null);
+  };
+
+  const handleAvatarFileSelected = async (file: File | undefined) => {
+    if (!file) return;
+    setAvatarCompressing(true);
+    setAvatarError(null);
+    try {
+      const compressed = await compressImageToWebP(file, 256, 0.82);
+      setAvatarPreview((prev) => {
+        if (prev?.previewUrl) URL.revokeObjectURL(prev.previewUrl);
+        return compressed;
+      });
+    } catch (err: unknown) {
+      setAvatarError(
+        err instanceof Error
+          ? err.message
+          : lang === 'tr'
+          ? 'Görsel sıkıştırılamadı.'
+          : 'Failed to compress image.'
+      );
+    } finally {
+      setAvatarCompressing(false);
+    }
+  };
+
+  const handleSaveAvatar = async () => {
+    if (!avatarEditingUser || !avatarPreview) return;
+    setAvatarSaving(true);
+    setAvatarError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('user_id', avatarEditingUser.id);
+      formData.append('actor_role', currentRole);
+      formData.append('file', avatarPreview.file);
+
+      const res = await fetch('/api/users/avatar', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setAvatarError(data.error || (lang === 'tr' ? 'Fotoğraf kaydedilemedi.' : 'Failed to save photo.'));
+        setAvatarSaving(false);
+        return;
+      }
+
+      const nextUrl = (data.avatar_url as string | null) ?? null;
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === avatarEditingUser.id ? { ...u, avatar_url: nextUrl } : u
+        )
+      );
+
+      if (
+        currentUserEmail &&
+        avatarEditingUser.email?.toLowerCase() === currentUserEmail.toLowerCase()
+      ) {
+        onCurrentUserAvatarUpdated?.(nextUrl);
+      }
+
+      closeAvatarModal();
+    } catch (err: unknown) {
+      setAvatarError(
+        err instanceof Error ? err.message : lang === 'tr' ? 'Ağ hatası.' : 'Network error.'
+      );
+    } finally {
+      setAvatarSaving(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!avatarEditingUser) return;
+    setAvatarRemoving(true);
+    setAvatarError(null);
+
+    try {
+      const res = await fetch(
+        `/api/users/avatar?user_id=${encodeURIComponent(
+          avatarEditingUser.id
+        )}&actor_role=${encodeURIComponent(currentRole)}`,
+        { method: 'DELETE' }
+      );
+
+      const data = await res.json();
+      if (!res.ok) {
+        setAvatarError(data.error || (lang === 'tr' ? 'Fotoğraf kaldırılamadı.' : 'Failed to remove photo.'));
+        setAvatarRemoving(false);
+        return;
+      }
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === avatarEditingUser.id ? { ...u, avatar_url: null } : u
+        )
+      );
+
+      if (
+        currentUserEmail &&
+        avatarEditingUser.email?.toLowerCase() === currentUserEmail.toLowerCase()
+      ) {
+        onCurrentUserAvatarUpdated?.(null);
+      }
+
+      closeAvatarModal();
+    } catch (err: unknown) {
+      setAvatarError(
+        err instanceof Error ? err.message : lang === 'tr' ? 'Ağ hatası.' : 'Network error.'
+      );
+    } finally {
+      setAvatarRemoving(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-16 font-sans">
       
@@ -570,14 +733,53 @@ export default function UserManagementWorkspace({
                   filteredUsers.map((u) => {
                     const roleMeta = ROLE_METADATA[u.role];
                     const isManageable = canManageUser(currentRole, u.role);
+                    const initialLetter = u.full_name?.charAt(0).toUpperCase() || 'U';
 
                     return (
                       <tr key={u.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                         <td className="px-4 py-3">
                           <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs">
-                              {u.full_name?.charAt(0).toUpperCase() || 'U'}
-                            </div>
+                            {canManageAvatars ? (
+                              <button
+                                type="button"
+                                onClick={() => openAvatarModal(u)}
+                                title={d.updateProfilePhoto}
+                                className="group relative w-9 h-9 rounded-full shrink-0 overflow-hidden border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                              >
+                                {u.avatar_url ? (
+                                  <img
+                                    src={u.avatar_url}
+                                    alt={u.full_name}
+                                    className="w-9 h-9 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-full h-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs">
+                                    {initialLetter}
+                                  </div>
+                                )}
+                                <div className="absolute inset-0 bg-slate-900/65 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="2"
+                                      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                                    />
+                                    <circle cx="12" cy="13" r="3" strokeWidth="2" />
+                                  </svg>
+                                </div>
+                              </button>
+                            ) : u.avatar_url ? (
+                              <img
+                                src={u.avatar_url}
+                                alt={u.full_name}
+                                className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs shrink-0">
+                                {initialLetter}
+                              </div>
+                            )}
                             <div>
                               <div className="font-bold text-slate-900 dark:text-white">
                                 {u.full_name}
@@ -991,6 +1193,166 @@ export default function UserManagementWorkspace({
           </div>
         </div>
       )}
+
+      {/* ================================================= */}
+      {/* MODAL 3: MILESTONE v2.9.4 UPDATE USER PHOTO MODAL (TIER 0-1) */}
+      {/* ================================================= */}
+      {avatarEditingUser && canManageAvatars && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase">
+                  {d.updateProfilePhoto}
+                </h3>
+                <p className="text-[11px] font-light text-slate-500 dark:text-slate-400">
+                  {d.avatarModalDesc}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeAvatarModal}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {avatarError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 rounded-xl text-xs font-bold text-rose-700 dark:text-rose-400">
+                {avatarError}
+              </div>
+            )}
+
+            {/* User Identity & Circular 112x112 Preview */}
+            <div className="flex flex-col items-center space-y-3 py-2">
+              <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-blue-500/40 bg-slate-100 dark:bg-slate-800 flex items-center justify-center shadow-md">
+                {avatarPreview?.previewUrl || avatarEditingUser.avatar_url ? (
+                  <img
+                    src={avatarPreview?.previewUrl || avatarEditingUser.avatar_url || ''}
+                    alt={avatarEditingUser.full_name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                    {avatarEditingUser.full_name?.charAt(0).toUpperCase() || 'U'}
+                  </span>
+                )}
+              </div>
+
+              <div className="text-center">
+                <div className="text-sm font-bold text-slate-900 dark:text-white">
+                  {avatarEditingUser.full_name}
+                </div>
+                <div className="text-xs font-mono font-light text-slate-400">
+                  {avatarEditingUser.email}
+                </div>
+                {avatarPreview && (
+                  <span className="mt-1 inline-block px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                    WebP • {avatarPreview.width}×{avatarPreview.height}px •{' '}
+                    {formatBytesLabel(avatarPreview.sizeBytes)}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Dual Source Buttons: Take Photo (WebcamCaptureModal) & Upload from Device */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                disabled={avatarCompressing || avatarSaving || avatarRemoving}
+                onClick={() => setIsAvatarCameraOpen(true)}
+                className="h-10 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center space-x-2 transition-colors cursor-pointer shadow-xs"
+              >
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                  />
+                  <circle cx="12" cy="13" r="3" strokeWidth="2" />
+                </svg>
+                <span>{d.takePhoto}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={avatarCompressing || avatarSaving || avatarRemoving}
+                onClick={() => avatarFileInputRef.current?.click()}
+                className="h-10 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 text-xs font-bold flex items-center justify-center space-x-2 transition-colors cursor-pointer"
+              >
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                  />
+                </svg>
+                <span>{d.uploadFromDevice}</span>
+              </button>
+
+              <input
+                ref={avatarFileInputRef}
+                type="file"
+                accept="image/webp,image/jpeg,image/png,image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  void handleAvatarFileSelected(file);
+                  e.target.value = '';
+                }}
+              />
+            </div>
+
+            {/* Footer Actions: Remove Photo (if existing) + Cancel + Save Photo */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800 gap-2">
+              {avatarEditingUser.avatar_url ? (
+                <button
+                  type="button"
+                  disabled={avatarRemoving || avatarSaving}
+                  onClick={handleRemoveAvatar}
+                  className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/70 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {avatarRemoving ? common.loading : d.removePhoto}
+                </button>
+              ) : (
+                <span />
+              )}
+
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={closeAvatarModal}
+                  className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  {common.cancel}
+                </button>
+                <button
+                  type="button"
+                  disabled={!avatarPreview || avatarSaving || avatarCompressing}
+                  onClick={handleSaveAvatar}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                >
+                  {avatarSaving ? common.saving : d.savePhoto}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live Camera Viewfinder Modal for Avatar Capture (Re-compressed to 256px WebP) */}
+      <WebcamCaptureModal
+        isOpen={isAvatarCameraOpen}
+        lang={lang}
+        onClose={() => setIsAvatarCameraOpen(false)}
+        onCaptured={(captured) => {
+          setIsAvatarCameraOpen(false);
+          void handleAvatarFileSelected(captured.file);
+        }}
+      />
 
     </div>
   );

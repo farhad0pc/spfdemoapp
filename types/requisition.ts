@@ -21,6 +21,21 @@ export type TicketStatus =
 
 export type PackagingUnitType = 'SINGLE_ITEM' | 'ATOMIC_SET';
 
+export type MediaSourceType = 'CAMERA' | 'LOCAL' | 'GOOGLE_DRIVE';
+
+export interface InventoryItemMedia {
+  id: string;
+  catalog_item_id: string;
+  storage_path: string;
+  public_url: string;
+  is_primary: boolean;
+  display_order: number;
+  source_type: MediaSourceType;
+  file_size_bytes?: number | null;
+  uploaded_by?: string | null;
+  created_at: string;
+}
+
 export interface InventoryCatalogItem {
   item_id: string;
   legacy_code: string | null;
@@ -51,6 +66,8 @@ export interface InventoryCatalogItem {
   product_url?: string | null;
   lifecycle_status?: string | null;
   attributes?: Record<string, unknown> | null;
+  // Milestone v2.9.0 Media Album pointer
+  primary_image_url?: string | null;
 }
 
 export interface PortfolioProject {
@@ -221,6 +238,8 @@ export interface CorporateUserProfile {
   allowed_project_ids?: string[] | null;
   allowed_depot_ids?: string[] | null;
   failsafe_password_hash?: string | null;
+  avatar_url?: string | null;
+  avatar_storage_path?: string | null;
   last_login_at?: string | null;
   created_at?: string;
   updated_at?: string;

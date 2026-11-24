@@ -1,9 +1,9 @@
 # Caesar Purchasing Sub-Ledger & Procurement Ecosystem — Project Context
-**Version:** v2.8.1 (Structured Attributes Key-Value Matrix, Uniform `h-10` Form Control Heights, Missing-Docs Compliance Thresholds & Subsystem Header/Badge Polish)  
-**Last Updated:** 2026-11-23  
+**Version:** v2.9.4 (Caesar Emblem Restoration, Sidebar `NEW` Badge Cleanup & RBAC-Gated User Profile Avatars)  
+**Last Updated:** 2026-11-24  
 **Lead Systems Architect:** Farhad Mokhtari  
-**Stack:** Next.js 16 (App Router), React 19, Tailwind CSS v4, Supabase (PostgreSQL 15)  
-**Status:** Compilation Clean (Exit Code 0: 0 errors, 0 warnings) — Milestone 2.8.1 Production Ready  
+**Stack:** Next.js 16 (App Router), React 19, Tailwind CSS v4, Supabase (PostgreSQL 15 + Supabase Storage `inventory-media`)  
+**Status:** Compilation Clean (Exit Code 0: 0 errors, 0 warnings) — Milestone 2.9.4 Production Ready  
 
 ---
 
@@ -12,8 +12,9 @@
 The **Caesar Operations (Procurement & Inventory Ecosystem)** is an enterprise procurement, predictive intake calculation, warehouse inventory ledger, and fiduciary governance platform designed for Caesar Group / Afik Group construction operations.
 
 ### Scope Boundaries & Anti-Collision Mandate
-- **Purchasing & Inventory System (This Repository):** Governs construction material requisitions, predictive volume/consumption calculations, supplier quotation containment, purchasing sub-ledgers, warehouse inventory handovers, serialized asset custody, 2D RBAC governance, universal catalog taxonomy (construction + furnishing/equipment), and executive capital exposure.
-  - Tables: `public.inventory_catalog`, `public.purchase_requisitions`, `public.requisition_approvals`, `public.corporate_users`, `public.user_invitations`, `public.portfolio_projects`, `public.portfolio_buildings`, `public.depot_locations`, `public.depot_stock_balances`, `public.depot_transactions`, `public.asset_register`.
+- **Purchasing & Inventory System (This Repository):** Governs construction material requisitions, predictive volume/consumption calculations, supplier quotation containment, purchasing sub-ledgers, warehouse inventory handovers, serialized asset custody, 2D RBAC governance, universal catalog taxonomy (construction + furnishing/equipment), multi-photo SKU media albums, RBAC-gated user profile avatars, hardened multi-barcode staging, full-schema executive CSV export, intent-driven pre-authentication module launcher, and executive capital exposure.
+  - Tables: `public.inventory_catalog`, `public.inventory_item_media`, `public.purchase_requisitions`, `public.requisition_approvals`, `public.corporate_users`, `public.user_invitations`, `public.portfolio_projects`, `public.portfolio_buildings`, `public.depot_locations`, `public.depot_stock_balances`, `public.depot_transactions`, `public.asset_register`.
+  - Storage Bucket: `inventory-media` (Public CDN bucket, 5 MB limit for SKU media / 2 MB limit for `avatars/{user_id}/{uuid}.webp`, WebP/JPEG/PNG, 1-year `cacheControl: '31536000'`).
   - Identifier Taxonomy: `REQ-[YYYYMM]-[HEX]`, `MOV-[YYYYMM]-[HEX]`, `AST-[YYYY]-[HEX]`.
 - **Daily Reporting System (Distinct Platform):** Governs daily construction progress, labor headcount shifts, heavy machinery hours, and quality control punch-lists (`master_logs`, `tasks_log`, etc.). Schema, table names, and ticket IDs are strictly partitioned to prevent context bleeding.
 
@@ -71,15 +72,28 @@ Houses authoritative construction material definitions (`DEPOT-PRJ02-CONST`), fu
 - `product_url` (TEXT, Supplier / manufacturer reference link)
 - `lifecycle_status` (TEXT, Product lifecycle stage)
 - `attributes` (JSONB, Structured snake_case dimensional specifications + locked migration provenance keys)
+- `primary_image_url` (TEXT, Denormalized primary album photo URL synced by `/api/depot/media` for zero-N+1 table thumbnail rendering)
 
-### B. public.depot_locations
+### B. public.inventory_item_media (SKU Photo Album — Max 5 Photos/SKU)
+- `id` (UUID, Primary Key, `gen_random_uuid()`)
+- `catalog_item_id` (UUID, Foreign Key -> `inventory_catalog.item_id ON DELETE CASCADE`)
+- `storage_path` (TEXT, Unique object key inside Supabase Storage `inventory-media` bucket)
+- `public_url` (TEXT, Public CDN URL)
+- `is_primary` (BOOLEAN, Primary photo flag)
+- `display_order` (INTEGER, Ordering index)
+- `source_type` (TEXT, `CAMERA`, `LOCAL`, or `GOOGLE_DRIVE`)
+- `file_size_bytes` (INTEGER, Compressed payload size in bytes)
+- `uploaded_by` (TEXT, Authenticated actor email)
+- `created_at` (TIMESTAMPTZ)
+
+### C. public.depot_locations
 - `depot_id` (TEXT, Primary Key, e.g. `DEPOT-PRJ02-MAIN`, `DEPOT-PRJ02-CONST`)
 - `project_id` (TEXT, Foreign Key -> `portfolio_projects.project_id`)
 - `depot_name` (TEXT, Physical site name)
 - `depot_category` (TEXT, `CENTRAL_CONSTRUCTION_DEPOT`, etc.)
 - `is_active` (BOOLEAN)
 
-### C. public.depot_stock_balances
+### D. public.depot_stock_balances
 - `balance_id` (UUID, Primary Key)
 - `depot_id` (TEXT, Foreign Key -> `depot_locations.depot_id`)
 - `catalog_item_id` (UUID, Foreign Key -> `inventory_catalog.item_id`)
@@ -88,7 +102,7 @@ Houses authoritative construction material definitions (`DEPOT-PRJ02-CONST`), fu
 - `min_stock_threshold` (NUMERIC, Safety reorder trigger)
 - `last_scanned_at` (TIMESTAMPTZ, Timestamp of latest barcode activity)
 
-### D. public.depot_transactions
+### E. public.depot_transactions
 - `transaction_id` (UUID, Primary Key)
 - `transaction_code` (TEXT, Format: `MOV-[YYYYMM]-[HEX]`)
 - `depot_id` (TEXT, Foreign Key -> `depot_locations.depot_id`)
@@ -109,7 +123,7 @@ Houses authoritative construction material definitions (`DEPOT-PRJ02-CONST`), fu
 - `confirmed_at` (TIMESTAMPTZ)
 - `created_at` (TIMESTAMPTZ)
 
-### E. public.asset_register
+### F. public.asset_register
 - `asset_id` (UUID, Primary Key)
 - `asset_tag` (TEXT, Format: `AST-[YYYY]-[HEX]`)
 - `catalog_item_id` (UUID, Foreign Key -> `inventory_catalog.item_id`)
@@ -124,8 +138,9 @@ Houses authoritative construction material definitions (`DEPOT-PRJ02-CONST`), fu
 - `warranty_expiry_date` (DATE)
 - `created_at` (TIMESTAMPTZ)
 
-### F. public.corporate_users & public.user_invitations (2D RBAC Governance & Hard Auth Gate)
+### G. public.corporate_users & public.user_invitations (2D RBAC Governance, Avatars & Hard Auth Gate)
 - 2D RBAC architecture: 5 Departments (`SYSTEM`, `EXECUTIVE`, `TECH_OFFICE`, `PURCHASING`, `DEPOT`) across 5 Authority Tiers (0=God, 1=Executive/Director, 2=Manager/Lead, 3=Officer/Specialist, 4=Field/Junior).
+- Profile Avatars: `avatar_url` (TEXT) and `avatar_storage_path` (TEXT) on `public.corporate_users`, backed by `inventory-media` Storage under `avatars/{user_id}/{uuid}.webp` and strictly gated to Tiers 0–1 (`SYSTEM_ADMIN`, `EXECUTIVE`) via `/api/users/avatar`.
 - 48-Hour Cryptographic Self-Service Invitations with SHA-256 token hashing, token rotation, and strict downward-only delegation limits.
 - Hard Route Gate via `proxy.ts` (Next.js 16 native convention) + unified `/api/auth/login` (stealth developer fail-safe + Supabase Auth with signed HTTP-only `caesar_session` cookie) and `/api/auth/logout`.
 
@@ -136,17 +151,21 @@ Houses authoritative construction material definitions (`DEPOT-PRJ02-CONST`), fu
 ```
 spfdemoapp/
 ├── proxy.ts                           # Next.js 16 hard auth gate for / and protected /api/* routes
+├── supabase/
+│   └── migrations/
+│       ├── 20261124_inventory_item_media.sql    # Idempotent DDL for inventory_item_media, primary_image_url & inventory-media bucket
+│       └── 20261124_corporate_users_avatar.sql  # Idempotent DDL adding avatar_url & avatar_storage_path to corporate_users
 ├── app/
-│   ├── layout.tsx                     # Global HTML metadata, Oswald font loader
-│   ├── page.tsx                       # Live authenticated session binding, hard sign-out navigation
+│   ├── layout.tsx                     # Global HTML metadata, Oswald font loader & persistent GlobalUtilityFab mount
+│   ├── page.tsx                       # Live session binding (including avatar_url), ?module= routing & post-auth RBAC Access Denied screen
 │   ├── login/
-│   │   └── page.tsx                   # Clean single-form production login (CAESAR OPERATIONS)
+│   │   └── page.tsx                   # 2-Step intent-driven login: Step 1 ModuleLauncher -> Step 2 Credentials -> /?module=
 │   ├── auth/
 │   │   └── accept-invite/
 │   │       └── page.tsx               # Self-service onboarding & password creation (<Suspense> wrapped)
 │   └── api/
 │       ├── auth/
-│       │   ├── login/route.ts         # Unified stealth fail-safe + Supabase Auth login & session hydration
+│       │   ├── login/route.ts         # Unified stealth fail-safe + Supabase Auth login & session hydration (returns avatar_url)
 │       │   ├── logout/route.ts        # Strict HTTP-only auth cookie termination
 │       │   ├── invite/route.ts        # 48h invitation generation, SHA-256 token hashing, delegation validation
 │       │   ├── accept-invite/route.ts # Token validation & account activation via Supabase Admin
@@ -154,29 +173,38 @@ spfdemoapp/
 │       │   ├── revoke-invite/route.ts # Invitation cancellation
 │       │   └── failsafe-login/route.ts# Legacy fail-safe endpoint
 │       ├── depot/
-│       │   ├── barcode-lookup/route.ts# Read-only public barcode proxy (UPCitemdb -> Open Products Facts)
-│       │   └── catalog/route.ts       # Authenticated POST (new item + balance) & Tier 0-2 gated PATCH
-│       ├── users/route.ts             # User roster queries & account management (Suspend/Activate/Change Role)
+│       │   ├── barcode-lookup/route.ts# Read-only public barcode proxy with URL/non-GTIN guard (UPCitemdb -> Open Products Facts)
+│       │   ├── catalog/route.ts       # Authenticated POST (new item + balance) & Tier 0-2 gated PATCH
+│       │   └── media/route.ts         # Atomic Storage + DB media API (GET, POST 5-photo cap + Drive mirror, PATCH primary, Tier 0-2 DELETE)
+│       ├── users/
+│       │   ├── route.ts               # User roster queries (with avatar_url) & account management (Suspend/Activate/Change Role)
+│       │   └── avatar/route.ts        # Tier 0-1 gated atomic user avatar upload (POST) & removal (DELETE) in inventory-media
 │       ├── requisition/route.ts       # Purchase requisition intake API
 │       └── approve/route.ts           # Requisition approval state engine
 ├── components/
 │   ├── AttributesEditor.tsx           # Structured snake_case Key-Value matrix, domain quick-chips & locked provenance pills
-│   ├── CorporateHeader.tsx            # CONTROL CENTER / KONTROL MERKEZİ header, role badge, red Sign Out button
-│   ├── DesktopSidebar.tsx             # CAESAR OPERATIONS v2.8.1 vertically aligned brand block, pill NEW/YENİ badge & grouped navigation
-│   ├── StickyControlsFAB.tsx          # Fixed bottom-left action buttons (bottom-4 left-4 z-40)
+│   ├── CorporateHeader.tsx            # CONTROL CENTER / KONTROL MERKEZİ header, circular user avatar / initial fallback, red Sign Out button
+│   ├── DesktopSidebar.tsx             # CAESAR OPERATIONS v2.9.4 vertically aligned brand block & grouped navigation (clean Active Modules without NEW badge)
+│   ├── GlobalUtilityFab.tsx           # Persistent route/viewport-aware Language (EN/TR) + Light/Dark glassmorphic FAB
+│   ├── ModuleLauncher.tsx             # Pre-auth 7-tile primary module launcher with official Caesar Group Emblem
+│   ├── StickyControlsFAB.tsx          # Legacy controls component
 │   ├── Toast.tsx                      # Non-intrusive notification toast for module & catalog alerts
 │   ├── TechnicalIntakeModule.tsx      # Full-screen 3-tier cascading location & predictive volume intake engine
 │   ├── RequisitionWorkspace.tsx       # Sub-ledger table with O(1) canonical portfolio lookup, batch controls, drawer
 │   ├── ExecutiveTelemetryStrip.tsx    # Board-level fiduciary KPI metrics strip (Executive only)
-│   ├── MobileBarcodeScannerModal.tsx  # Dual-mode (Scan/Lookup & Manual Add) ZXing WASM scanner + external auto-fill + AttributesEditor
-│   ├── ItemDetailsModal.tsx           # Full 30+ column item inspection, compliance banner, AttributesEditor & Tier 0-2 edit mode
-│   ├── DepoManagementWorkspace.tsx    # Clickable stock rows, unified filters popover with compliance toggle, 2-tier alert KPI & pill return button
-│   └── UserManagementWorkspace.tsx    # Personnel roster, 48h invitation countdown table, developer role preview switcher (Tier 0 only)
+│   ├── WebcamCaptureModal.tsx         # Cross-device getUserMedia live camera viewfinder + WebP shutter capture
+│   ├── ItemMediaUploadModal.tsx       # Responsive desktop modal / mobile bottom sheet (Live Camera / Local / Google Drive + Preview & Confirm)
+│   ├── MobileBarcodeScannerModal.tsx  # Top-mounted 128x128 Reference Photo hero + multi-barcode staging tray + single-barcode guardrail
+│   ├── ItemDetailsModal.tsx           # Top-left 180x180 album hero + 5-slot strip + lightbox + split RBAC media controls & Tier 0-2 edit mode
+│   ├── DepoManagementWorkspace.tsx    # 40x40px lazy-loaded thumbnails, filter-aware Export CSV button, scanner View Item bridge & 2-tier alert KPI
+│   └── UserManagementWorkspace.tsx    # Personnel roster with circular avatars, Tier 0-1 Update User Photo modal, 48h invitation table & dev role preview
 ├── types/
-│   └── requisition.ts                 # Schema interfaces (InventoryCatalogItem extended, Portfolio, Requisition, Depot, Assets, 2D RBAC)
+│   └── requisition.ts                 # Schema interfaces (InventoryCatalogItem, InventoryItemMedia, CorporateUserProfile with avatar_url, 2D RBAC)
 ├── lib/
 │   ├── authSession.ts                 # Server-side HMAC-SHA256 session cookie signing & verification
-│   ├── i18n.ts                        # Centralized symmetric TR/EN dictionary (v2.8.1) with clean UTF-8 Turkish diacritics
+│   ├── csvExport.ts                   # Client-side RFC-4180 CSV serializer with UTF-8 BOM, formula-injection guard, dynamic attr_* & Tier 0-2 masking
+│   ├── imageCompression.ts            # Client-side Canvas WebP compressor (1024px SKU media / 256px user avatars, JPEG fallback)
+│   ├── i18n.ts                        # Centralized symmetric TR/EN dictionary (v2.9.4) with clean UTF-8 Turkish diacritics
 │   ├── supabaseClient.ts              # Client-safe Supabase anon instance
 │   ├── supabaseAdmin.ts               # Server-isolated service-role Supabase admin instance
 │   ├── rbac.ts                        # 2D RBAC delegation matrix, role metadata, permission helper functions
@@ -190,9 +218,8 @@ spfdemoapp/
 
 ## 5. Current System State & Milestone Verification
 
-Milestone v2.8.1 is completed and verified clean:
-- **Structured Attributes Key-Value Matrix (`components/AttributesEditor.tsx`, `ItemDetailsModal.tsx`, `MobileBarcodeScannerModal.tsx`):** COMPLETED. Eliminated all raw JSON `<textarea>` / `<pre>` editing for end users. Locks system migration provenance keys (`source_workbook`, `source_sheet`, `raw_ozellik`) as read-only pills, provides domain-aware 1-click quick-chips (`CONSTRUCTION_MATERIALS` vs `FURNISHING_AND_EQUIPMENT`), sanitizes custom keys to `snake_case`, trims values, and renders clean read-only attribute cards.
-- **Uniform `h-10` Form Control Height Standardization (`ItemDetailsModal.tsx`, `MobileBarcodeScannerModal.tsx`, `DepoManagementWorkspace.tsx`, `AttributesEditor.tsx`):** COMPLETED. All standard `<input>` and `<select>` form controls share the unified `h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900` invariant; compact inline toolbar selects (`RECORD STATUS`, camera selector) are normalized to `h-9 px-3 rounded-lg text-xs`.
-- **Missing-Docs & Catalog Compliance Threshold Protocol (`DepoManagementWorkspace.tsx`, `ItemDetailsModal.tsx`):** COMPLETED. Exported deterministic `getItemComplianceIssues(item)` (`UNPRICED`, `MISSING_METADATA`, `REVIEW_REQUIRED`) combined with movement document alerts (`INBOUND_RECEIPT` missing dispatch/invoice, `OUTBOUND_HANDOVER` missing recipient/target). Surfaced on KPI Card 4 (`DOC & COMPLIANCE ALERTS` with `Incomplete SKUs · Missing Docs` breakdown), inside the unified `Filters` popover (`Incomplete / Missing Docs Only` toggle counted in active filter badge), as amber SKU badges in `Live Stock Balances`, and as a detailed alert banner in `ItemDetailsModal.tsx`.
-- **Subsystem Return Pill & Sidebar Badge Polish (`DepoManagementWorkspace.tsx`, `DesktopSidebar.tsx`, `lib/i18n.ts`):** COMPLETED. Upgraded `← Requisitions` (`← Talepler`) to a bordered pill button; standardized `Personnel & RBAC` `NEW` (`YENİ`) badge to `text-[9px] font-bold px-2 py-0.5 rounded-full tracking-wider uppercase`; bumped version to `v2.8.1` with clean UTF-8 Turkish diacritics.
+Milestone v2.9.4 is completed and verified clean:
+- **Caesar Emblem Restoration on Module Launcher (`components/ModuleLauncher.tsx`):** COMPLETED. Replaced the generic `CO` text box with the official Caesar Group emblem image (`https://i.ibb.co/p6CSmYL7/CAESAR-EMBLEM-NO-TEXT.png` with automatic `onError` fallback to `https://res.cloudinary.com/iczztnnz/image/upload/v1793015175/CAESAR_EMBLEM_NO_TEXT.png`), matching the Login card and Desktop Sidebar emblem styling.
+- **Sidebar `NEW` Badge Cleanup (`components/DesktopSidebar.tsx`):** COMPLETED. Removed the yellow `NEW` / `YENİ` badge pill next to `Personnel & RBAC` (`Personel & Yetki Matrisi`) while keeping all 4 roadmap `SOON` / `YAKINDA` badges intact.
+- **RBAC-Gated User Profile Avatars (`supabase/migrations/20261124_corporate_users_avatar.sql`, `app/api/users/avatar/route.ts`, `components/UserManagementWorkspace.tsx`, `components/CorporateHeader.tsx`, `app/page.tsx`):** COMPLETED. Added `avatar_url` and `avatar_storage_path` to `public.corporate_users`, created atomic `POST`/`DELETE /api/users/avatar` strictly gated to Tiers 0–1 (`SYSTEM_ADMIN`, `EXECUTIVE`), integrated circular `w-9 h-9` avatars with alphabet-initial fallback across `UserManagementWorkspace` and `CorporateHeader`, and added the **Update User Photo (`Fotoğrafı Güncelle`)** modal supporting live camera capture (`WebcamCaptureModal`) and device upload with client-side `256×256px` WebP compression.
 - **Workspace Hygiene:** COMPLETED. 0 unauthorized physical markdown files on disk. Compilation clean with 0 errors and 0 warnings.

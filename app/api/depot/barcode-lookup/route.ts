@@ -6,6 +6,7 @@ export interface BarcodeLookupResult {
   brand?: string;
   specification?: string;
   source?: string;
+  skippedReason?: 'URL_OR_NON_GTIN';
 }
 
 interface UpcItemDbItem {
@@ -31,6 +32,46 @@ interface OpenProductsFactsResponse {
 }
 
 /**
+ * URL / Non-GTIN Guard:
+ * Prevents wasted external API latency & quota on QR URLs (http/https/www),
+ * multi-word free text, or non-GTIN payloads.
+ * Allows standard 8-14 digit numeric GTIN/EAN/UPC barcodes and compact
+ * alphanumeric product SKUs containing digits.
+ */
+function isEligibleForExternalLookup(rawCode: string): boolean {
+  const code = rawCode.trim();
+  if (!code || code.length < 6 || code.length > 32) return false;
+
+  const lower = code.toLowerCase();
+  if (
+    lower.startsWith('http://') ||
+    lower.startsWith('https://') ||
+    lower.startsWith('www.') ||
+    lower.includes('://') ||
+    /\s/.test(code)
+  ) {
+    return false;
+  }
+
+  // Standard 8-14 digit numeric EAN-8, UPC-A, EAN-13, GTIN-14
+  if (/^\d{8,14}$/.test(code)) {
+    return true;
+  }
+
+  // Reject bare domains like "example.com" or "vendor.co.uk/abc"
+  if (/\.[a-z]{2,}(\/|$)/i.test(code)) {
+    return false;
+  }
+
+  // Compact alphanumeric industrial SKU (must contain at least one digit)
+  if (/^[A-Za-z0-9][A-Za-z0-9._-]{5,31}$/.test(code) && /\d/.test(code)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Read-only public barcode lookup proxy.
  * NEVER writes to or mutates Supabase tables.
  */
@@ -38,8 +79,11 @@ export async function GET(request: NextRequest) {
   const rawCode = request.nextUrl.searchParams.get('code') || '';
   const code = rawCode.trim();
 
-  if (!code || code.length < 6) {
-    return NextResponse.json<BarcodeLookupResult>({ found: false });
+  if (!code || !isEligibleForExternalLookup(code)) {
+    return NextResponse.json<BarcodeLookupResult>({
+      found: false,
+      skippedReason: 'URL_OR_NON_GTIN',
+    });
   }
 
   // 1. Primary Query: UPCitemdb Public Trial Endpoint (3-second timeout)
@@ -50,7 +94,7 @@ export async function GET(request: NextRequest) {
         method: 'GET',
         headers: {
           Accept: 'application/json',
-          'User-Agent': 'CaesarOperationsDepotLookup/2.8.0',
+          'User-Agent': 'CaesarOperationsDepotLookup/2.9.1',
         },
         signal: AbortSignal.timeout(3000),
       }
@@ -90,7 +134,7 @@ export async function GET(request: NextRequest) {
         method: 'GET',
         headers: {
           Accept: 'application/json',
-          'User-Agent': 'CaesarOperationsDepotLookup/2.8.0',
+          'User-Agent': 'CaesarOperationsDepotLookup/2.9.1',
         },
         signal: AbortSignal.timeout(3000),
       }

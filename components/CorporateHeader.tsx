@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable @next/next/no-img-element */
+
 import React from 'react';
 import Link from 'next/link';
 import { RoleTier, DepartmentCode } from '@/types/requisition';
@@ -13,6 +15,7 @@ interface CorporateHeaderProps {
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   currentUserEmail?: string | null;
+  avatarUrl?: string | null;
   isLoggedIn?: boolean;
   onLogout?: () => void;
 }
@@ -35,6 +38,7 @@ export default function CorporateHeader({
   lang,
   onToggleSidebar,
   currentUserEmail,
+  avatarUrl,
   isLoggedIn = false,
   onLogout,
 }: CorporateHeaderProps) {
@@ -99,11 +103,19 @@ export default function CorporateHeader({
             {/* User Session & Red Sign Out Button */}
             {isLoggedIn ? (
               <div className="flex items-center space-x-2.5 pl-2 border-l border-slate-200 dark:border-slate-800">
-                <div className="w-8 h-8 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/20">
-                  {currentUserEmail
-                    ? currentUserEmail.charAt(0).toUpperCase()
-                    : 'U'}
-                </div>
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={currentUserEmail || t.activeUser}
+                    className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800"
+                  />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/20 shrink-0">
+                    {currentUserEmail
+                      ? currentUserEmail.charAt(0).toUpperCase()
+                      : 'U'}
+                  </div>
+                )}
                 <div className="hidden lg:flex flex-col text-left">
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200 max-w-[140px] truncate">
                     {currentUserEmail || t.activeUser}

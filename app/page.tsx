@@ -9,23 +9,66 @@ import {
   PortfolioProject,
   PortfolioBuilding,
 } from '@/types/requisition';
+import { ROLE_METADATA } from '@/lib/rbac';
+import { DICTIONARY, useCaesarLanguage } from '@/lib/i18n';
+import {
+  ActiveModuleKey,
+  isActiveModuleKey,
+  renderLauncherModuleIcon,
+} from '@/components/ModuleLauncher';
 import CorporateHeader from '@/components/CorporateHeader';
 import DesktopSidebar from '@/components/DesktopSidebar';
-import StickyControlsFAB from '@/components/StickyControlsFAB';
 import TechnicalIntakeModule from '@/components/TechnicalIntakeModule';
 import RequisitionWorkspace from '@/components/RequisitionWorkspace';
 import DepoManagementWorkspace from '@/components/DepoManagementWorkspace';
 import UserManagementWorkspace from '@/components/UserManagementWorkspace';
 import Toast from '@/components/Toast';
 
+type PortalView =
+  | 'WORKSPACE'
+  | 'TECHNICAL_INTAKE'
+  | 'DEPOT_WORKSPACE'
+  | 'USER_MANAGEMENT';
+
+/**
+ * Post-Auth Module Clearance Matrix:
+ * - 'users' (Personnel & RBAC): Strictly restricted to Tiers 0-1 (SYSTEM_ADMIN, EXECUTIVE)
+ * - 'purchasing' & 'depot': Accessible to all authenticated operational tiers
+ */
+function hasModuleClearance(
+  role: RoleTier,
+  moduleKey: ActiveModuleKey
+): boolean {
+  if (moduleKey === 'users') {
+    const meta = ROLE_METADATA[role];
+    return Boolean(meta && meta.tier <= 1);
+  }
+  return Boolean(ROLE_METADATA[role]);
+}
+
+function getAuthorizedModulesForRole(role: RoleTier): ActiveModuleKey[] {
+  const allActive: ActiveModuleKey[] = ['purchasing', 'depot', 'users'];
+  return allActive.filter((mod) => hasModuleClearance(role, mod));
+}
+
+function mapModuleKeyToView(moduleKey: ActiveModuleKey): PortalView {
+  if (moduleKey === 'depot') return 'DEPOT_WORKSPACE';
+  if (moduleKey === 'users') return 'USER_MANAGEMENT';
+  return 'WORKSPACE';
+}
+
 export default function PurchasingPortalPage() {
-  const [view, setView] = useState<
-    'WORKSPACE' | 'TECHNICAL_INTAKE' | 'DEPOT_WORKSPACE' | 'USER_MANAGEMENT'
-  >('WORKSPACE');
+  const [lang] = useCaesarLanguage();
+  const [view, setView] = useState<PortalView>('WORKSPACE');
+  const [accessDeniedModule, setAccessDeniedModule] =
+    useState<ActiveModuleKey | null>(null);
   const [currentRole, setCurrentRole] = useState<RoleTier>('TECH_OFFICE_USER');
   const [authenticatedRole, setAuthenticatedRole] =
     useState<RoleTier>('TECH_OFFICE_USER');
   const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const [currentUserAvatarUrl, setCurrentUserAvatarUrl] = useState<
+    string | null
+  >(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [catalogItems, setCatalogItems] = useState<InventoryCatalogItem[]>([]);
   const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>([]);
@@ -36,20 +79,29 @@ export default function PurchasingPortalPage() {
     PortfolioBuilding[]
   >([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [lang, setLang] = useState<'tr' | 'en'>('tr');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [toastState, setToastState] = useState<{
     message: string;
     subMessage?: string;
   } | null>(null);
 
-  // Synchronize document DOM language dynamically to prevent CSS uppercase dotted 'İ' in English
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.lang = lang;
+  const applyRequestedModuleRouting = useCallback((resolvedRole: RoleTier) => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const requestedMod = params.get('module');
+    if (!isActiveModuleKey(requestedMod)) {
+      setAccessDeniedModule(null);
+      return;
     }
-  }, [lang]);
+
+    if (hasModuleClearance(resolvedRole, requestedMod)) {
+      setAccessDeniedModule(null);
+      setView(mapModuleKeyToView(requestedMod));
+    } else {
+      // Strictly NO silent auto-redirect: surface explicit Access Denied screen
+      setAccessDeniedModule(requestedMod);
+    }
+  }, []);
 
   const fetchData = useCallback(async () => {
     const { data: catalog } = await supabase
@@ -87,11 +139,13 @@ export default function PurchasingPortalPage() {
         const data = await res.json();
         if (data.authenticated && data.email) {
           setCurrentUserEmail(data.email);
+          setCurrentUserAvatarUrl(data.avatar_url || null);
           setIsLoggedIn(true);
-          if (data.role) {
-            setCurrentRole(data.role as RoleTier);
-            setAuthenticatedRole(data.role as RoleTier);
-          }
+          const resolvedRole =
+            (data.role as RoleTier | undefined) || 'TECH_OFFICE_USER';
+          setCurrentRole(resolvedRole);
+          setAuthenticatedRole(resolvedRole);
+          applyRequestedModuleRouting(resolvedRole);
           return;
         }
       }
@@ -106,14 +160,18 @@ export default function PurchasingPortalPage() {
 
         const { data: profile } = await supabase
           .from('corporate_users')
-          .select('role')
+          .select('role, avatar_url')
           .eq('email', session.user.email)
           .maybeSingle();
 
-        if (profile?.role) {
-          setCurrentRole(profile.role as RoleTier);
-          setAuthenticatedRole(profile.role as RoleTier);
-        }
+        const resolvedRole =
+          (profile?.role as RoleTier | undefined) || 'TECH_OFFICE_USER';
+        setCurrentUserAvatarUrl(
+          (profile as { avatar_url?: string | null } | null)?.avatar_url || null
+        );
+        setCurrentRole(resolvedRole);
+        setAuthenticatedRole(resolvedRole);
+        applyRequestedModuleRouting(resolvedRole);
         return;
       }
 
@@ -123,7 +181,7 @@ export default function PurchasingPortalPage() {
     } catch (err) {
       console.error('Session hydration error:', err);
     }
-  }, []);
+  }, [applyRequestedModuleRouting]);
 
   const handleLogout = async () => {
     try {
@@ -133,6 +191,7 @@ export default function PurchasingPortalPage() {
       console.error('Logout error:', err);
     } finally {
       setCurrentUserEmail(null);
+      setCurrentUserAvatarUrl(null);
       setIsLoggedIn(false);
       setCurrentRole('TECH_OFFICE_USER');
       setAuthenticatedRole('TECH_OFFICE_USER');
@@ -177,17 +236,26 @@ export default function PurchasingPortalPage() {
     };
   }, [fetchData, checkSession]);
 
-  const toggleLang = () => {
-    setLang((prev) => (prev === 'tr' ? 'en' : 'tr'));
+  const handleSelectSidebarView = (nextView: PortalView) => {
+    if (
+      nextView === 'USER_MANAGEMENT' &&
+      !hasModuleClearance(currentRole, 'users')
+    ) {
+      setAccessDeniedModule('users');
+      return;
+    }
+    setAccessDeniedModule(null);
+    setView(nextView);
   };
 
-  const toggleTheme = () => {
-    const nextTheme = theme === 'light' ? 'dark' : 'light';
-    setTheme(nextTheme);
-    if (nextTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+  const handleChooseAuthorizedModule = (modKey: ActiveModuleKey) => {
+    setAccessDeniedModule(null);
+    setView(mapModuleKeyToView(modKey));
+    if (typeof window !== 'undefined') {
+      const nextUrl = `${window.location.pathname}?module=${encodeURIComponent(
+        modKey
+      )}`;
+      window.history.replaceState(null, '', nextUrl);
     }
   };
 
@@ -447,6 +515,10 @@ export default function PurchasingPortalPage() {
     );
   }
 
+  const tl = DICTIONARY[lang].launcher;
+  const roleMeta = ROLE_METADATA[currentRole];
+  const authorizedModules = getAuthorizedModulesForRole(currentRole);
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex transition-colors font-sans">
       {/* Desktop Left Sidebar Rail */}
@@ -454,7 +526,7 @@ export default function PurchasingPortalPage() {
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         currentView={view}
-        onSelectView={setView}
+        onSelectView={handleSelectSidebarView}
         onUpcomingClick={handleUpcomingClick}
         lang={lang}
         userRole={currentRole}
@@ -464,17 +536,111 @@ export default function PurchasingPortalPage() {
       <div className="flex-1 flex flex-col min-w-0">
         <CorporateHeader
           currentRole={currentRole}
-          onRoleChange={setCurrentRole}
+          onRoleChange={(nextRole) => {
+            setCurrentRole(nextRole);
+            if (
+              accessDeniedModule &&
+              hasModuleClearance(nextRole, accessDeniedModule)
+            ) {
+              setView(mapModuleKeyToView(accessDeniedModule));
+              setAccessDeniedModule(null);
+            }
+          }}
           lang={lang}
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           currentUserEmail={currentUserEmail}
+          avatarUrl={currentUserAvatarUrl}
           isLoggedIn={isLoggedIn}
           onLogout={handleLogout}
         />
 
         <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-1">
-          {view === 'TECHNICAL_INTAKE' ? (
+          {/* STRICT POST-AUTH RBAC ACCESS DENIED GATE (NO SILENT AUTO-REDIRECT) */}
+          {accessDeniedModule ? (
+            <div className="max-w-2xl mx-auto my-8 bg-white dark:bg-[#0f172a] rounded-2xl border-2 border-rose-500/40 shadow-xl p-6 sm:p-8 space-y-6 animate-fade-in">
+              <div className="flex items-start space-x-4">
+                <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center justify-center shrink-0">
+                  <svg
+                    className="w-6 h-6"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                    />
+                  </svg>
+                </div>
+                <div className="space-y-1">
+                  <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
+                    403 RBAC • {tl.accessDeniedTitle}
+                  </span>
+                  <h2 className="text-xl font-bold text-slate-900 dark:text-white uppercase">
+                    {tl.accessDeniedTitle} — {tl.modules[accessDeniedModule]}
+                  </h2>
+                  <p className="text-xs font-light text-slate-600 dark:text-slate-300 leading-relaxed">
+                    {tl.accessDeniedBody}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 text-xs">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                    {tl.authenticatedAsLabel}
+                  </span>
+                  <span className="font-bold text-slate-900 dark:text-white">
+                    {lang === 'tr' ? roleMeta?.titleTr : roleMeta?.titleEn} (Tier{' '}
+                    {roleMeta?.tier ?? '—'})
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                    {tl.requestedModuleLabel}
+                  </span>
+                  <span className="font-bold text-rose-600 dark:text-rose-400 uppercase">
+                    {tl.modules[accessDeniedModule]} (Tier 0–1)
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  {tl.authorizedModulesLabel}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {authorizedModules.map((modKey) => (
+                    <button
+                      key={modKey}
+                      type="button"
+                      onClick={() => handleChooseAuthorizedModule(modKey)}
+                      className="group p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50/40 dark:hover:bg-blue-950/30 flex items-center justify-between text-left transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center space-x-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
+                          <div className="scale-75">
+                            {renderLauncherModuleIcon(modKey)}
+                          </div>
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white uppercase block truncate">
+                            {tl.modules[modKey]}
+                          </span>
+                          <span className="text-[11px] font-light text-blue-600 dark:text-blue-400">
+                            {tl.openAuthorizedModule}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : view === 'TECHNICAL_INTAKE' ? (
             <TechnicalIntakeModule
               onBack={() => setView('WORKSPACE')}
               onSubmitTicket={handleSubmitTicket}
@@ -506,6 +672,7 @@ export default function PurchasingPortalPage() {
               currentUserEmail={currentUserEmail || undefined}
               lang={lang}
               portfolioProjects={portfolioProjects}
+              onCurrentUserAvatarUpdated={setCurrentUserAvatarUrl}
             />
           ) : (
             <RequisitionWorkspace
@@ -532,14 +699,6 @@ export default function PurchasingPortalPage() {
           onClose={() => setToastState(null)}
         />
       )}
-
-      {/* Fixed Language & Theme Switcher Controls (Bottom-Left) */}
-      <StickyControlsFAB
-        lang={lang}
-        onToggleLang={toggleLang}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
     </div>
   );
 }

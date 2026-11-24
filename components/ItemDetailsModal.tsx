@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+/* eslint-disable @next/next/no-img-element */
+
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   InventoryCatalogItem,
+  InventoryItemMedia,
   DepotStockBalance,
   DepotTransaction,
   AssetRegisterItem,
@@ -10,8 +13,10 @@ import {
   RoleTier,
   PackagingUnitType,
 } from '@/types/requisition';
+import { canEditDepotStock } from '@/lib/rbac';
 import { DICTIONARY } from '@/lib/i18n';
 import AttributesEditor from '@/components/AttributesEditor';
+import ItemMediaUploadModal from '@/components/ItemMediaUploadModal';
 
 const TIER_0_TO_2_EDIT_ROLES: RoleTier[] = [
   'SYSTEM_ADMIN',
@@ -104,14 +109,28 @@ export default function ItemDetailsModal({
   const t = DICTIONARY[lang].itemDetails;
   const td = DICTIONARY[lang].depot;
   const tc = DICTIONARY[lang].common;
+  const tm = DICTIONARY[lang].media;
 
+  // Strictly Tiers 0, 1, 2 can edit catalog fields and delete album photos
   const canEditCatalog = TIER_0_TO_2_EDIT_ROLES.includes(currentRole);
+  const canDeleteMedia = TIER_0_TO_2_EDIT_ROLES.includes(currentRole);
+  // All depot staff authorized to add items (canEditDepotStock + Tiers 0-2) can upload photos & set primary
+  const canUploadMedia =
+    canEditDepotStock(currentRole) ||
+    TIER_0_TO_2_EDIT_ROLES.includes(currentRole);
 
   const [activeTab, setActiveTab] = useState<'RECORD' | 'HISTORY'>('RECORD');
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [showConfirmPrompt, setShowConfirmPrompt] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Album Media State (Max 5 photos per SKU)
+  const [rawAlbumMedia, setRawAlbumMedia] = useState<InventoryItemMedia[]>([]);
+  const [selectedMediaId, setSelectedMediaId] = useState<string | null>(null);
+  const [mediaActionBusy, setMediaActionBusy] = useState<boolean>(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
 
   // Edit Form State
   const [formLegacyCode, setFormLegacyCode] = useState<string>('');
@@ -148,6 +167,41 @@ export default function ItemDetailsModal({
     {}
   );
 
+  // Fetch Album Media asynchronously on Modal Open without synchronous setState in effect
+  useEffect(() => {
+    if (!isOpen || !item?.item_id) return;
+    let ignore = false;
+    const targetItemId = item.item_id;
+
+    const loadAlbum = async () => {
+      try {
+        const res = await fetch(
+          `/api/depot/media?catalog_item_id=${encodeURIComponent(targetItemId)}`
+        );
+        if (!ignore && res.ok) {
+          const data = (await res.json()) as { media?: InventoryItemMedia[] };
+          const list = data.media || [];
+          setRawAlbumMedia(list);
+          const primary = list.find((m) => m.is_primary) || list[0] || null;
+          setSelectedMediaId(primary ? primary.id : null);
+        }
+      } catch {
+        // Ignore fetch failure and fall back to item.primary_image_url
+      }
+    };
+
+    void loadAlbum();
+    return () => {
+      ignore = true;
+    };
+  }, [isOpen, item?.item_id]);
+
+  // Scope album strictly to current item_id so switching items never shows stale photos
+  const albumMedia = useMemo(() => {
+    if (!item) return [];
+    return rawAlbumMedia.filter((m) => m.catalog_item_id === item.item_id);
+  }, [rawAlbumMedia, item]);
+
   const itemTransactions = useMemo(() => {
     if (!item) return [];
     return transactions.filter((tx) => tx.catalog_item_id === item.item_id);
@@ -163,7 +217,102 @@ export default function ItemDetailsModal({
     [item]
   );
 
+  const activeMediaItem = useMemo(() => {
+    if (albumMedia.length === 0) return null;
+    if (selectedMediaId) {
+      const found = albumMedia.find((m) => m.id === selectedMediaId);
+      if (found) return found;
+    }
+    return albumMedia.find((m) => m.is_primary) || albumMedia[0];
+  }, [albumMedia, selectedMediaId]);
+
   if (!isOpen || !item) return null;
+
+  const displayImageUrl =
+    activeMediaItem?.public_url || item.primary_image_url || null;
+
+  const handleAlbumUpdated = async (
+    updatedAlbum: InventoryItemMedia[],
+    newPrimaryUrl: string | null
+  ) => {
+    setRawAlbumMedia(updatedAlbum);
+    const nextActive =
+      updatedAlbum.find((m) => m.id === selectedMediaId) ||
+      updatedAlbum.find((m) => m.is_primary) ||
+      updatedAlbum[0] ||
+      null;
+    setSelectedMediaId(nextActive ? nextActive.id : null);
+
+    if (newPrimaryUrl !== item.primary_image_url) {
+      const updatedCatalogItem: InventoryCatalogItem = {
+        ...item,
+        primary_image_url: newPrimaryUrl,
+      };
+      await onSaved?.(updatedCatalogItem, balance);
+    }
+  };
+
+  const handleSetPrimaryMedia = async (targetMedia: InventoryItemMedia) => {
+    if (!canUploadMedia || targetMedia.is_primary || mediaActionBusy) return;
+    setMediaActionBusy(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch('/api/depot/media', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          media_id: targetMedia.id,
+          catalog_item_id: item.item_id,
+          actor_role: currentRole,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || 'Failed to update primary photo.');
+        return;
+      }
+      await handleAlbumUpdated(
+        (data.media || []) as InventoryItemMedia[],
+        (data.primary_image_url as string | null) ?? targetMedia.public_url
+      );
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMediaActionBusy(false);
+    }
+  };
+
+  const handleDeleteMedia = async (targetMedia: InventoryItemMedia) => {
+    if (!canDeleteMedia || mediaActionBusy) return;
+    if (!window.confirm(tm.deleteConfirmPrompt)) return;
+
+    setMediaActionBusy(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch('/api/depot/media', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          media_id: targetMedia.id,
+          catalog_item_id: item.item_id,
+          actor_role: currentRole,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || 'Failed to delete photo.');
+        return;
+      }
+      await handleAlbumUpdated(
+        (data.media || []) as InventoryItemMedia[],
+        (data.primary_image_url as string | null) ?? null
+      );
+    } catch (err: unknown) {
+      setErrorMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setMediaActionBusy(false);
+    }
+  };
 
   const enterEditMode = () => {
     if (!canEditCatalog) return;
@@ -300,6 +449,8 @@ export default function ItemDetailsModal({
   const qtyOnHand = balance?.quantity_on_hand ?? 0;
   const qtyReserved = balance?.quantity_reserved ?? 0;
   const minThreshold = balance?.min_stock_threshold ?? 5;
+  const itemDisplayTitle =
+    lang === 'tr' ? item.item_name_tr : item.item_name_en || item.item_name_tr;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in font-sans select-none">
@@ -328,9 +479,7 @@ export default function ItemDetailsModal({
               )}
             </div>
             <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate mt-1">
-              {lang === 'tr'
-                ? item.item_name_tr
-                : item.item_name_en || item.item_name_tr}
+              {itemDisplayTitle}
             </h2>
           </div>
 
@@ -376,7 +525,11 @@ export default function ItemDetailsModal({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                setIsLightboxOpen(false);
+                setIsUploadModalOpen(false);
+                onClose();
+              }}
               className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               title={tc.close}
             >
@@ -498,51 +651,290 @@ export default function ItemDetailsModal({
           {/* TAB 1: FULL DATABASE RECORD (READ MODE) */}
           {activeTab === 'RECORD' && !isEditing && (
             <div className="space-y-5 text-xs select-text">
-              {/* 1. Live Stock Summary Strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 dark:bg-slate-900/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block">
-                    {t.lblQtyOnHand}
-                  </span>
-                  <span className="text-lg font-light text-slate-900 dark:text-white">
-                    {qtyOnHand}{' '}
-                    <span className="text-xs text-slate-400">
-                      {item.unit_of_measure}
-                    </span>
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block">
-                    {t.lblQtyReserved}
-                  </span>
-                  <span className="text-lg font-light text-amber-600 dark:text-amber-400">
-                    {qtyReserved}{' '}
-                    <span className="text-xs text-slate-400">
-                      {item.unit_of_measure}
-                    </span>
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block">
-                    {t.lblMinThreshold}
-                  </span>
-                  <span className="text-lg font-light text-slate-700 dark:text-slate-300">
-                    {minThreshold}{' '}
-                    <span className="text-xs text-slate-400">
-                      {item.unit_of_measure}
-                    </span>
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-400 block">
-                    {t.lblValuedPriceEur}
-                  </span>
-                  <span className="text-lg font-light text-emerald-600 dark:text-emerald-400">
-                    €
-                    {valuedUnitPrice.toLocaleString('en-US', {
-                      minimumFractionDigits: 2,
+              {/* ========================================================= */}
+              {/* MILESTONE v2.9.0: TOP-LEFT PHOTO / ALBUM HERO + TELEMETRY */}
+              {/* Desktop (md:+): 2-col hero with 180x180px rounded frame   */}
+              {/* Mobile (< md): Stacked full-width 4:3 hero gallery        */}
+              {/* ========================================================= */}
+              <div className="flex flex-col md:flex-row gap-4 bg-slate-50 dark:bg-slate-900/70 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                {/* Left Column: Album Frame + 5-Slot Thumbnail Strip + RBAC Actions */}
+                <div className="w-full md:w-[180px] shrink-0 flex flex-col space-y-2.5">
+                  {/* Primary / Active Photo Frame */}
+                  <div className="relative w-full aspect-[4/3] max-h-60 md:max-h-none md:w-[180px] md:h-[180px] md:aspect-square rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 overflow-hidden flex items-center justify-center group">
+                    {displayImageUrl ? (
+                      <>
+                        <img
+                          src={displayImageUrl}
+                          alt={itemDisplayTitle}
+                          loading="lazy"
+                          decoding="async"
+                          onClick={() => setIsLightboxOpen(true)}
+                          className="w-full h-full object-cover cursor-zoom-in transition-transform duration-200 group-hover:scale-[1.03]"
+                        />
+
+                        {/* Primary Badge */}
+                        {(activeMediaItem?.is_primary ||
+                          albumMedia.length <= 1) && (
+                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-slate-950/75 backdrop-blur-xs text-[10px] font-bold text-emerald-400 border border-emerald-500/30">
+                            ★ {tm.primaryBadge}
+                          </span>
+                        )}
+
+                        {/* Album Counter Badge */}
+                        <span className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-slate-950/75 backdrop-blur-xs text-[10px] font-mono font-bold text-white border border-white/10">
+                          {Math.max(1, albumMedia.length)}/5
+                        </span>
+
+                        {/* Bottom Overlay Controls: Set Primary & Delete (Strictly Tier 0-2) */}
+                        {activeMediaItem && (
+                          <div className="absolute inset-x-0 bottom-0 p-1.5 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-transparent flex items-center justify-between gap-1">
+                            {canUploadMedia && !activeMediaItem.is_primary ? (
+                              <button
+                                type="button"
+                                disabled={mediaActionBusy}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleSetPrimaryMedia(activeMediaItem);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-blue-600/90 hover:bg-blue-600 text-white text-[10px] font-bold truncate cursor-pointer"
+                                title={tm.setPrimary}
+                              >
+                                ★ {tm.setPrimary}
+                              </button>
+                            ) : (
+                              <span />
+                            )}
+
+                            {canDeleteMedia && (
+                              <button
+                                type="button"
+                                disabled={mediaActionBusy}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleDeleteMedia(activeMediaItem);
+                                }}
+                                className="p-1.5 rounded-lg bg-rose-600/90 hover:bg-rose-600 text-white transition-colors cursor-pointer"
+                                title={tm.deletePhoto}
+                              >
+                                <svg
+                                  className="w-3.5 h-3.5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth="2"
+                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                  />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      /* Dashed Camera Placeholder when Empty */
+                      <div
+                        onClick={() => {
+                          if (canUploadMedia) setIsUploadModalOpen(true);
+                        }}
+                        className={`w-full h-full flex flex-col items-center justify-center p-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl ${
+                          canUploadMedia
+                            ? 'cursor-pointer hover:border-blue-400 hover:bg-blue-50/30 dark:hover:bg-blue-950/20'
+                            : ''
+                        }`}
+                      >
+                        <svg
+                          className="w-8 h-8 text-slate-400 dark:text-slate-600 mb-1.5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.5"
+                            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth="1.5"
+                            d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                        </svg>
+                        <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                          {tm.noPhotoPlaceholder}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 5-Slot Mini Thumbnail Strip */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+                    {[0, 1, 2, 3, 4].map((slotIdx) => {
+                      const slotMedia = albumMedia[slotIdx];
+                      const isSelected =
+                        slotMedia && activeMediaItem?.id === slotMedia.id;
+
+                      if (slotMedia) {
+                        return (
+                          <button
+                            key={slotMedia.id}
+                            type="button"
+                            onClick={() => setSelectedMediaId(slotMedia.id)}
+                            className={`relative w-8 h-8 rounded-lg overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                              isSelected
+                                ? 'border-blue-600 dark:border-blue-400 ring-1 ring-blue-500/40'
+                                : 'border-slate-200 dark:border-slate-700 opacity-75 hover:opacity-100'
+                            }`}
+                            title={`${tm.albumTitle} #${slotIdx + 1}`}
+                          >
+                            <img
+                              src={slotMedia.public_url}
+                              alt=""
+                              loading="lazy"
+                              decoding="async"
+                              className="w-full h-full object-cover"
+                            />
+                            {slotMedia.is_primary && (
+                              <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 ring-1 ring-slate-900" />
+                            )}
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <button
+                          key={`empty-slot-${slotIdx}`}
+                          type="button"
+                          disabled={
+                            !canUploadMedia || albumMedia.length >= 5
+                          }
+                          onClick={() => {
+                            if (canUploadMedia && albumMedia.length < 5) {
+                              setIsUploadModalOpen(true);
+                            }
+                          }}
+                          className={`w-8 h-8 rounded-lg shrink-0 border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400 ${
+                            canUploadMedia && albumMedia.length < 5
+                              ? 'hover:border-blue-400 hover:text-blue-500 cursor-pointer'
+                              : 'opacity-40 cursor-default'
+                          }`}
+                          title={tm.addPhoto}
+                        >
+                          +
+                        </button>
+                      );
                     })}
-                  </span>
+                  </div>
+
+                  {/* Prominent + Add Photo Pill Button */}
+                  {canUploadMedia && (
+                    <button
+                      type="button"
+                      disabled={albumMedia.length >= 5}
+                      onClick={() => setIsUploadModalOpen(true)}
+                      className={`w-full py-1.5 px-3 rounded-xl text-[11px] font-bold flex items-center justify-center space-x-1.5 border transition-colors ${
+                        albumMedia.length >= 5
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-2xs cursor-pointer'
+                      }`}
+                    >
+                      <span>
+                        {albumMedia.length >= 5
+                          ? tm.maxPhotosLimit
+                          : `+ ${tm.addPhoto}`}
+                      </span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Right Column: Identity Summary & 4-Stat Live Stock / Valuation Telemetry */}
+                <div className="flex-1 min-w-0 flex flex-col justify-between space-y-3">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center flex-wrap gap-1.5">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300 dark:border-blue-800">
+                        {item.product_domain || 'CONSTRUCTION_MATERIALS'}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                        {balance?.depot_id || 'DEPOT-PRJ02-MAIN'}
+                      </span>
+                      {item.category && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                          {item.category}
+                          {item.subcategory ? ` • ${item.subcategory}` : ''}
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white leading-snug">
+                      {item.item_name_tr}
+                    </h3>
+                    {item.item_name_en &&
+                      item.item_name_en !== item.item_name_tr && (
+                        <p className="text-xs font-light text-slate-500 dark:text-slate-400">
+                          {item.item_name_en}
+                        </p>
+                      )}
+                    {(item.brand_model || item.supplier_name) && (
+                      <p className="text-[11px] font-light text-slate-500 dark:text-slate-400">
+                        {item.brand_model ? `${item.brand_model}` : ''}
+                        {item.brand_model && item.supplier_name ? ' • ' : ''}
+                        {item.supplier_name ? `${item.supplier_name}` : ''}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 4-Metric Stock & Price Telemetry Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                        {t.lblQtyOnHand}
+                      </span>
+                      <span className="text-base sm:text-lg font-light text-slate-900 dark:text-white">
+                        {qtyOnHand}{' '}
+                        <span className="text-[11px] text-slate-400">
+                          {item.unit_of_measure}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                        {t.lblQtyReserved}
+                      </span>
+                      <span className="text-base sm:text-lg font-light text-amber-600 dark:text-amber-400">
+                        {qtyReserved}{' '}
+                        <span className="text-[11px] text-slate-400">
+                          {item.unit_of_measure}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                        {t.lblMinThreshold}
+                      </span>
+                      <span className="text-base sm:text-lg font-light text-slate-700 dark:text-slate-300">
+                        {minThreshold}{' '}
+                        <span className="text-[11px] text-slate-400">
+                          {item.unit_of_measure}
+                        </span>
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800">
+                      <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                        {t.lblValuedPriceEur}
+                      </span>
+                      <span className="text-base sm:text-lg font-light text-emerald-600 dark:text-emerald-400">
+                        €
+                        {valuedUnitPrice.toLocaleString('en-US', {
+                          minimumFractionDigits: 2,
+                        })}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1338,13 +1730,94 @@ export default function ItemDetailsModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => {
+              setIsLightboxOpen(false);
+              setIsUploadModalOpen(false);
+              onClose();
+            }}
             className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
           >
             {tc.close}
           </button>
         </div>
       </div>
+
+      {/* Multi-Source Upload Modal / Bottom Sheet */}
+      <ItemMediaUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        catalogItemId={item.item_id}
+        itemTitle={itemDisplayTitle}
+        existingCount={albumMedia.length}
+        currentRole={currentRole}
+        lang={lang}
+        onUploaded={(updatedAlbum, primaryUrl) => {
+          void handleAlbumUpdated(updatedAlbum, primaryUrl);
+        }}
+      />
+
+      {/* Fullscreen Click-to-Zoom Lightbox */}
+      {isLightboxOpen && displayImageUrl && (
+        <div
+          onClick={() => setIsLightboxOpen(false)}
+          className="fixed inset-0 z-[70] bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-fade-in"
+        >
+          <div className="w-full max-w-4xl flex items-center justify-between text-white mb-3">
+            <div className="min-w-0 pr-4">
+              <span className="text-xs font-mono font-bold text-blue-400 mr-2">
+                {item.legacy_code}
+              </span>
+              <span className="text-sm font-bold truncate">
+                {itemDisplayTitle}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsLightboxOpen(false)}
+              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white cursor-pointer"
+            >
+              ✕ {tc.close}
+            </button>
+          </div>
+
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-4xl max-h-[75vh] flex items-center justify-center"
+          >
+            <img
+              src={displayImageUrl}
+              alt={itemDisplayTitle}
+              className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+            />
+          </div>
+
+          {albumMedia.length > 1 && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-2 mt-4"
+            >
+              {albumMedia.map((m) => (
+                <button
+                  key={`lb-${m.id}`}
+                  type="button"
+                  onClick={() => setSelectedMediaId(m.id)}
+                  className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                    activeMediaItem?.id === m.id
+                      ? 'border-blue-500 scale-105'
+                      : 'border-white/20 opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img
+                    src={m.public_url}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

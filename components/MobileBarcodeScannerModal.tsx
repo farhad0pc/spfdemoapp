@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+/* eslint-disable @next/next/no-img-element */
+
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   BarcodeDetector as ZXingBarcodeDetector,
   prepareZXingModule,
@@ -14,19 +16,114 @@ import {
   PortfolioProject,
   DepotLocation,
   RoleTier,
+  MediaSourceType,
 } from '@/types/requisition';
 import { supabase } from '@/lib/supabaseClient';
 import { DICTIONARY } from '@/lib/i18n';
 import AttributesEditor from '@/components/AttributesEditor';
+import WebcamCaptureModal from '@/components/WebcamCaptureModal';
+import {
+  compressImageToWebP,
+  CompressedImageResult,
+  formatBytesLabel,
+} from '@/lib/imageCompression';
 
 const CONTROL_CLASS =
   'w-full h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
 
-interface DetectedItemInfo {
-  rawValue: string;
+const MAX_STAGED_BARCODES = 5;
+
+export type StagedBarcodeStatus =
+  | 'CHECKING'
+  | 'INVENTORY_MATCH'
+  | 'PUBLIC_MATCH'
+  | 'UNLISTED';
+
+export interface StagedBarcodeEntry {
+  code: string;
   format: string;
-  cornerPoints?: { x: number; y: number }[];
-  boundingBox?: DOMRectReadOnly;
+  status: StagedBarcodeStatus;
+  inventoryItem?: InventoryCatalogItem;
+  inventoryAsset?: AssetRegisterItem;
+  publicSuggestion?: {
+    name?: string;
+    brand?: string;
+    specification?: string;
+    source?: string;
+  };
+  skippedExternalReason?: 'URL_OR_NON_GTIN';
+  detectedAt: number;
+}
+
+/**
+ * Client-side mirror of the URL / Non-GTIN guard to skip wasted external requests.
+ */
+function isEligibleForExternalLookup(rawCode: string): boolean {
+  const code = rawCode.trim();
+  if (!code || code.length < 6 || code.length > 32) return false;
+
+  const lower = code.toLowerCase();
+  if (
+    lower.startsWith('http://') ||
+    lower.startsWith('https://') ||
+    lower.startsWith('www.') ||
+    lower.includes('://') ||
+    /\s/.test(code)
+  ) {
+    return false;
+  }
+
+  if (/^\d{8,14}$/.test(code)) {
+    return true;
+  }
+
+  if (/\.[a-z]{2,}(\/|$)/i.test(code)) {
+    return false;
+  }
+
+  if (/^[A-Za-z0-9][A-Za-z0-9._-]{5,31}$/.test(code) && /\d/.test(code)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Smart default selection priority for new barcodes:
+ * Strongly prefers 1D retail/industrial product codes (EAN-13, UPC-A, EAN-8, Code-128,
+ * numeric 8-14 digit GTINs) over QR_CODE / URL payloads.
+ */
+function getNewBarcodePriorityScore(entry: StagedBarcodeEntry): number {
+  const fmt = entry.format.toLowerCase();
+  const code = entry.code.trim();
+  const lowerCode = code.toLowerCase();
+  const isUrl =
+    lowerCode.startsWith('http://') ||
+    lowerCode.startsWith('https://') ||
+    lowerCode.startsWith('www.') ||
+    lowerCode.includes('://');
+
+  if (isUrl) return 0;
+
+  let score = 0;
+  if (entry.status === 'PUBLIC_MATCH') score += 40;
+  if (/^\d{13}$/.test(code)) score += 100;
+  else if (/^\d{8,14}$/.test(code)) score += 90;
+
+  if (fmt.includes('ean_13') || fmt.includes('ean-13')) score += 60;
+  else if (fmt.includes('upc_a') || fmt.includes('upc-a')) score += 55;
+  else if (fmt.includes('ean_8') || fmt.includes('upc_e')) score += 50;
+  else if (fmt.includes('code_128') || fmt.includes('code_39') || fmt.includes('itf'))
+    score += 45;
+  else if (fmt === 'manual') score += 35;
+  else if (fmt.includes('qr') || fmt.includes('data_matrix')) score += 10;
+
+  return score;
+}
+
+function formatBarcodeTypeLabel(format: string): string {
+  const clean = format.replace(/_/g, '-').toUpperCase();
+  return clean || 'BARCODE';
 }
 
 interface MobileBarcodeScannerModalProps {
@@ -45,6 +142,7 @@ interface MobileBarcodeScannerModalProps {
     action: 'INBOUND' | 'OUTBOUND' | 'REGISTER_ASSET',
     asset?: AssetRegisterItem
   ) => void;
+  onViewExistingItem?: (item: InventoryCatalogItem) => void;
   onItemRegistered?: (
     newCatalogItem: InventoryCatalogItem,
     newBalance: DepotStockBalance,
@@ -67,12 +165,15 @@ export default function MobileBarcodeScannerModal({
   currentRole = 'DEPOT_MANAGER',
   lang,
   onQuickAction,
+  onViewExistingItem,
   onItemRegistered,
   onCatalogRefresh,
   onShowToast,
 }: MobileBarcodeScannerModalProps) {
   const d = DICTIONARY[lang].scanner;
   const common = DICTIONARY[lang].common;
+  const tm = DICTIONARY[lang].media;
+  const tc = DICTIONARY[lang].camera;
 
   // Dual-Mode Switcher: 'SCAN_LOOKUP' vs 'MANUAL_ADD'
   const [activeMode, setActiveMode] = useState<'SCAN_LOOKUP' | 'MANUAL_ADD'>(
@@ -81,6 +182,7 @@ export default function MobileBarcodeScannerModal({
 
   // Camera & Device State
   const [cameraActive, setCameraActive] = useState<boolean>(false);
+  const [cameraPaused, setCameraPaused] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
@@ -88,20 +190,17 @@ export default function MobileBarcodeScannerModal({
     'INITIALIZING' | 'READY' | 'ERROR'
   >('INITIALIZING');
 
-  // Scanning & Detection State
+  // Milestone v2.9.1: Multi-Barcode Session Staging Tray & Single-Barcode Guardrail
   const [manualInput, setManualInput] = useState<string>('');
-  const [scannedCode, setScannedCode] = useState<string | null>(null);
-  const [matchedCatalogItem, setMatchedCatalogItem] =
-    useState<InventoryCatalogItem | null>(null);
-  const [matchedAsset, setMatchedAsset] = useState<AssetRegisterItem | null>(
+  const [scanFlash, setScanFlash] = useState<boolean>(false);
+  const [detectedBarcodes, setDetectedBarcodes] = useState<
+    StagedBarcodeEntry[]
+  >([]);
+  const [selectedNewBarcode, setSelectedNewBarcode] = useState<string | null>(
     null
   );
-  const [scanFlash, setScanFlash] = useState<boolean>(false);
-  const [detectedBarcodes, setDetectedBarcodes] = useState<DetectedItemInfo[]>(
-    []
-  );
 
-  // External Lookup State
+  // External Lookup Badge in Manual Add form
   const [externalLookingUp, setExternalLookingUp] = useState<boolean>(false);
   const [externalSuggestionSource, setExternalSuggestionSource] = useState<
     string | null
@@ -147,16 +246,36 @@ export default function MobileBarcodeScannerModal({
     null
   );
 
-  // Refs
+  // Milestone v2.9.0 / v2.9.3: Top-Mounted Reference Photo Hero + Cross-Device Live Camera
+  const [regRefPhoto, setRegRefPhoto] = useState<CompressedImageResult | null>(
+    null
+  );
+  const [regPhotoSource, setRegPhotoSource] =
+    useState<MediaSourceType>('CAMERA');
+  const [regPhotoCompressing, setRegPhotoCompressing] =
+    useState<boolean>(false);
+  const [isRefWebcamOpen, setIsRefWebcamOpen] = useState<boolean>(false);
+
+  // Refs for camera, WASM detector, and synchronous deduplication
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasOverlayRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanLoopRef = useRef<number | null>(null);
   const detectorRef = useRef<ZXingBarcodeDetector | null>(null);
-  const lastScannedTimeRef = useRef<number>(0);
+  const seenCodesRef = useRef<Set<string>>(new Set());
+  const regDevicePhotoInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Cleanup Reference Photo object URL
+  useEffect(() => {
+    return () => {
+      if (regRefPhoto?.previewUrl) {
+        URL.revokeObjectURL(regRefPhoto.previewUrl);
+      }
+    };
+  }, [regRefPhoto]);
 
   // Web Audio Synth Beep
-  const playBeep = () => {
+  const playBeep = useCallback(() => {
     try {
       const AudioCtx =
         window.AudioContext ||
@@ -176,10 +295,11 @@ export default function MobileBarcodeScannerModal({
     } catch {
       // Audio autoplay policy fallback
     }
-  };
+  }, []);
 
-  // Query External Public Barcode Lookup Proxy (Read-Only)
-  const triggerExternalLookup = useCallback(async (code: string) => {
+  // Direct external lookup button inside Manual Add form
+  const triggerManualExternalLookup = useCallback(async (code: string) => {
+    if (!isEligibleForExternalLookup(code)) return;
     setExternalLookingUp(true);
     setExternalSuggestionSource(null);
     try {
@@ -209,73 +329,129 @@ export default function MobileBarcodeScannerModal({
         }
       }
     } catch {
-      // Ignore external lookup timeout or miss gracefully
+      // Ignore timeout or miss gracefully
     } finally {
       setExternalLookingUp(false);
     }
   }, []);
 
-  // Resolve Barcode Match: Always check live Supabase inventory_catalog & asset_register FIRST
-  const handleResolveCode = useCallback(
-    async (code: string, secondarySerial?: string) => {
-      const clean = code.trim();
+  /**
+   * Hardened Two-Tier Resolution Pipeline (NEVER auto-redirects to Manual Add):
+   * Priority 1 — Existing Supabase Inventory (always wins, NEVER calls external API).
+   * Priority 2 — Smart Public Directory Lookup (skipped immediately for URLs / non-GTINs).
+   */
+  const stageAndResolveBarcode = useCallback(
+    async (rawCode: string, format: string) => {
+      const clean = rawCode.trim();
       if (!clean) return;
 
-      setScannedCode(clean);
-      setRegError(null);
-      setExternalSuggestionSource(null);
+      const dedupeKey = clean.toLowerCase();
+      if (seenCodesRef.current.has(dedupeKey)) {
+        return;
+      }
+      if (seenCodesRef.current.size >= MAX_STAGED_BARCODES) {
+        return;
+      }
+
+      seenCodesRef.current.add(dedupeKey);
       playBeep();
       setScanFlash(true);
-      setTimeout(() => setScanFlash(false), 250);
+      setTimeout(() => setScanFlash(false), 220);
 
-      // 1. Check in-memory props first
+      const initialEntry: StagedBarcodeEntry = {
+        code: clean,
+        format: format || 'MANUAL',
+        status: 'CHECKING',
+        detectedAt: Date.now(),
+      };
+
+      setDetectedBarcodes((prev) => {
+        if (
+          prev.length >= MAX_STAGED_BARCODES ||
+          prev.some((e) => e.code.toLowerCase() === dedupeKey)
+        ) {
+          return prev;
+        }
+        return [...prev, initialEntry];
+      });
+
+      const updateEntry = (patch: Partial<StagedBarcodeEntry>) => {
+        setDetectedBarcodes((prev) =>
+          prev.map((entry) =>
+            entry.code.toLowerCase() === dedupeKey
+              ? { ...entry, ...patch }
+              : entry
+          )
+        );
+      };
+
+      // =========================================================
+      // PRIORITY 1: EXISTING SUPABASE INVENTORY (ALWAYS WINS)
+      // =========================================================
       let foundAsset = assetRegister.find(
         (a) =>
-          a.serial_number.toLowerCase() === clean.toLowerCase() ||
-          a.asset_tag.toLowerCase() === clean.toLowerCase() ||
-          (a.barcode_ean && a.barcode_ean.toLowerCase() === clean.toLowerCase())
+          a.serial_number.toLowerCase() === dedupeKey ||
+          a.asset_tag.toLowerCase() === dedupeKey ||
+          (a.barcode_ean && a.barcode_ean.toLowerCase() === dedupeKey)
       );
 
       let foundCatalog = catalogItems.find(
         (c) =>
-          (c.barcode_ean &&
-            c.barcode_ean.toLowerCase() === clean.toLowerCase()) ||
-          (c.legacy_code &&
-            c.legacy_code.toLowerCase() === clean.toLowerCase()) ||
+          (c.barcode_ean && c.barcode_ean.toLowerCase() === dedupeKey) ||
+          (c.legacy_code && c.legacy_code.toLowerCase() === dedupeKey) ||
+          (c.manufacturer_article &&
+            c.manufacturer_article.toLowerCase() === dedupeKey) ||
           c.item_id === clean
       );
 
-      // 2. Also verify directly against live Supabase tables if not in local cache
+      // Query live Supabase tables if not in local cache
       if (!foundCatalog && !foundAsset) {
         try {
-          const { data: dbCatalog } = await supabase
-            .from('inventory_catalog')
-            .select('*')
-            .or(`barcode_ean.eq.${clean},legacy_code.ilike.${clean}`)
-            .limit(1)
-            .maybeSingle();
+          const isPostgrestOrSafe = /^[A-Za-z0-9._-]+$/.test(clean);
 
-          if (dbCatalog) {
-            foundCatalog = dbCatalog as InventoryCatalogItem;
-          } else {
-            const { data: dbAsset } = await supabase
-              .from('asset_register')
-              .select('*, catalog_item:inventory_catalog(*)')
+          if (isPostgrestOrSafe) {
+            const { data: dbCatalog } = await supabase
+              .from('inventory_catalog')
+              .select('*')
               .or(
-                `serial_number.ilike.${clean},asset_tag.ilike.${clean},barcode_ean.eq.${clean}`
+                `barcode_ean.eq.${clean},legacy_code.ilike.${clean},manufacturer_article.ilike.${clean}`
               )
               .limit(1)
               .maybeSingle();
 
-            if (dbAsset) {
-              foundAsset = dbAsset as AssetRegisterItem;
-              if (dbAsset.catalog_item) {
-                foundCatalog = dbAsset.catalog_item as InventoryCatalogItem;
+            if (dbCatalog) {
+              foundCatalog = dbCatalog as InventoryCatalogItem;
+            } else {
+              const { data: dbAsset } = await supabase
+                .from('asset_register')
+                .select('*, catalog_item:inventory_catalog(*)')
+                .or(
+                  `serial_number.ilike.${clean},asset_tag.ilike.${clean},barcode_ean.eq.${clean}`
+                )
+                .limit(1)
+                .maybeSingle();
+
+              if (dbAsset) {
+                foundAsset = dbAsset as AssetRegisterItem;
+                if (dbAsset.catalog_item) {
+                  foundCatalog = dbAsset.catalog_item as InventoryCatalogItem;
+                }
               }
+            }
+          } else {
+            const { data: dbCatalog } = await supabase
+              .from('inventory_catalog')
+              .select('*')
+              .eq('barcode_ean', clean)
+              .limit(1)
+              .maybeSingle();
+
+            if (dbCatalog) {
+              foundCatalog = dbCatalog as InventoryCatalogItem;
             }
           }
         } catch {
-          // Continue with local state if query fails
+          // Continue cleanly if live query fails
         }
       }
 
@@ -285,30 +461,68 @@ export default function MobileBarcodeScannerModal({
         );
       }
 
-      setMatchedAsset(foundAsset || null);
-      setMatchedCatalogItem(foundCatalog || null);
-
-      // 3. If NOT found in Supabase, pre-populate registration form and call external barcode proxy
-      if (!foundCatalog && !foundAsset) {
-        setRegBarcode(clean);
-        setRegLegacyCode('');
-        setRegNameTr('');
-        setRegNameEn('');
-        setRegBrandModel('');
-        setRegSpec('');
-        setRegAttributes({});
-        setRegFormKey((k) => k + 1);
-        if (secondarySerial) {
-          setRegIsTrackable(true);
-          setRegSerialNo(secondarySerial);
-        }
-        setIsRegistering(true);
-        void triggerExternalLookup(clean);
-      } else {
-        setIsRegistering(false);
+      if (foundCatalog) {
+        updateEntry({
+          status: 'INVENTORY_MATCH',
+          inventoryItem: foundCatalog,
+          inventoryAsset: foundAsset || undefined,
+        });
+        return;
       }
+
+      // =========================================================
+      // PRIORITY 2: SMART PUBLIC DIRECTORY LOOKUP (NEW CODES ONLY)
+      // =========================================================
+      if (!isEligibleForExternalLookup(clean)) {
+        updateEntry({
+          status: 'UNLISTED',
+          skippedExternalReason: 'URL_OR_NON_GTIN',
+        });
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `/api/depot/barcode-lookup?code=${encodeURIComponent(clean)}`
+        );
+        if (res.ok) {
+          const data = (await res.json()) as {
+            found: boolean;
+            name?: string;
+            brand?: string;
+            specification?: string;
+            source?: string;
+            skippedReason?: 'URL_OR_NON_GTIN';
+          };
+
+          if (data.found) {
+            updateEntry({
+              status: 'PUBLIC_MATCH',
+              publicSuggestion: {
+                name: data.name,
+                brand: data.brand,
+                specification: data.specification,
+                source: data.source || 'Public Directory',
+              },
+            });
+            return;
+          }
+
+          updateEntry({
+            status: 'UNLISTED',
+            skippedExternalReason: data.skippedReason,
+          });
+          return;
+        }
+      } catch {
+        // Network error falls through gracefully to UNLISTED
+      }
+
+      updateEntry({
+        status: 'UNLISTED',
+      });
     },
-    [assetRegister, catalogItems, triggerExternalLookup]
+    [assetRegister, catalogItems, playBeep]
   );
 
   // Enumerate Cameras
@@ -392,12 +606,27 @@ export default function MobileBarcodeScannerModal({
   // Handle camera device switch
   const handleCameraChange = (newDeviceId: string) => {
     setSelectedDeviceId(newDeviceId);
+    setCameraPaused(false);
     void startCamera(newDeviceId);
   };
 
-  // Manage Camera on Modal Open/Close & Mode Switch
+  // Clear Session Staging Tray
+  const handleClearTray = useCallback(() => {
+    seenCodesRef.current.clear();
+    setDetectedBarcodes([]);
+    setSelectedNewBarcode(null);
+    setManualInput('');
+    setRegSuccessMessage(null);
+  }, []);
+
+  // Manage Camera on Modal Open/Close, Pause/Resume & Mode Switch
   useEffect(() => {
-    if (isOpen && activeMode === 'SCAN_LOOKUP' && !isRegistering) {
+    if (
+      isOpen &&
+      activeMode === 'SCAN_LOOKUP' &&
+      !isRegistering &&
+      !cameraPaused
+    ) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void startCamera(selectedDeviceId || undefined);
     } else {
@@ -405,16 +634,19 @@ export default function MobileBarcodeScannerModal({
     }
 
     if (!isOpen) {
-      setScannedCode(null);
-      setMatchedCatalogItem(null);
-      setMatchedAsset(null);
+      seenCodesRef.current.clear();
       setDetectedBarcodes([]);
+      setSelectedNewBarcode(null);
+      setCameraPaused(false);
       setIsRegistering(false);
+      setIsRefWebcamOpen(false);
       setActiveMode('SCAN_LOOKUP');
       setRegSuccessMessage(null);
       setRegError(null);
       setExternalSuggestionSource(null);
       setRegAttributes({});
+      setRegRefPhoto(null);
+      setManualInput('');
     }
 
     return () => {
@@ -424,6 +656,7 @@ export default function MobileBarcodeScannerModal({
     isOpen,
     activeMode,
     isRegistering,
+    cameraPaused,
     selectedDeviceId,
     startCamera,
     stopCamera,
@@ -485,12 +718,13 @@ export default function MobileBarcodeScannerModal({
     };
   }, []);
 
-  // Multi-Barcode Frame Detection Loop (Dual-Pass: Raw + Horizontal Un-Mirror)
+  // Multi-Symbol Frame Detection Loop (Dual-Pass: Raw + Horizontal Un-Mirror)
   useEffect(() => {
     if (
       !isOpen ||
       activeMode !== 'SCAN_LOOKUP' ||
       isRegistering ||
+      cameraPaused ||
       !cameraActive ||
       !videoRef.current
     ) {
@@ -562,142 +796,88 @@ export default function MobileBarcodeScannerModal({
           }
 
           if (barcodes && barcodes.length > 0) {
-            const currentItems: DetectedItemInfo[] = [];
             const mapX = (x: number) => (isFlippedMatch ? vw - x : x);
 
             barcodes.forEach((b) => {
               const raw = b.rawValue?.trim();
-              if (raw) {
-                const mappedCornerPoints = b.cornerPoints?.map((p) => ({
-                  x: mapX(p.x),
-                  y: p.y,
-                }));
+              if (!raw) return;
 
-                const mappedBoundingBox = b.boundingBox
-                  ? new DOMRectReadOnly(
-                      isFlippedMatch
-                        ? vw - (b.boundingBox.x + b.boundingBox.width)
-                        : b.boundingBox.x,
-                      b.boundingBox.y,
-                      b.boundingBox.width,
-                      b.boundingBox.height
-                    )
-                  : undefined;
-
-                currentItems.push({
-                  rawValue: raw,
-                  format: b.format,
-                  cornerPoints: mappedCornerPoints,
-                  boundingBox: mappedBoundingBox,
-                });
-
-                if (
-                  overlayCtx &&
-                  mappedCornerPoints &&
-                  mappedCornerPoints.length >= 4
-                ) {
-                  overlayCtx.beginPath();
-                  overlayCtx.moveTo(
-                    mappedCornerPoints[0].x,
-                    mappedCornerPoints[0].y
-                  );
-                  overlayCtx.lineTo(
-                    mappedCornerPoints[1].x,
-                    mappedCornerPoints[1].y
-                  );
-                  overlayCtx.lineTo(
-                    mappedCornerPoints[2].x,
-                    mappedCornerPoints[2].y
-                  );
-                  overlayCtx.lineTo(
-                    mappedCornerPoints[3].x,
-                    mappedCornerPoints[3].y
-                  );
-                  overlayCtx.closePath();
-                  overlayCtx.lineWidth = 4;
-                  overlayCtx.strokeStyle = isFlippedMatch
-                    ? '#06b6d4'
-                    : '#10b981';
-                  overlayCtx.stroke();
-
-                  const labelX = Math.min(
-                    mappedCornerPoints[0].x,
-                    mappedCornerPoints[1].x,
-                    mappedCornerPoints[2].x,
-                    mappedCornerPoints[3].x
-                  );
-                  const labelY = Math.min(
-                    mappedCornerPoints[0].y,
-                    mappedCornerPoints[1].y,
-                    mappedCornerPoints[2].y,
-                    mappedCornerPoints[3].y
-                  );
-                  const tagText = `${b.format.toUpperCase()}${
-                    isFlippedMatch ? ' (MIRRORED)' : ''
-                  }`;
-
-                  overlayCtx.fillStyle = isFlippedMatch ? '#0891b2' : '#059669';
-                  overlayCtx.fillRect(
-                    labelX,
-                    Math.max(0, labelY - 24),
-                    tagText.length * 8 + 12,
-                    22
-                  );
-                  overlayCtx.fillStyle = '#ffffff';
-                  overlayCtx.font = 'bold 11px Oswald, sans-serif';
-                  overlayCtx.fillText(
-                    tagText,
-                    labelX + 6,
-                    Math.max(14, labelY - 8)
-                  );
-                }
-              }
-            });
-
-            setDetectedBarcodes(currentItems);
-
-            const now = Date.now();
-            if (
-              now - lastScannedTimeRef.current > 1500 &&
-              currentItems.length > 0
-            ) {
-              lastScannedTimeRef.current = now;
-
-              const eanBarcode = currentItems.find(
-                (i) => i.format.includes('ean') || i.format.includes('upc')
-              );
-              const snBarcode = currentItems.find(
-                (i) =>
-                  i.format.includes('code_128') ||
-                  i.format.includes('data_matrix') ||
-                  i.format.includes('code_39')
-              );
+              const mappedCornerPoints = b.cornerPoints?.map((p) => ({
+                x: mapX(p.x),
+                y: p.y,
+              }));
 
               if (
-                eanBarcode &&
-                snBarcode &&
-                eanBarcode.rawValue !== snBarcode.rawValue
+                overlayCtx &&
+                mappedCornerPoints &&
+                mappedCornerPoints.length >= 4
               ) {
-                void handleResolveCode(
-                  eanBarcode.rawValue,
-                  snBarcode.rawValue
+                overlayCtx.beginPath();
+                overlayCtx.moveTo(
+                  mappedCornerPoints[0].x,
+                  mappedCornerPoints[0].y
                 );
-              } else {
-                void handleResolveCode(currentItems[0].rawValue);
+                overlayCtx.lineTo(
+                  mappedCornerPoints[1].x,
+                  mappedCornerPoints[1].y
+                );
+                overlayCtx.lineTo(
+                  mappedCornerPoints[2].x,
+                  mappedCornerPoints[2].y
+                );
+                overlayCtx.lineTo(
+                  mappedCornerPoints[3].x,
+                  mappedCornerPoints[3].y
+                );
+                overlayCtx.closePath();
+                overlayCtx.lineWidth = 4;
+                overlayCtx.strokeStyle = isFlippedMatch ? '#06b6d4' : '#10b981';
+                overlayCtx.stroke();
+
+                const labelX = Math.min(
+                  mappedCornerPoints[0].x,
+                  mappedCornerPoints[1].x,
+                  mappedCornerPoints[2].x,
+                  mappedCornerPoints[3].x
+                );
+                const labelY = Math.min(
+                  mappedCornerPoints[0].y,
+                  mappedCornerPoints[1].y,
+                  mappedCornerPoints[2].y,
+                  mappedCornerPoints[3].y
+                );
+                const tagText = `${formatBarcodeTypeLabel(b.format)}${
+                  isFlippedMatch ? ' (MIRRORED)' : ''
+                }`;
+
+                overlayCtx.fillStyle = isFlippedMatch ? '#0891b2' : '#059669';
+                overlayCtx.fillRect(
+                  labelX,
+                  Math.max(0, labelY - 24),
+                  tagText.length * 8 + 12,
+                  22
+                );
+                overlayCtx.fillStyle = '#ffffff';
+                overlayCtx.font = 'bold 11px Oswald, sans-serif';
+                overlayCtx.fillText(
+                  tagText,
+                  labelX + 6,
+                  Math.max(14, labelY - 8)
+                );
               }
-            }
-          } else {
-            if (overlayCtx && overlayCanvas) {
-              overlayCtx.clearRect(
-                0,
-                0,
-                overlayCanvas.width,
-                overlayCanvas.height
-              );
-            }
+
+              void stageAndResolveBarcode(raw, b.format || 'BARCODE');
+            });
+          } else if (overlayCtx && overlayCanvas) {
+            overlayCtx.clearRect(
+              0,
+              0,
+              overlayCanvas.width,
+              overlayCanvas.height
+            );
           }
         } catch {
-          // Frame error ignored
+          // Frame decode error ignored
         }
       }
 
@@ -719,35 +899,133 @@ export default function MobileBarcodeScannerModal({
     isOpen,
     activeMode,
     isRegistering,
+    cameraPaused,
     cameraActive,
-    handleResolveCode,
+    stageAndResolveBarcode,
   ]);
 
-  // Switch to Manual Add mode
-  const handleSwitchToManualAdd = () => {
+  // Derived: Pin INVENTORY_MATCH cards to top of the staging tray
+  const sortedStagedBarcodes = useMemo(() => {
+    const rank = (status: StagedBarcodeStatus) => {
+      if (status === 'INVENTORY_MATCH') return 0;
+      if (status === 'PUBLIC_MATCH') return 1;
+      if (status === 'CHECKING') return 2;
+      return 3;
+    };
+    return [...detectedBarcodes].sort((a, b) => {
+      const rDiff = rank(a.status) - rank(b.status);
+      if (rDiff !== 0) return rDiff;
+      return a.detectedAt - b.detectedAt;
+    });
+  }, [detectedBarcodes]);
+
+  const inventoryMatchEntries = useMemo(
+    () => sortedStagedBarcodes.filter((e) => e.status === 'INVENTORY_MATCH'),
+    [sortedStagedBarcodes]
+  );
+
+  const newBarcodeEntries = useMemo(
+    () => sortedStagedBarcodes.filter((e) => e.status !== 'INVENTORY_MATCH'),
+    [sortedStagedBarcodes]
+  );
+
+  // Smart Default Single-Barcode Selection (prefers 1D EAN/UPC/Code-128 over QR/URLs)
+  const effectiveSelectedNewBarcode = useMemo(() => {
+    if (newBarcodeEntries.length === 0) return null;
+    if (
+      selectedNewBarcode &&
+      newBarcodeEntries.some((e) => e.code === selectedNewBarcode)
+    ) {
+      return selectedNewBarcode;
+    }
+    const ranked = [...newBarcodeEntries].sort(
+      (a, b) => getNewBarcodePriorityScore(b) - getNewBarcodePriorityScore(a)
+    );
+    return ranked[0]?.code || null;
+  }, [newBarcodeEntries, selectedNewBarcode]);
+
+  const selectedNewEntry = useMemo(
+    () =>
+      newBarcodeEntries.find((e) => e.code === effectiveSelectedNewBarcode) ||
+      null,
+    [newBarcodeEntries, effectiveSelectedNewBarcode]
+  );
+
+  // Explicit "Add New Item" transition using strictly the ONE selected barcode
+  const handleProceedToAddNewItem = (targetEntry?: StagedBarcodeEntry | null) => {
+    const entry = targetEntry || selectedNewEntry;
+    if (!entry) return;
+
+    setCameraPaused(true);
+    setRegBarcode(entry.code);
+    setRegLegacyCode('');
+    setRegNameTr(entry.publicSuggestion?.name || '');
+    setRegNameEn(entry.publicSuggestion?.name || '');
+    setRegBrandModel(entry.publicSuggestion?.brand || '');
+    setRegSpec(entry.publicSuggestion?.specification || '');
+    setExternalSuggestionSource(entry.publicSuggestion?.source || null);
+    setRegAttributes({});
+    setRegRefPhoto(null);
+    setRegError(null);
+    setRegSuccessMessage(null);
+    setRegFormKey((k) => k + 1);
     setActiveMode('MANUAL_ADD');
     setIsRegistering(true);
-    setMatchedCatalogItem(null);
-    setMatchedAsset(null);
+  };
+
+  // Switch to blank Manual Add mode
+  const handleSwitchToManualAdd = () => {
+    setCameraPaused(true);
+    setActiveMode('MANUAL_ADD');
+    setIsRegistering(true);
     setRegError(null);
     setRegSuccessMessage(null);
   };
 
-  // Switch to Scan / Lookup mode
+  // Switch back to Scan / Lookup mode
   const handleSwitchToScanLookup = () => {
     setActiveMode('SCAN_LOOKUP');
     setIsRegistering(false);
+    setCameraPaused(false);
     setRegError(null);
   };
 
-  // Handle Manual Form Search
+  // Handle Manual Lookup Input -> stages into the tray (never auto-redirects)
   const handleManualSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualInput.trim()) return;
-    void handleResolveCode(manualInput.trim());
+    const clean = manualInput.trim();
+    if (!clean) return;
+    void stageAndResolveBarcode(clean, 'MANUAL');
+    setManualInput('');
   };
 
-  // Handle Submission of New Item Form via POST /api/depot/catalog
+  // Handle Optional Reference Photo Compression from Local Device Picker
+  const handleSelectReferencePhoto = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    source: MediaSourceType
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setRegPhotoSource(source);
+    setRegPhotoCompressing(true);
+    setRegError(null);
+
+    try {
+      const compressed = await compressImageToWebP(file, 1024, 0.78);
+      if (regRefPhoto?.previewUrl) {
+        URL.revokeObjectURL(regRefPhoto.previewUrl);
+      }
+      setRegRefPhoto(compressed);
+    } catch (err: unknown) {
+      setRegError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRegPhotoCompressing(false);
+    }
+  };
+
+  // Handle Submission of New Item Form via POST /api/depot/catalog (+ optional POST /api/depot/media)
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regNameTr.trim() || !regUnit.trim() || !regCategory.trim()) return;
@@ -819,10 +1097,44 @@ export default function MobileBarcodeScannerModal({
         return;
       }
 
-      const createdItem = data.item as InventoryCatalogItem;
-      const createdBalance = data.balance as DepotStockBalance;
+      let createdItem = data.item as InventoryCatalogItem;
+      let createdBalance = data.balance as DepotStockBalance;
       const createdTx = (data.transaction as DepotTransaction) || null;
       const createdAsset = (data.asset as AssetRegisterItem) || null;
+
+      // Milestone v2.9.0: Automatically upload optional Reference Photo right after item creation
+      if (regRefPhoto?.file && createdItem?.item_id) {
+        try {
+          const mediaFormData = new FormData();
+          mediaFormData.append('catalog_item_id', createdItem.item_id);
+          mediaFormData.append('source_type', regPhotoSource);
+          mediaFormData.append('set_primary', 'true');
+          mediaFormData.append('actor_role', currentRole);
+          mediaFormData.append('file', regRefPhoto.file);
+
+          const mediaRes = await fetch('/api/depot/media', {
+            method: 'POST',
+            body: mediaFormData,
+          });
+          if (mediaRes.ok) {
+            const mediaData = (await mediaRes.json()) as {
+              primary_image_url?: string | null;
+            };
+            if (mediaData.primary_image_url) {
+              createdItem = {
+                ...createdItem,
+                primary_image_url: mediaData.primary_image_url,
+              };
+              createdBalance = {
+                ...createdBalance,
+                catalog_item: createdItem,
+              };
+            }
+          }
+        } catch {
+          // Non-fatal if optional photo upload fails after item creation
+        }
+      }
 
       onItemRegistered?.(
         createdItem,
@@ -841,13 +1153,53 @@ export default function MobileBarcodeScannerModal({
 
       onShowToast?.(successTitle, successSub);
       setRegSuccessMessage(`${successTitle}: ${successSub}`);
-      setMatchedCatalogItem(createdItem);
-      if (createdAsset) setMatchedAsset(createdAsset);
-      setScannedCode(createdItem.barcode_ean || createdItem.legacy_code);
+
+      // Upgrade the registered barcode in the staging tray to INVENTORY_MATCH
+      const registeredCode = (
+        createdItem.barcode_ean ||
+        createdItem.legacy_code ||
+        ''
+      ).trim();
+      if (registeredCode) {
+        const key = registeredCode.toLowerCase();
+        seenCodesRef.current.add(key);
+        setDetectedBarcodes((prev) => {
+          const exists = prev.some((e) => e.code.toLowerCase() === key);
+          if (exists) {
+            return prev.map((e) =>
+              e.code.toLowerCase() === key
+                ? {
+                    ...e,
+                    status: 'INVENTORY_MATCH',
+                    inventoryItem: createdItem,
+                    inventoryAsset: createdAsset || undefined,
+                  }
+                : e
+            );
+          }
+          return [
+            {
+              code: registeredCode,
+              format: 'REGISTERED',
+              status: 'INVENTORY_MATCH',
+              inventoryItem: createdItem,
+              inventoryAsset: createdAsset || undefined,
+              detectedAt: Date.now(),
+            },
+            ...prev.slice(0, MAX_STAGED_BARCODES - 1),
+          ];
+        });
+      }
+
       setRegAttributes({});
+      if (regRefPhoto?.previewUrl) {
+        URL.revokeObjectURL(regRefPhoto.previewUrl);
+      }
+      setRegRefPhoto(null);
       setRegFormKey((k) => k + 1);
       setIsRegistering(false);
       setActiveMode('SCAN_LOOKUP');
+      setCameraPaused(false);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setRegError(msg);
@@ -857,17 +1209,6 @@ export default function MobileBarcodeScannerModal({
   };
 
   if (!isOpen) return null;
-
-  const matchedBalance = matchedCatalogItem
-    ? stockBalances.find(
-        (b) => b.catalog_item_id === matchedCatalogItem.item_id
-      )
-    : null;
-
-  const currentStockQty = matchedBalance ? matchedBalance.quantity_on_hand : 0;
-  const baseCost = matchedCatalogItem?.base_cost_eur || 0;
-  const markupPct = matchedCatalogItem?.commercial_markup_pct ?? 15;
-  const valuedCost = Number((baseCost * (1 + markupPct / 100)).toFixed(2));
 
   const dynamicCategories = Array.from(
     new Set([
@@ -884,12 +1225,12 @@ export default function MobileBarcodeScannerModal({
       : [{ project_id: 'PRJ-02', project_name: 'Caesar Resort & Spa' }];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in font-sans">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in font-sans">
       <div className="relative w-full max-w-2xl bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
-          <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+          <div className="flex items-center space-x-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
               <svg
                 className="w-5 h-5"
                 fill="none"
@@ -904,26 +1245,26 @@ export default function MobileBarcodeScannerModal({
                 />
               </svg>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center space-x-2">
-                <h2 className="text-base font-bold text-slate-900 dark:text-white uppercase tracking-wide">
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white uppercase tracking-wide truncate">
                   {d.title}
                 </h2>
                 {engineStatus === 'READY' && (
-                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1">
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800 flex items-center gap-1 shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     WASM Ready
                   </span>
                 )}
               </div>
-              <p className="text-[11px] font-light text-slate-500 dark:text-slate-400">
+              <p className="text-[11px] font-light text-slate-500 dark:text-slate-400 truncate">
                 {d.subtitle}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
             title={common.close}
           >
             <svg
@@ -943,7 +1284,7 @@ export default function MobileBarcodeScannerModal({
         </div>
 
         {/* Top Dual-Mode Switcher: Scan / Lookup vs Manual Add */}
-        <div className="px-5 pt-3 bg-white dark:bg-[#0f172a]">
+        <div className="px-4 sm:px-5 pt-3 bg-white dark:bg-[#0f172a]">
           <div className="grid grid-cols-2 rounded-xl bg-slate-100 dark:bg-slate-900 p-1 border border-slate-200 dark:border-slate-800">
             <button
               type="button"
@@ -972,38 +1313,71 @@ export default function MobileBarcodeScannerModal({
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
-          {/* Camera Viewport & Multi-Lens Switcher (Scan / Lookup mode) */}
+          {/* ========================================================= */}
+          {/* SCAN / LOOKUP VIEWPORT + SESSION CONTROLS                 */}
+          {/* ========================================================= */}
           {!isRegistering && activeMode === 'SCAN_LOOKUP' && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-light text-slate-500">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {videoDevices.length > 1
-                    ? d.cameraSelect
-                    : lang === 'tr'
-                    ? 'Kamera Aktif:'
-                    : 'Active Camera:'}
-                </span>
-                {videoDevices.length > 1 && (
-                  <select
-                    value={selectedDeviceId}
-                    onChange={(e) => handleCameraChange(e.target.value)}
-                    className="h-9 px-3 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-hidden cursor-pointer"
+            <div className="space-y-3">
+              {/* Camera Control Row: Selector + Pause/Resume + Clear Tray */}
+              <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {cameraPaused
+                      ? d.cameraPausedLabel
+                      : videoDevices.length > 1
+                      ? d.cameraSelect
+                      : lang === 'tr'
+                      ? 'Kamera Aktif'
+                      : 'Active Camera'}
+                  </span>
+                  {videoDevices.length > 1 && (
+                    <select
+                      value={selectedDeviceId}
+                      onChange={(e) => handleCameraChange(e.target.value)}
+                      className="h-9 px-3 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-hidden cursor-pointer"
+                    >
+                      {videoDevices.map((dev, idx) => (
+                        <option key={dev.deviceId || idx} value={dev.deviceId}>
+                          {dev.label ||
+                            (lang === 'tr'
+                              ? `Kamera ${idx + 1}`
+                              : `Camera ${idx + 1}`)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setCameraPaused((prev) => !prev)}
+                    className={`h-9 px-3 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                      cameraPaused
+                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
+                        : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
+                    }`}
                   >
-                    {videoDevices.map((dev, idx) => (
-                      <option key={dev.deviceId || idx} value={dev.deviceId}>
-                        {dev.label ||
-                          (lang === 'tr'
-                            ? `Kamera ${idx + 1}`
-                            : `Camera ${idx + 1}`)}
-                      </option>
-                    ))}
-                  </select>
-                )}
+                    {cameraPaused
+                      ? `▶ ${d.btnResumeCamera}`
+                      : `⏸ ${d.btnPauseCamera}`}
+                  </button>
+
+                  {detectedBarcodes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearTray}
+                      className="h-9 px-3 rounded-lg text-xs font-bold bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
+                    >
+                      {d.btnClearTray}
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Viewfinder Video Area with Live Overlay Canvas */}
+              {/* Viewfinder Video Area with Live Multi-Symbol Overlay Canvas */}
               <div
-                className={`relative rounded-xl overflow-hidden aspect-video bg-black flex items-center justify-center border-2 transition-all ${
+                className={`relative rounded-xl overflow-hidden aspect-[16/9] sm:aspect-video max-h-56 sm:max-h-64 bg-black flex items-center justify-center border-2 transition-all ${
                   scanFlash
                     ? 'border-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.6)]'
                     : 'border-slate-800'
@@ -1022,261 +1396,410 @@ export default function MobileBarcodeScannerModal({
                   className="absolute inset-0 w-full h-full pointer-events-none"
                 />
 
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                  <div className="w-4/5 h-3/5 border border-dashed border-amber-400/50 rounded-xl relative">
-                    <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_8px_#f59e0b] animate-bounce" />
-                    <div className="absolute -top-6 left-0 right-0 text-center">
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-amber-300 bg-slate-900/80 px-2 py-0.5 rounded-md">
-                        {d.alignHelp}
-                      </span>
+                {!cameraPaused && !cameraError && (
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="w-4/5 h-3/5 border border-dashed border-amber-400/50 rounded-xl relative">
+                      <div className="absolute left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_8px_#f59e0b] animate-bounce" />
+                      <div className="absolute -top-6 left-0 right-0 text-center">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-amber-300 bg-slate-900/80 px-2 py-0.5 rounded-md">
+                          {d.alignHelp}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {cameraError && (
+                {cameraPaused && (
+                  <div className="absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center p-4 text-center space-y-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                      ⏸ {d.cameraPausedLabel}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCameraPaused(false)}
+                      className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+                    >
+                      ▶ {d.btnResumeCamera}
+                    </button>
+                  </div>
+                )}
+
+                {cameraError && !cameraPaused && (
                   <div className="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-6 text-center">
                     <span className="text-rose-400 font-bold text-sm mb-1">
                       {cameraError}
                     </span>
-                    <p className="text-xs text-slate-400 max-w-sm">
+                    <p className="text-xs font-light text-slate-400 max-w-sm">
                       {d.cameraUnavailable}
                     </p>
                   </div>
                 )}
               </div>
 
-              {/* Detected Barcodes in Current Frame */}
-              {detectedBarcodes.length > 0 && (
-                <div className="bg-slate-100 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700/60 space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400">
-                    <span>{d.detectedInFrame}</span>
-                    <span className="font-mono text-emerald-600 dark:text-emerald-400">
-                      {detectedBarcodes.length}{' '}
-                      {lang === 'tr' ? 'Algılandı' : 'Detected'}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {detectedBarcodes.map((item, idx) => (
-                      <button
-                        key={`${item.rawValue}-${idx}`}
-                        type="button"
-                        onClick={() => void handleResolveCode(item.rawValue)}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all flex items-center space-x-1.5 cursor-pointer ${
-                          scannedCode === item.rawValue
-                            ? 'bg-blue-600 text-white border-blue-500 shadow-xs'
-                            : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:border-blue-400'
-                        }`}
-                      >
-                        <span className="text-[9px] opacity-70 uppercase font-sans font-normal">
-                          {item.format}
-                        </span>
-                        <span>{item.rawValue}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Manual Lookup Input / USB Barcode Scanner Field */}
-          {!isRegistering && activeMode === 'SCAN_LOOKUP' && (
-            <form onSubmit={handleManualSearch} className="flex gap-2">
-              <input
-                type="text"
-                value={manualInput}
-                onChange={(e) => setManualInput(e.target.value)}
-                placeholder={d.manualPlaceholder}
-                className="flex-1 h-10 px-3.5 py-2 rounded-xl text-xs font-light font-mono border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              />
-              <button
-                type="submit"
-                className="h-10 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
-              >
-                {d.btnSearch}
-              </button>
-            </form>
-          )}
-
-          {/* Success Banner if newly registered */}
-          {regSuccessMessage && (
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-xl flex items-center space-x-2 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
-              <svg
-                className="w-4 h-4 shrink-0 text-emerald-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M5 13l4 4L19 7"
+              {/* Manual Lookup Input / USB Barcode Scanner Field */}
+              <form onSubmit={handleManualSearch} className="flex gap-2">
+                <input
+                  type="text"
+                  value={manualInput}
+                  onChange={(e) => setManualInput(e.target.value)}
+                  placeholder={d.manualPlaceholder}
+                  className="flex-1 h-10 px-3.5 py-2 rounded-xl text-xs font-light font-mono border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 />
-              </svg>
-              <span>{regSuccessMessage}</span>
-            </div>
-          )}
+                <button
+                  type="submit"
+                  disabled={
+                    !manualInput.trim() ||
+                    detectedBarcodes.length >= MAX_STAGED_BARCODES
+                  }
+                  className="h-10 px-5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                >
+                  {d.btnSearch}
+                </button>
+              </form>
 
-          {/* Matched Item / Asset Card */}
-          {matchedCatalogItem && !isRegistering && (
-            <div className="bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/30 rounded-2xl p-4 sm:p-5 space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-                      {d.itemFound}
-                    </span>
-                    <span className="text-[10px] font-mono text-slate-400">
-                      [{scannedCode}]
-                    </span>
-                  </div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white mt-1">
-                    {lang === 'tr'
-                      ? matchedCatalogItem.item_name_tr
-                      : matchedCatalogItem.item_name_en ||
-                        matchedCatalogItem.item_name_tr}
-                  </h3>
-                  <p className="text-xs font-light text-slate-500 dark:text-slate-400">
-                    {matchedCatalogItem.specification}
-                  </p>
-                </div>
-
-                {matchedCatalogItem.packaging_unit_type === 'ATOMIC_SET' ? (
-                  <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
-                    {d.atomicSet} ({matchedCatalogItem.set_piece_count || 1}{' '}
-                    {d.pieceCount})
-                  </span>
-                ) : (
-                  <span className="px-2.5 py-1 rounded-lg text-xs font-light bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                    {d.singleItem}
-                  </span>
-                )}
-              </div>
-
-              {/* SKU & Price Breakdown */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-emerald-500/20">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">
-                    {d.sku}
-                  </span>
-                  <p className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
-                    {matchedCatalogItem.legacy_code}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">
-                    {d.stockOnHand}
-                  </span>
-                  <p className="text-xs font-light text-slate-900 dark:text-white">
-                    <span className="font-bold">{currentStockQty}</span>{' '}
-                    {matchedCatalogItem.unit_of_measure}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">
-                    {d.baseCost}
-                  </span>
-                  <p className="text-xs font-light text-slate-700 dark:text-slate-300">
-                    €
-                    {baseCost.toLocaleString('en-US', {
-                      minimumFractionDigits: 2,
-                    })}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">
-                    {d.valuedCost}
-                  </span>
-                  <p className="text-xs font-light text-emerald-600 dark:text-emerald-400">
-                    €
-                    {valuedCost.toLocaleString('en-US', {
-                      minimumFractionDigits: 2,
-                    })}
-                  </p>
-                </div>
-              </div>
-
-              {/* Matched Asset Details */}
-              {matchedAsset && (
-                <div className="bg-white/60 dark:bg-slate-900/60 rounded-xl p-3 border border-purple-300 dark:border-purple-900/50 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-purple-700 dark:text-purple-400">
-                      {lang === 'tr'
-                        ? 'Zimmetli Varlık Bilgisi:'
-                        : 'Custody Asset Info:'}
-                    </span>
-                    <span className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
-                      {matchedAsset.asset_tag}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">
-                        {d.serialNo}
-                      </span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-white">
-                        {matchedAsset.serial_number}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-400 block">
-                        {d.custody}
-                      </span>
-                      <span className="font-bold text-amber-600 dark:text-amber-400">
-                        {matchedAsset.custody_status}
-                      </span>
-                    </div>
-                  </div>
+              {/* Success Banner if newly registered */}
+              {regSuccessMessage && (
+                <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 rounded-xl flex items-center space-x-2 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
+                  <svg
+                    className="w-4 h-4 shrink-0 text-emerald-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  <span>{regSuccessMessage}</span>
                 </div>
               )}
 
-              {/* Action Buttons for Matched Item */}
-              <div className="flex flex-wrap gap-2 pt-2">
-                <button
-                  onClick={() => {
-                    onClose();
-                    onQuickAction?.(
-                      matchedCatalogItem,
-                      'INBOUND',
-                      matchedAsset || undefined
-                    );
-                  }}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
-                >
-                  {d.btnInbound}
-                </button>
-                <button
-                  onClick={() => {
-                    onClose();
-                    onQuickAction?.(
-                      matchedCatalogItem,
-                      'OUTBOUND',
-                      matchedAsset || undefined
-                    );
-                  }}
-                  className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
-                >
-                  {d.btnOutbound}
-                </button>
-                {matchedCatalogItem.is_trackable_asset && !matchedAsset && (
-                  <button
-                    onClick={() => {
-                      onClose();
-                      onQuickAction?.(matchedCatalogItem, 'REGISTER_ASSET');
-                    }}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
-                  >
-                    {d.btnRegisterAsset}
-                  </button>
+              {/* ========================================================= */}
+              {/* MILESTONE v2.9.1: MULTI-BARCODE SESSION STAGING TRAY      */}
+              {/* ========================================================= */}
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/50 p-3.5 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                      {d.trayTitle}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      {detectedBarcodes.length}/{MAX_STAGED_BARCODES}
+                    </span>
+                  </div>
+                  {detectedBarcodes.length >= MAX_STAGED_BARCODES && (
+                    <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                      {d.trayMaxReached}
+                    </span>
+                  )}
+                </div>
+
+                {/* Guardrail 1: Inventory Collision Warning when existing match + new codes coexist */}
+                {inventoryMatchEntries.length > 0 &&
+                  newBarcodeEntries.length > 0 && (
+                    <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-[11px] font-bold text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
+                      <span className="shrink-0">ℹ️</span>
+                      <span>{d.inventoryCollisionWarning}</span>
+                    </div>
+                  )}
+
+                {/* Guardrail 2: Single-Barcode Selection Banner when > 1 new barcode is staged */}
+                {newBarcodeEntries.length > 1 && (
+                  <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-[11px] font-bold text-amber-800 dark:text-amber-300 flex items-start gap-2">
+                    <span className="shrink-0">⚠️</span>
+                    <span>{d.multiBarcodeGuardrail}</span>
+                  </div>
+                )}
+
+                {sortedStagedBarcodes.length === 0 ? (
+                  <p className="text-xs font-light text-slate-400 text-center py-4">
+                    {d.trayEmptyHint}
+                  </p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {sortedStagedBarcodes.map((entry) => {
+                      // -------------------------------------------------------
+                      // CARD TYPE 1: EXISTING SUPABASE INVENTORY (EMERALD GREEN)
+                      // -------------------------------------------------------
+                      if (
+                        entry.status === 'INVENTORY_MATCH' &&
+                        entry.inventoryItem
+                      ) {
+                        const invItem = entry.inventoryItem;
+                        const matchedBal = stockBalances.find(
+                          (b) => b.catalog_item_id === invItem.item_id
+                        );
+                        const qty = matchedBal ? matchedBal.quantity_on_hand : 0;
+
+                        return (
+                          <div
+                            key={entry.code}
+                            className="rounded-xl border-2 border-emerald-500/50 bg-emerald-50/70 dark:bg-emerald-950/30 p-3 space-y-2.5 shadow-2xs"
+                          >
+                            <div className="flex items-start justify-between gap-2.5">
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                {invItem.primary_image_url ? (
+                                  <img
+                                    src={invItem.primary_image_url}
+                                    alt={invItem.item_name_tr}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="w-11 h-11 rounded-lg object-cover shrink-0 border border-emerald-500/30 bg-white dark:bg-slate-900"
+                                  />
+                                ) : (
+                                  <div className="w-11 h-11 rounded-lg shrink-0 border border-emerald-500/30 bg-emerald-100/70 dark:bg-emerald-900/40 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
+                                    <svg
+                                      className="w-5 h-5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M5 13l4 4L19 7"
+                                      />
+                                    </svg>
+                                  </div>
+                                )}
+
+                                <div className="min-w-0">
+                                  <div className="flex items-center flex-wrap gap-1.5">
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-600 text-white">
+                                      ✓ {d.badgeInventoryMatch}
+                                    </span>
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-white/80 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                      {formatBarcodeTypeLabel(entry.format)}
+                                    </span>
+                                    <span className="text-[11px] font-mono font-bold text-emerald-800 dark:text-emerald-300 break-all">
+                                      {entry.code}
+                                    </span>
+                                  </div>
+                                  <h4 className="text-sm font-bold text-slate-900 dark:text-white mt-1 leading-snug">
+                                    {lang === 'tr'
+                                      ? invItem.item_name_tr
+                                      : invItem.item_name_en ||
+                                        invItem.item_name_tr}
+                                  </h4>
+                                  <div className="flex items-center flex-wrap gap-x-3 gap-y-0.5 text-[11px] font-light text-slate-600 dark:text-slate-300 mt-0.5">
+                                    <span className="font-mono font-bold">
+                                      {invItem.legacy_code || 'SKU'}
+                                    </span>
+                                    <span>
+                                      {d.stockOnHand}:{' '}
+                                      <strong className="font-bold text-slate-900 dark:text-white">
+                                        {qty}
+                                      </strong>{' '}
+                                      {invItem.unit_of_measure}
+                                    </span>
+                                    {entry.inventoryAsset && (
+                                      <span className="font-mono text-purple-700 dark:text-purple-300 font-bold">
+                                        S/N: {entry.inventoryAsset.serial_number}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Primary Action: View Item (+ Quick Inbound/Outbound) */}
+                            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-emerald-500/20">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (onViewExistingItem) {
+                                    onViewExistingItem(invItem);
+                                  } else {
+                                    onClose();
+                                  }
+                                }}
+                                className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+                              >
+                                {d.btnViewItem}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onClose();
+                                  onQuickAction?.(
+                                    invItem,
+                                    'INBOUND',
+                                    entry.inventoryAsset
+                                  );
+                                }}
+                                className="h-9 px-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-slate-800 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                {d.btnInbound}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onClose();
+                                  onQuickAction?.(
+                                    invItem,
+                                    'OUTBOUND',
+                                    entry.inventoryAsset
+                                  );
+                                }}
+                                className="h-9 px-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-amber-50 dark:hover:bg-slate-800 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 text-xs font-bold transition-colors cursor-pointer"
+                              >
+                                {d.btnOutbound}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // -------------------------------------------------------
+                      // CARD TYPE 2 & 3: NEW BARCODE (PUBLIC_MATCH / UNLISTED / CHECKING)
+                      // -------------------------------------------------------
+                      const isSelected =
+                        effectiveSelectedNewBarcode === entry.code;
+                      const isPublicMatch = entry.status === 'PUBLIC_MATCH';
+                      const isChecking = entry.status === 'CHECKING';
+
+                      const cardStyle = isPublicMatch
+                        ? isSelected
+                          ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/35 ring-1 ring-blue-500/40'
+                          : 'border-blue-300/70 dark:border-blue-800/70 bg-blue-50/30 dark:bg-blue-950/20 hover:border-blue-400'
+                        : isSelected
+                        ? 'border-amber-500 bg-amber-50/60 dark:bg-amber-950/30 ring-1 ring-amber-500/30'
+                        : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/70 hover:border-amber-400';
+
+                      return (
+                        <div
+                          key={entry.code}
+                          onClick={() => setSelectedNewBarcode(entry.code)}
+                          role="radio"
+                          aria-checked={isSelected}
+                          tabIndex={0}
+                          onKeyDown={(ev) => {
+                            if (ev.key === 'Enter' || ev.key === ' ') {
+                              ev.preventDefault();
+                              setSelectedNewBarcode(entry.code);
+                            }
+                          }}
+                          className={`rounded-xl border-2 p-3 transition-all cursor-pointer ${cardStyle}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            {/* Single-Barcode Radio Selection Ring */}
+                            <div className="pt-0.5 shrink-0">
+                              <div
+                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                  isSelected
+                                    ? isPublicMatch
+                                      ? 'border-blue-600 bg-blue-600'
+                                      : 'border-amber-600 bg-amber-600'
+                                    : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900'
+                                }`}
+                              >
+                                {isSelected && (
+                                  <span className="w-2 h-2 rounded-full bg-white" />
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <div className="flex items-center flex-wrap gap-1.5">
+                                {isChecking ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 animate-pulse">
+                                    {d.badgeChecking}
+                                  </span>
+                                ) : isPublicMatch ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-600 text-white">
+                                    ✨ {d.badgePublicMatch}
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                    {d.badgeUnlisted}
+                                  </span>
+                                )}
+
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-white/80 dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                  {formatBarcodeTypeLabel(entry.format)}
+                                </span>
+
+                                {isSelected && newBarcodeEntries.length > 1 && (
+                                  <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                                    • {d.selectedForNewItem}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="text-xs font-mono font-bold text-slate-900 dark:text-white break-all">
+                                {entry.code}
+                              </div>
+
+                              {isPublicMatch && entry.publicSuggestion && (
+                                <div className="text-xs space-y-0.5">
+                                  {entry.publicSuggestion.name && (
+                                    <p className="font-bold text-blue-900 dark:text-blue-200">
+                                      {entry.publicSuggestion.name}
+                                    </p>
+                                  )}
+                                  {(entry.publicSuggestion.brand ||
+                                    entry.publicSuggestion.source) && (
+                                    <p className="text-[11px] font-light text-slate-600 dark:text-slate-400">
+                                      {entry.publicSuggestion.brand
+                                        ? `${entry.publicSuggestion.brand}`
+                                        : ''}
+                                      {entry.publicSuggestion.brand &&
+                                      entry.publicSuggestion.source
+                                        ? ' • '
+                                        : ''}
+                                      {entry.publicSuggestion.source || ''}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+
+                              {!isChecking && !isPublicMatch && (
+                                <p className="text-[11px] font-light text-slate-600 dark:text-slate-400">
+                                  {entry.skippedExternalReason ===
+                                  'URL_OR_NON_GTIN'
+                                    ? d.urlSkippedText
+                                    : d.unlistedConfirmText}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Explicit "Add New Item" Action Button for the Single Selected New Barcode */}
+                {selectedNewEntry && (
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="text-[11px] font-light text-slate-500 dark:text-slate-400 truncate">
+                      {lang === 'tr' ? 'Atanacak ID:' : 'Assigned ID:'}{' '}
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                        {selectedNewEntry.code}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={selectedNewEntry.status === 'CHECKING'}
+                      onClick={() =>
+                        handleProceedToAddNewItem(selectedNewEntry)
+                      }
+                      className="h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                    >
+                      + {d.btnAddNewItem}
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
           )}
 
           {/* ================================================= */}
-          {/* MANUAL / NEW ITEM REGISTRATION FORM */}
+          {/* MANUAL / NEW ITEM REGISTRATION FORM               */}
           {/* ================================================= */}
           {isRegistering && (
             <form
@@ -1285,7 +1808,7 @@ export default function MobileBarcodeScannerModal({
             >
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
                 <div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center flex-wrap gap-2">
                     <h4 className="text-sm font-bold text-blue-600 dark:text-blue-400 uppercase">
                       {d.formTitle}
                     </h4>
@@ -1301,15 +1824,15 @@ export default function MobileBarcodeScannerModal({
                     )}
                   </div>
                   {regBarcode && (
-                    <p className="text-[11px] font-mono font-light text-slate-400 mt-0.5">
-                      EAN: <span className="font-bold">{regBarcode}</span>
+                    <p className="text-[11px] font-mono font-light text-slate-400 mt-0.5 break-all">
+                      ID / EAN: <span className="font-bold">{regBarcode}</span>
                     </p>
                   )}
                 </div>
                 <button
                   type="button"
                   onClick={handleSwitchToScanLookup}
-                  className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                  className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer shrink-0 ml-2"
                 >
                   ✕ {common.cancel}
                 </button>
@@ -1320,6 +1843,134 @@ export default function MobileBarcodeScannerModal({
                   {regError}
                 </div>
               )}
+
+              {/* ========================================================= */}
+              {/* MILESTONE v2.9.3: TOP-MOUNTED REFERENCE PHOTO HERO CARD   */}
+              {/* Left: w-28 h-28 md:w-32 md:h-32 rounded-2xl frame         */}
+              {/* Right: Separate h-10 Take Photo (Live Camera) vs Upload   */}
+              {/* ========================================================= */}
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 p-4 flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                <input
+                  ref={regDevicePhotoInputRef}
+                  type="file"
+                  accept="image/webp,image/jpeg,image/png,image/*"
+                  onChange={(e) => void handleSelectReferencePhoto(e, 'LOCAL')}
+                  className="hidden"
+                />
+
+                {/* Left: Large 112x112px (mobile) / 128x128px (desktop) Square Preview Frame */}
+                <div
+                  onClick={() => {
+                    if (!regRefPhoto) {
+                      setIsRefWebcamOpen(true);
+                    }
+                  }}
+                  className="relative w-28 h-28 md:w-32 md:h-32 rounded-2xl shrink-0 border-2 border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 overflow-hidden flex flex-col items-center justify-center text-center cursor-pointer hover:border-blue-400 transition-colors"
+                >
+                  {regRefPhoto ? (
+                    <>
+                      <img
+                        src={regRefPhoto.previewUrl}
+                        alt="Reference preview"
+                        className="w-full h-full object-cover"
+                      />
+                      <span className="absolute bottom-1.5 inset-x-1.5 px-1.5 py-0.5 rounded-md bg-slate-950/85 text-emerald-400 text-[9px] font-mono font-bold truncate">
+                        {formatBytesLabel(regRefPhoto.sizeBytes)} •{' '}
+                        {regRefPhoto.formatLabel}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <svg
+                        className="w-8 h-8 text-slate-400 dark:text-slate-500 mb-1"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.6"
+                          d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth="1.6"
+                          d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 px-2">
+                        {tm.noPhotoPlaceholder}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {/* Right: Title, Helper Subtext & Distinct h-10 Take Photo / Upload Image Controls */}
+                <div className="flex-1 min-w-0 flex flex-col justify-between space-y-3 text-center sm:text-left w-full">
+                  <div>
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 block">
+                      {d.lblRefPhoto}
+                    </span>
+                    <p className="text-[11px] font-light text-slate-500 dark:text-slate-400 mt-0.5">
+                      {tm.dropzoneSub}
+                    </p>
+                    {regRefPhoto && (
+                      <p className="text-[11px] font-mono font-bold text-emerald-600 dark:text-emerald-400 mt-1 truncate">
+                        ✓ {regRefPhoto.file.name} ({regRefPhoto.width}×
+                        {regRefPhoto.height})
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <button
+                      type="button"
+                      disabled={regPhotoCompressing}
+                      onClick={() => {
+                        setRegPhotoSource('CAMERA');
+                        setIsRefWebcamOpen(true);
+                      }}
+                      className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center space-x-1.5 shadow-2xs transition-colors cursor-pointer"
+                    >
+                      <span>
+                        📷{' '}
+                        {regRefPhoto ? tc.retakePhoto : tc.takePhoto}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={regPhotoCompressing}
+                      onClick={() => regDevicePhotoInputRef.current?.click()}
+                      className="h-10 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer"
+                    >
+                      <span>
+                        📁{' '}
+                        {regPhotoCompressing
+                          ? tm.compressing
+                          : tc.uploadImage}
+                      </span>
+                    </button>
+
+                    {regRefPhoto && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (regRefPhoto.previewUrl) {
+                            URL.revokeObjectURL(regRefPhoto.previewUrl);
+                          }
+                          setRegRefPhoto(null);
+                        }}
+                        className="h-10 px-3.5 rounded-xl bg-rose-100 dark:bg-rose-950/60 hover:bg-rose-200 text-rose-700 dark:text-rose-300 text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        {d.btnRemovePhoto}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {/* Primary Classification Filters (Required) */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-white/70 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200 dark:border-slate-800">
@@ -1378,6 +2029,50 @@ export default function MobileBarcodeScannerModal({
 
               {/* Core & Extended Fields Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {/* Single Assigned Barcode / EAN & Optional Reference SKU */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[10px] font-bold uppercase text-slate-500">
+                      {d.lblBarcode}
+                    </label>
+                    {isEligibleForExternalLookup(regBarcode) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void triggerManualExternalLookup(regBarcode.trim())
+                        }
+                        className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                      >
+                        {lang === 'tr' ? 'Rehberden Doldur' : 'Auto-Fill'}
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    value={regBarcode}
+                    onChange={(e) => setRegBarcode(e.target.value)}
+                    placeholder={
+                      lang === 'tr'
+                        ? 'Boş bırakılırsa otomatik üretilir'
+                        : 'Auto-generated if left blank'
+                    }
+                    className={`${CONTROL_CLASS} font-mono`}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                    {d.lblLegacyCode}
+                  </label>
+                  <input
+                    type="text"
+                    value={regLegacyCode}
+                    onChange={(e) => setRegLegacyCode(e.target.value)}
+                    placeholder="MAT-XXXX / WH-XXXX"
+                    className={`${CONTROL_CLASS} font-mono`}
+                  />
+                </div>
+
                 {/* Item Name (Required) & English Name */}
                 <div>
                   <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
@@ -1434,50 +2129,6 @@ export default function MobileBarcodeScannerModal({
                     onChange={(e) => setRegSubcategory(e.target.value)}
                     placeholder={d.placeholderSubcategory}
                     className={CONTROL_CLASS}
-                  />
-                </div>
-
-                {/* Optional Barcode / EAN & Optional Reference SKU */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-[10px] font-bold uppercase text-slate-500">
-                      {d.lblBarcode}
-                    </label>
-                    {regBarcode.trim().length >= 6 && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          void triggerExternalLookup(regBarcode.trim())
-                        }
-                        className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-                      >
-                        {lang === 'tr' ? 'Rehberden Doldur' : 'Auto-Fill'}
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={regBarcode}
-                    onChange={(e) => setRegBarcode(e.target.value)}
-                    placeholder={
-                      lang === 'tr'
-                        ? 'Boş bırakılırsa otomatik üretilir'
-                        : 'Auto-generated if left blank'
-                    }
-                    className={`${CONTROL_CLASS} font-mono`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
-                    {d.lblLegacyCode}
-                  </label>
-                  <input
-                    type="text"
-                    value={regLegacyCode}
-                    onChange={(e) => setRegLegacyCode(e.target.value)}
-                    placeholder="MAT-XXXX / WH-XXXX"
-                    className={`${CONTROL_CLASS} font-mono`}
                   />
                 </div>
 
@@ -1728,7 +2379,7 @@ export default function MobileBarcodeScannerModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
+        <div className="px-4 sm:px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
           <div className="text-[10px] font-mono font-bold text-slate-400">
             {activeDepotId}
           </div>
@@ -1740,6 +2391,21 @@ export default function MobileBarcodeScannerModal({
           </button>
         </div>
       </div>
+
+      {/* Cross-Device getUserMedia Live Camera Viewfinder for Reference Photo */}
+      <WebcamCaptureModal
+        isOpen={isRefWebcamOpen}
+        onClose={() => setIsRefWebcamOpen(false)}
+        lang={lang}
+        onCaptured={(capturedResult) => {
+          if (regRefPhoto?.previewUrl) {
+            URL.revokeObjectURL(regRefPhoto.previewUrl);
+          }
+          setRegPhotoSource('CAMERA');
+          setRegError(null);
+          setRegRefPhoto(capturedResult);
+        }}
+      />
     </div>
   );
 }

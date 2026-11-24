@@ -50,8 +50,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const normalizedUsers = (users || []).map((u) => ({
+      ...u,
+      avatar_url: (u as { avatar_url?: string | null }).avatar_url ?? null,
+    }));
+
     return NextResponse.json({
-      users: users || [],
+      users: normalizedUsers,
       invitations: invites || [],
       effectiveRole,
       isFailsafeActive: Boolean(session?.isFailsafe),

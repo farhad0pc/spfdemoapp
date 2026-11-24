@@ -102,6 +102,8 @@ export async function POST(request: NextRequest) {
       }
 
       const fullName = userProfile?.full_name || 'System Administrator';
+      const avatarUrl =
+        (userProfile?.avatar_url as string | null | undefined) || null;
       const sessionToken = signAuthSession({
         email: cleanEmail,
         role: 'SYSTEM_ADMIN',
@@ -116,6 +118,7 @@ export async function POST(request: NextRequest) {
         email: cleanEmail,
         role: 'SYSTEM_ADMIN' as RoleTier,
         full_name: fullName,
+        avatar_url: avatarUrl,
       });
 
       setSessionCookies(response, sessionToken, true);
@@ -147,7 +150,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 3. Hydrate User Role from public.corporate_users
+    // 3. Hydrate User Role & Avatar from public.corporate_users
     const { data: profile } = await supabaseAdmin
       .from('corporate_users')
       .select('*')
@@ -174,6 +177,8 @@ export async function POST(request: NextRequest) {
     const hydratedRole: RoleTier =
       (profile?.role as RoleTier) || 'TECH_OFFICE_USER';
     const fullName = profile?.full_name || cleanEmail;
+    const avatarUrl =
+      (profile?.avatar_url as string | null | undefined) || null;
 
     const sessionToken = signAuthSession({
       email: cleanEmail,
@@ -189,6 +194,7 @@ export async function POST(request: NextRequest) {
       email: cleanEmail,
       role: hydratedRole,
       full_name: fullName,
+      avatar_url: avatarUrl,
       session: {
         access_token: authData.session.access_token,
         refresh_token: authData.session.refresh_token,
@@ -212,23 +218,26 @@ export async function GET(request: NextRequest) {
 
     let role: RoleTier = session.role;
     let fullName = session.fullName || session.email;
+    let avatarUrl: string | null = null;
 
-    if (!session.isFailsafe) {
-      const { data: profile } = await supabaseAdmin
-        .from('corporate_users')
-        .select('role, full_name, account_status')
-        .eq('email', session.email)
-        .maybeSingle();
+    const { data: profile } = await supabaseAdmin
+      .from('corporate_users')
+      .select('*')
+      .eq('email', session.email)
+      .maybeSingle();
 
-      if (profile?.account_status === 'SUSPENDED') {
-        return NextResponse.json({ authenticated: false }, { status: 403 });
-      }
-      if (profile?.role) {
-        role = profile.role as RoleTier;
-      }
-      if (profile?.full_name) {
-        fullName = profile.full_name;
-      }
+    if (!session.isFailsafe && profile?.account_status === 'SUSPENDED') {
+      return NextResponse.json({ authenticated: false }, { status: 403 });
+    }
+
+    if (!session.isFailsafe && profile?.role) {
+      role = profile.role as RoleTier;
+    }
+    if (profile?.full_name) {
+      fullName = profile.full_name;
+    }
+    if (profile?.avatar_url) {
+      avatarUrl = String(profile.avatar_url);
     }
 
     return NextResponse.json({
@@ -236,6 +245,7 @@ export async function GET(request: NextRequest) {
       email: session.email,
       role,
       full_name: fullName,
+      avatar_url: avatarUrl,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

@@ -199,7 +199,7 @@ export default function DesktopSidebar({
                 </div>
               </button>
 
-              {/* Module 3: Personel & Yetki Matrisi */}
+              {/* Module 3: Personel & Yetki Matrisi (NEW badge removed per Milestone v2.9.4) */}
               {hasAccessPersonnel && (
                 <button
                   onClick={() => onSelectView('USER_MANAGEMENT')}
@@ -228,11 +228,6 @@ export default function DesktopSidebar({
                       <span className="truncate">{t.personnel}</span>
                     )}
                   </div>
-                  {!isCollapsed && (
-                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full tracking-wider uppercase bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800 shrink-0">
-                      {t.badgeNew}
-                    </span>
-                  )}
                 </button>
               )}
             </div>

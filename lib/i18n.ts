@@ -46,7 +46,7 @@ export const DICTIONARY = {
     },
     sidebar: {
       brand: 'CAESAR OPERATIONS',
-      version: 'v2.8.1',
+      version: 'v2.9.4',
       subLedger: 'Dahili Operasyonlar',
       activeSection: 'Aktif Modüller',
       groupPurchasing: 'Satın Alma & Sipariş',
@@ -57,6 +57,48 @@ export const DICTIONARY = {
       badgeNew: 'YENİ',
       collapse: 'Menüyü Daralt',
       expand: 'Genişlet',
+    },
+    launcher: {
+      title: 'CAESAR OPERATIONS',
+      selectModulePrompt: 'Giriş yapmak istediğiniz operasyon modülünü seçin',
+      soon: 'YAKINDA',
+      changeModule: '← Modül Değiştir',
+      targetWorkspace: 'Hedef Çalışma Alanı:',
+      accessDeniedTitle: 'Erişim Reddedildi',
+      accessDeniedBody:
+        'Kimliği doğrulanmış hesabınızın seçilen modüle erişim yetkisi bulunmamaktadır. Bu modül daha yüksek yetki kademesi gerektirmektedir.',
+      authenticatedAsLabel: 'Oturum Açan Rol & Kademe:',
+      requestedModuleLabel: 'Talep Edilen Modül:',
+      authorizedModulesLabel: 'Yetkiniz Dahilindeki Aktif Modüller:',
+      openAuthorizedModule: 'Modülü Aç →',
+      modules: {
+        purchasing: 'Satın Alma ve Siparişler',
+        depot: 'Depo ve Stok Yönetimi',
+        users: 'Personel ve Yetki Yönetimi',
+        portfolio: 'Portföy ve Lokasyonlar',
+        catalog: 'Ana Katalog Yönetimi',
+        dossiers: 'Yönetici Raporları',
+        devtools: 'Veritabanı ve Geliştirici Araçları',
+      },
+    },
+    camera: {
+      modalTitle: 'Canlı Kamera Vizörü',
+      modalSubtitle: 'Otomatik 1024px WebP Sıkıştırma • Cihaz Kamerası',
+      takePhoto: 'Fotoğraf Çek',
+      uploadImage: 'Görsel Yükle',
+      captureShutter: 'Fotoğraf Çek',
+      switchCamera: 'Kamerayı Değiştir',
+      retakePhoto: 'Yeniden Çek',
+      cameraFallback: 'Dosya Seçici ile Yükle',
+      cameraDenied:
+        'Kamera donanımına erişilemedi veya izin reddedildi. Aşağıdaki düğme ile cihazınızdan görsel seçebilirsiniz.',
+      initializingCamera: 'Kamera başlatılıyor...',
+    },
+    fab: {
+      switchToEnglish: 'İngilizce Diline Geç (EN)',
+      switchToTurkish: 'Türkçe Diline Geç (TR)',
+      switchToDark: 'Koyu Temaya Geç',
+      switchToLight: 'Açık Temaya Geç',
     },
     depot: {
       title: 'DEPO YÖNETİMİ',
@@ -73,6 +115,9 @@ export const DICTIONARY = {
       // Filter Popover
       filtersButton: 'Filtreler',
       filtersTitle: 'Filtreler',
+      exportCsv: 'CSV Dışa Aktar',
+      exportCsvTooltip: 'Filtrelenmiş tüm verileri CSV olarak indir',
+      complianceOk: 'Tamam',
       filterProject: 'Proje / Konum',
       filterDepot: 'Depo / Ürün Alanı',
       filterCategory: 'Malzeme Kategorisi',
@@ -177,7 +222,7 @@ export const DICTIONARY = {
     },
     scanner: {
       title: 'Depo Barkod Tarayıcı & Manuel Kayıt',
-      subtitle: 'ZXing WebAssembly Motoru • Canlı Katalog Sorgu & Yeni Malzeme Kaydı',
+      subtitle: 'ZXing WebAssembly Motoru • Çoklu Barkod Tepsisi & Envanter Öncelikli Sorgu',
       tabScanLookup: 'Tara / Ara',
       tabManualAdd: 'Manuel Ekle',
       cameraSelect: 'Kamera Seç:',
@@ -204,6 +249,32 @@ export const DICTIONARY = {
       btnInbound: '+ Malzeme Girişi Yap',
       btnOutbound: '+ Şantiyeye Çıkış Yap',
       btnRegisterAsset: '+ Seri No Kaydı Aç',
+
+      // Milestone v2.9.1 Multi-Barcode Staging Tray & Guardrails
+      trayTitle: 'Algılanan Barkodlar',
+      btnPauseCamera: 'Kamerayı Duraklat',
+      btnResumeCamera: 'Devam Et',
+      btnClearTray: 'Listeyi Temizle',
+      cameraPausedLabel: 'Kamera Duraklatıldı',
+      badgeInventoryMatch: 'Envanterde Bulundu',
+      badgePublicMatch: 'Yeni Ürün · Dış Kaynak Eşleşmesi',
+      badgeUnlisted: 'Yeni Ürün · Kayıtsız Barkod',
+      badgeChecking: 'Sorgulanıyor...',
+      unlistedConfirmText:
+        'Barkod algılandı — mevcut envanterde veya genel dizinde bulunamadı',
+      urlSkippedText:
+        'URL veya GTIN dışı metin algılandı — harici barkod rehberi sorgusu atlandı',
+      multiBarcodeGuardrail:
+        'Birden fazla barkod algılandı — bu ürünün benzersiz kimliği olarak atanacak 1 barkodu seçin',
+      inventoryCollisionWarning:
+        'Bu ambalaj mevcut bir envanter ürünüyle eşleşiyor. Tekrar kayıt oluşturmadan önce mevcut ürünü görüntüleyin.',
+      btnViewItem: 'Ürünü Görüntüle',
+      btnAddNewItem: 'Yeni Ürün Ekle',
+      trayMaxReached:
+        'Oturum tepsisi dolu (5/5) — yeni barkod taramak için listeyi temizleyin',
+      trayEmptyHint:
+        'Kamerayı ambalaj üzerindeki barkodlara doğrultun veya yukarıdan manuel kod sorgulayın (en fazla 5 benzersiz barkod).',
+      selectedForNewItem: 'Yeni kayıt için seçildi',
 
       // Unregistered Item Prompt
       unregisteredTitle: 'Kayıtsız Barkod Algılandı',
@@ -239,6 +310,11 @@ export const DICTIONARY = {
       lblAttributes: 'Boyutsal / Ek Nitelikler',
       lblInitialQty: 'Başlangıç Depo Giriş Miktarı',
       lblIrsaliye: 'İrsaliye Numarası (Opsiyonel)',
+      lblRefPhoto: 'Referans Fotoğraf (Opsiyonel • Otomatik WebP Sıkıştırma)',
+      btnTakePhoto: 'Fotoğraf Çek',
+      btnUploadFile: 'Görsel Yükle',
+      btnReplacePhoto: 'Değiştir',
+      btnRemovePhoto: 'Kaldır',
       btnSaveAndIntake: 'Kataloğa Kaydet & Depoyu Güncelle',
       placeholderSubcategory: 'Örn: Isı Pompası / Seramik',
       placeholderSpec: 'Örn: R32 Inverter, 14kW, Teknik standart ve boyutlar',
@@ -267,6 +343,34 @@ export const DICTIONARY = {
         'Henüz özel nitelik eklenmedi. Yukarıdaki hazır etiketlerden seçin veya "+ Özellik Ekle" düğmesine tıklayın.',
       emptyReadOnly: 'Kayıtlı ek nitelik bulunmuyor.',
       btnRemove: 'Satırı Kaldır',
+    },
+    media: {
+      albumTitle: 'Albüm',
+      addPhoto: 'Fotoğraf Ekle',
+      takePhoto: 'Fotoğraf Çek',
+      uploadFromDevice: 'Görsel Yükle',
+      googleDrive: 'Google Drive',
+      setPrimary: 'Ana Görsel Yap',
+      primaryBadge: 'Ana Görsel',
+      confirmAndSave: 'Onayla ve Kaydet',
+      replacePhoto: 'Değiştir',
+      deletePhoto: 'Fotoğrafı Sil',
+      maxPhotosLimit: 'Maksimum 5 fotoğraf',
+      noPhotoPlaceholder: 'Fotoğraf Yok',
+      compressing: 'WebP Sıkıştırılıyor...',
+      uploading: 'Yükleniyor...',
+      dropzoneTitle: 'Görseli buraya sürükleyin veya cihazdan seçin',
+      dropzoneSub: 'Otomatik 1024px WebP sıkıştırma (~50–80 KB)',
+      cameraHelpTitle: 'Canlı kamera vizörünü açarak malzeme fotoğrafı çekin',
+      cameraHelpSub: 'Masaüstü ve mobil cihazlarda canlı kamera vizörü açılır',
+      driveInputLabel: 'Google Drive Paylaşım Bağlantısı',
+      driveInputPlaceholder: 'https://drive.google.com/file/d/.../view?usp=sharing',
+      driveHelperHint: 'Google Drive paylaşım bağlantısını yapıştırın (Bağlantıya sahip olan herkes)',
+      btnValidateDrive: 'Önizlemeyi Yükle',
+      btnGooglePicker: 'Google Drive Seçiciyi Aç',
+      setAsPrimaryCheckbox: 'Bu fotoğrafı ana katalog görseli olarak ayarla',
+      zoomHint: 'Büyütmek için tıklayın',
+      deleteConfirmPrompt: 'Bu fotoğrafı albümden kalıcı olarak silmek istediğinize emin misiniz?',
     },
     itemDetails: {
       modalTitle: 'Malzeme Detay & Veritabanı Kütüğü',
@@ -376,6 +480,18 @@ export const DICTIONARY = {
       btnCopy: 'Linki Kopyala',
       copySuccess: 'Bağlantı Panoya Kopyalandı!',
 
+      // Milestone v2.9.4 Profile Avatar Management (Tier 0-1)
+      profilePhoto: 'Profil Fotoğrafı',
+      updateProfilePhoto: 'Fotoğrafı Güncelle',
+      savePhoto: 'Fotoğrafı Kaydet',
+      removePhoto: 'Fotoğrafı Kaldır',
+      uploadFromDevice: 'Cihazdan Yükle',
+      takePhoto: 'Fotoğraf Çek',
+      uploadImage: 'Görsel Yükle',
+      avatarUpdated: 'Profil fotoğrafı güncellendi.',
+      avatarRemoved: 'Profil fotoğrafı kaldırıldı.',
+      avatarModalDesc: 'Otomatik 256×256px WebP sıkıştırma (~10–25 KB) • Kademe 0–1 Yetkisi',
+
       // Modals
       modalInviteTitle: 'Yeni Ekip Üyesi Daveti Oluştur',
       lblDelegator: 'Delegatör:',
@@ -480,7 +596,7 @@ export const DICTIONARY = {
     },
     sidebar: {
       brand: 'CAESAR OPERATIONS',
-      version: 'v2.8.1',
+      version: 'v2.9.4',
       subLedger: 'Internal Operations',
       activeSection: 'Active Modules',
       groupPurchasing: 'Purchasing & Orders',
@@ -491,6 +607,48 @@ export const DICTIONARY = {
       badgeNew: 'NEW',
       collapse: 'Collapse Sidebar',
       expand: 'Expand Sidebar',
+    },
+    launcher: {
+      title: 'CAESAR OPERATIONS',
+      selectModulePrompt: 'Select an operational workspace module to sign in',
+      soon: 'SOON',
+      changeModule: '← Change Module',
+      targetWorkspace: 'Target Workspace:',
+      accessDeniedTitle: 'Access Denied',
+      accessDeniedBody:
+        'Your authenticated account does not have clearance for the requested module. Higher role tier authority is required.',
+      authenticatedAsLabel: 'Authenticated Role & Tier:',
+      requestedModuleLabel: 'Requested Module:',
+      authorizedModulesLabel: 'Authorized Active Modules for Your Clearance:',
+      openAuthorizedModule: 'Open Module →',
+      modules: {
+        purchasing: 'Purchasing & Orders',
+        depot: 'Depot & Stock Management',
+        users: 'Personnel & RBAC',
+        portfolio: 'Portfolio & Locations',
+        catalog: 'Master Catalog Admin',
+        dossiers: 'Executive Dossiers',
+        devtools: 'Database & Dev Tools',
+      },
+    },
+    camera: {
+      modalTitle: 'Live Camera Viewfinder',
+      modalSubtitle: 'Auto 1024px WebP Compression • Device Camera',
+      takePhoto: 'Take Photo',
+      uploadImage: 'Upload Image',
+      captureShutter: 'Capture Photo',
+      switchCamera: 'Switch Camera',
+      retakePhoto: 'Retake',
+      cameraFallback: 'Browse via File Picker',
+      cameraDenied:
+        'Camera hardware is unavailable or permission was denied. You can select an image from your device below.',
+      initializingCamera: 'Starting camera...',
+    },
+    fab: {
+      switchToEnglish: 'Switch to English (EN)',
+      switchToTurkish: 'Switch to Turkish (TR)',
+      switchToDark: 'Switch to Dark Mode',
+      switchToLight: 'Switch to Light Mode',
     },
     depot: {
       title: 'DEPOT MANAGEMENT',
@@ -507,6 +665,9 @@ export const DICTIONARY = {
       // Filter Popover
       filtersButton: 'Filters',
       filtersTitle: 'Filters',
+      exportCsv: 'Export CSV',
+      exportCsvTooltip: 'Download all filtered data as CSV',
+      complianceOk: 'OK',
       filterProject: 'Project / Location',
       filterDepot: 'Depot / Domain',
       filterCategory: 'Item Category',
@@ -611,7 +772,7 @@ export const DICTIONARY = {
     },
     scanner: {
       title: 'Depot Barcode Scanner & Manual Registry',
-      subtitle: 'ZXing WebAssembly Engine • Live Catalog Lookup & New Material Registration',
+      subtitle: 'ZXing WebAssembly Engine • Multi-Barcode Staging Tray & Inventory-First Lookup',
       tabScanLookup: 'Scan / Lookup',
       tabManualAdd: 'Manual Add',
       cameraSelect: 'Select Camera:',
@@ -638,6 +799,32 @@ export const DICTIONARY = {
       btnInbound: '+ Log Inbound Receipt',
       btnOutbound: '+ Issue Outbound Handover',
       btnRegisterAsset: '+ Register Serialized Asset',
+
+      // Milestone v2.9.1 Multi-Barcode Staging Tray & Guardrails
+      trayTitle: 'Detected Barcodes',
+      btnPauseCamera: 'Pause Camera',
+      btnResumeCamera: 'Resume Camera',
+      btnClearTray: 'Clear Tray',
+      cameraPausedLabel: 'Camera Paused',
+      badgeInventoryMatch: 'Inventory Detected',
+      badgePublicMatch: 'New Item · External Match',
+      badgeUnlisted: 'New Item · Unlisted Barcode',
+      badgeChecking: 'Checking...',
+      unlistedConfirmText:
+        'Barcode detected — not in existing inventory or public directory',
+      urlSkippedText:
+        'URL or non-GTIN text detected — external public directory lookup skipped',
+      multiBarcodeGuardrail:
+        'Multiple barcodes detected — select 1 barcode to assign as this item\'s unique ID',
+      inventoryCollisionWarning:
+        'This packaging already matches an existing inventory item. View the existing item before creating a duplicate.',
+      btnViewItem: 'View Item',
+      btnAddNewItem: 'Add New Item',
+      trayMaxReached:
+        'Session tray full (5/5) — clear tray to scan additional barcodes',
+      trayEmptyHint:
+        'Point the camera at packaging barcodes or enter a code manually above (up to 5 unique barcodes).',
+      selectedForNewItem: 'Selected for new item',
 
       // Unregistered Item Prompt
       unregisteredTitle: 'Unregistered Barcode Detected',
@@ -673,6 +860,11 @@ export const DICTIONARY = {
       lblAttributes: 'Dimensional / Custom Attributes',
       lblInitialQty: 'Initial Stock Quantity',
       lblIrsaliye: 'Dispatch / Delivery Note No (Optional)',
+      lblRefPhoto: 'Reference Photo (Optional • Auto WebP Compression)',
+      btnTakePhoto: 'Take Photo',
+      btnUploadFile: 'Upload Image',
+      btnReplacePhoto: 'Replace',
+      btnRemovePhoto: 'Remove',
       btnSaveAndIntake: 'Save to Catalog & Update Depot',
       placeholderSubcategory: 'E.g.: Heat Pump / Ceramic Tiles',
       placeholderSpec: 'E.g.: R32 Inverter, 14kW, Technical specs & dimensions',
@@ -701,6 +893,34 @@ export const DICTIONARY = {
         'No custom attributes added yet. Pick a preset chip above or click "+ Add Attribute".',
       emptyReadOnly: 'No custom attributes recorded.',
       btnRemove: 'Remove Row',
+    },
+    media: {
+      albumTitle: 'Album',
+      addPhoto: 'Add Photo',
+      takePhoto: 'Take Photo',
+      uploadFromDevice: 'Upload Image',
+      googleDrive: 'Google Drive',
+      setPrimary: 'Set Primary',
+      primaryBadge: 'Primary',
+      confirmAndSave: 'Confirm & Save',
+      replacePhoto: 'Replace',
+      deletePhoto: 'Delete Photo',
+      maxPhotosLimit: 'Maximum 5 photos',
+      noPhotoPlaceholder: 'No Photo',
+      compressing: 'Compressing WebP...',
+      uploading: 'Uploading...',
+      dropzoneTitle: 'Drag & drop an image here or browse from device',
+      dropzoneSub: 'Automatic 1024px WebP compression (~50–80 KB)',
+      cameraHelpTitle: 'Open live camera viewfinder to capture item photo',
+      cameraHelpSub: 'Opens real-time device camera across desktop & mobile',
+      driveInputLabel: 'Google Drive Share Link',
+      driveInputPlaceholder: 'https://drive.google.com/file/d/.../view?usp=sharing',
+      driveHelperHint: 'Paste Google Drive share link (Anyone with link)',
+      btnValidateDrive: 'Load Preview',
+      btnGooglePicker: 'Open Google Drive Picker',
+      setAsPrimaryCheckbox: 'Set this photo as the primary catalog image',
+      zoomHint: 'Click to zoom',
+      deleteConfirmPrompt: 'Are you sure you want to permanently delete this photo from the album?',
     },
     itemDetails: {
       modalTitle: 'Item Details & Database Record',
@@ -810,6 +1030,18 @@ export const DICTIONARY = {
       btnCopy: 'Copy Link',
       copySuccess: 'Link Copied to Clipboard!',
 
+      // Milestone v2.9.4 Profile Avatar Management (Tier 0-1)
+      profilePhoto: 'Profile Photo',
+      updateProfilePhoto: 'Update Profile Photo',
+      savePhoto: 'Save Photo',
+      removePhoto: 'Remove Photo',
+      uploadFromDevice: 'Upload from Device',
+      takePhoto: 'Take Photo',
+      uploadImage: 'Upload Image',
+      avatarUpdated: 'Profile photo updated.',
+      avatarRemoved: 'Profile photo removed.',
+      avatarModalDesc: 'Automatic 256×256px WebP compression (~10–25 KB) • Tier 0–1 Authority',
+
       // Modals
       modalInviteTitle: 'Create Team Member Invitation',
       lblDelegator: 'Delegator:',
@@ -907,9 +1139,11 @@ function subscribe(callback: () => void) {
   if (typeof window === 'undefined') return () => {};
   window.addEventListener('storage', callback);
   window.addEventListener('caesar_pref_change', callback);
+  window.addEventListener('caesar:prefs-changed', callback);
   return () => {
     window.removeEventListener('storage', callback);
     window.removeEventListener('caesar_pref_change', callback);
+    window.removeEventListener('caesar:prefs-changed', callback);
   };
 }
 
@@ -936,6 +1170,7 @@ export function useCaesarLanguage(): [Language, (lang: Language) => void] {
       localStorage.setItem('caesar_lang', newLang);
       document.documentElement.lang = newLang;
       window.dispatchEvent(new Event('caesar_pref_change'));
+      window.dispatchEvent(new Event('caesar:prefs-changed'));
     } catch {
       // ignore
     }
@@ -967,6 +1202,7 @@ export function useCaesarTheme(): [Theme, (theme: Theme) => void] {
       localStorage.setItem('caesar_theme', newTheme);
       document.documentElement.classList.toggle('dark', newTheme === 'dark');
       window.dispatchEvent(new Event('caesar_pref_change'));
+      window.dispatchEvent(new Event('caesar:prefs-changed'));
     } catch {
       // ignore
     }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Oswald } from "next/font/google";
 import "./globals.css";
+import GlobalUtilityFab from "@/components/GlobalUtilityFab";
 
 const oswald = Oswald({
   variable: "--font-oswald",
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col bg-canvas-dark text-slate-100 dark:bg-canvas-dark dark:text-slate-100 selection:bg-amber-500 selection:text-slate-950">
         {children}
+        <GlobalUtilityFab />
       </body>
     </html>
   );
