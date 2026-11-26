@@ -1,15 +1,15 @@
 # Caesar Purchasing Sub-Ledger & Procurement Ecosystem — Project Context
-**Version:** v2.9.4 (Caesar Emblem Restoration, Sidebar `NEW` Badge Cleanup & RBAC-Gated User Profile Avatars)  
-**Last Updated:** 2026-11-24  
+**Version:** v2.9.7 (Technical Intake Catalog Picker & Reset Controls + Depot Hero Action Colors & Light Blue Table Header)  
+**Last Updated:** 2026-11-26  
 **Lead Systems Architect:** Farhad Mokhtari  
 **Stack:** Next.js 16 (App Router), React 19, Tailwind CSS v4, Supabase (PostgreSQL 15 + Supabase Storage `inventory-media`)  
-**Status:** Compilation Clean (Exit Code 0: 0 errors, 0 warnings) — Milestone 2.9.4 Production Ready  
+**Status:** Compilation Clean (Exit Code 0: 0 errors, 0 warnings) — Milestone 2.9.7 Production Ready  
 
 ---
 
 ## 1. Executive Summary & Operational Scope
 
-The **Caesar Operations (Procurement & Inventory Ecosystem)** is an enterprise procurement, predictive intake calculation, warehouse inventory ledger, and fiduciary governance platform designed for Caesar Group / Afik Group construction operations.
+The **CAESAR CENTRAL HUB (Internal Operations Portal — Procurement & Inventory Ecosystem)** is an enterprise procurement, predictive intake calculation, warehouse inventory ledger, and fiduciary governance platform designed for Caesar Group / Afik Group construction operations.
 
 ### Scope Boundaries & Anti-Collision Mandate
 - **Purchasing & Inventory System (This Repository):** Governs construction material requisitions, predictive volume/consumption calculations, supplier quotation containment, purchasing sub-ledgers, warehouse inventory handovers, serialized asset custody, 2D RBAC governance, universal catalog taxonomy (construction + furnishing/equipment), multi-photo SKU media albums, RBAC-gated user profile avatars, hardened multi-barcode staging, full-schema executive CSV export, intent-driven pre-authentication module launcher, and executive capital exposure.
@@ -156,8 +156,8 @@ spfdemoapp/
 │       ├── 20261124_inventory_item_media.sql    # Idempotent DDL for inventory_item_media, primary_image_url & inventory-media bucket
 │       └── 20261124_corporate_users_avatar.sql  # Idempotent DDL adding avatar_url & avatar_storage_path to corporate_users
 ├── app/
-│   ├── layout.tsx                     # Global HTML metadata, Oswald font loader & persistent GlobalUtilityFab mount
-│   ├── page.tsx                       # Live session binding (including avatar_url), ?module= routing & post-auth RBAC Access Denied screen
+│   ├── layout.tsx                     # Global HTML metadata (CAESAR CENTRAL HUB), Oswald font loader, SplashOverlay & GlobalUtilityFab mount
+│   ├── page.tsx                       # Live session binding (including avatar_url), ?module= routing, onOpenDepot bridge & post-auth RBAC Access Denied screen
 │   ├── login/
 │   │   └── page.tsx                   # 2-Step intent-driven login: Step 1 ModuleLauncher -> Step 2 Credentials -> /?module=
 │   ├── auth/
@@ -183,31 +183,35 @@ spfdemoapp/
 │       └── approve/route.ts           # Requisition approval state engine
 ├── components/
 │   ├── AttributesEditor.tsx           # Structured snake_case Key-Value matrix, domain quick-chips & locked provenance pills
+│   ├── CatalogMaterialPicker.tsx      # Full-title centered domain tabs, category-grouped, Turkish-locale searchable material selector with inline ✕ resets & Depot jump
 │   ├── CorporateHeader.tsx            # CONTROL CENTER / KONTROL MERKEZİ header, circular user avatar / initial fallback, red Sign Out button
-│   ├── DesktopSidebar.tsx             # CAESAR OPERATIONS v2.9.4 vertically aligned brand block & grouped navigation (clean Active Modules without NEW badge)
+│   ├── DesktopSidebar.tsx             # CAESAR CENTRAL HUB v2.9.7 hierarchical collapsible module groups & Tier 0-only Database & Dev Tools footer
 │   ├── GlobalUtilityFab.tsx           # Persistent route/viewport-aware Language (EN/TR) + Light/Dark glassmorphic FAB
-│   ├── ModuleLauncher.tsx             # Pre-auth 7-tile primary module launcher with official Caesar Group Emblem
+│   ├── ModuleLauncher.tsx             # Pre-auth 6-tile prioritized module launcher (3x2 grid) driven by lib/moduleRegistry.ts
+│   ├── SplashOverlay.tsx              # Root client wrapper mounting createCaesarSplash (6.5s Canvas 2D atomic orbit splash) with session/skip/failsafe guards
 │   ├── StickyControlsFAB.tsx          # Legacy controls component
 │   ├── Toast.tsx                      # Non-intrusive notification toast for module & catalog alerts
-│   ├── TechnicalIntakeModule.tsx      # Full-screen 3-tier cascading location & predictive volume intake engine
+│   ├── TechnicalIntakeModule.tsx      # Full-screen 3-tier cascading location (h-10 + inline ✕ resets) & CatalogMaterialPicker predictive volume intake engine
 │   ├── RequisitionWorkspace.tsx       # Sub-ledger table with O(1) canonical portfolio lookup, batch controls, drawer
 │   ├── ExecutiveTelemetryStrip.tsx    # Board-level fiduciary KPI metrics strip (Executive only)
 │   ├── WebcamCaptureModal.tsx         # Cross-device getUserMedia live camera viewfinder + WebP shutter capture
 │   ├── ItemMediaUploadModal.tsx       # Responsive desktop modal / mobile bottom sheet (Live Camera / Local / Google Drive + Preview & Confirm)
 │   ├── MobileBarcodeScannerModal.tsx  # Top-mounted 128x128 Reference Photo hero + multi-barcode staging tray + single-barcode guardrail
 │   ├── ItemDetailsModal.tsx           # Top-left 180x180 album hero + 5-slot strip + lightbox + split RBAC media controls & Tier 0-2 edit mode
-│   ├── DepoManagementWorkspace.tsx    # 40x40px lazy-loaded thumbnails, filter-aware Export CSV button, scanner View Item bridge & 2-tier alert KPI
+│   ├── DepoManagementWorkspace.tsx    # 40x40px lazy-loaded thumbnails, dark-orange Inbound / yellow Outbound hero buttons, light-blue table headers & Export CSV
 │   └── UserManagementWorkspace.tsx    # Personnel roster with circular avatars, Tier 0-1 Update User Photo modal, 48h invitation table & dev role preview
 ├── types/
 │   └── requisition.ts                 # Schema interfaces (InventoryCatalogItem, InventoryItemMedia, CorporateUserProfile with avatar_url, 2D RBAC)
 ├── lib/
 │   ├── authSession.ts                 # Server-side HMAC-SHA256 session cookie signing & verification
+│   ├── caesarSplashEngine.ts          # Dependency-free TypeScript 6.5s Canvas 2D perspective ribbon/electron splash renderer
 │   ├── csvExport.ts                   # Client-side RFC-4180 CSV serializer with UTF-8 BOM, formula-injection guard, dynamic attr_* & Tier 0-2 masking
 │   ├── imageCompression.ts            # Client-side Canvas WebP compressor (1024px SKU media / 256px user avatars, JPEG fallback)
-│   ├── i18n.ts                        # Centralized symmetric TR/EN dictionary (v2.9.4) with clean UTF-8 Turkish diacritics
+│   ├── i18n.ts                        # Centralized symmetric TR/EN dictionary (v2.9.7) with clean UTF-8 Turkish diacritics
+│   ├── moduleRegistry.ts              # Centralized single-source-of-truth config for modules, sub-sections, launcher order, sidebar hierarchy & RBAC allowedTiers
 │   ├── supabaseClient.ts              # Client-safe Supabase anon instance
 │   ├── supabaseAdmin.ts               # Server-isolated service-role Supabase admin instance
-│   ├── rbac.ts                        # 2D RBAC delegation matrix, role metadata, permission helper functions
+│   ├── rbac.ts                        # 2D RBAC delegation matrix, role metadata, config-driven module/view clearance helpers
 │   └── emailService.ts                # Transactional email service & invitation email dispatch templates
 └── public/
     └── wasm/
@@ -223,3 +227,21 @@ Milestone v2.9.4 is completed and verified clean:
 - **Sidebar `NEW` Badge Cleanup (`components/DesktopSidebar.tsx`):** COMPLETED. Removed the yellow `NEW` / `YENİ` badge pill next to `Personnel & RBAC` (`Personel & Yetki Matrisi`) while keeping all 4 roadmap `SOON` / `YAKINDA` badges intact.
 - **RBAC-Gated User Profile Avatars (`supabase/migrations/20261124_corporate_users_avatar.sql`, `app/api/users/avatar/route.ts`, `components/UserManagementWorkspace.tsx`, `components/CorporateHeader.tsx`, `app/page.tsx`):** COMPLETED. Added `avatar_url` and `avatar_storage_path` to `public.corporate_users`, created atomic `POST`/`DELETE /api/users/avatar` strictly gated to Tiers 0–1 (`SYSTEM_ADMIN`, `EXECUTIVE`), integrated circular `w-9 h-9` avatars with alphabet-initial fallback across `UserManagementWorkspace` and `CorporateHeader`, and added the **Update User Photo (`Fotoğrafı Güncelle`)** modal supporting live camera capture (`WebcamCaptureModal`) and device upload with client-side `256×256px` WebP compression.
 - **Workspace Hygiene:** COMPLETED. 0 unauthorized physical markdown files on disk. Compilation clean with 0 errors and 0 warnings.
+
+Milestone v2.9.5 is completed and verified clean:
+- **Centralized Config-Driven Module Registry (`lib/moduleRegistry.ts`, `lib/rbac.ts`):** COMPLETED. Created `lib/moduleRegistry.ts` as the single source of truth for modules, nested sub-sections, `launcherOrder`, `sidebarOrder`, and RBAC `allowedTiers`. Removed `Master Catalog Admin` from top-level navigation, aligned `Requisition Workspace` to Tiers `0–3`, `User Management & RBAC` to Tiers `0–2`, and restricted `Database & Dev Tools` strictly to Tier `0` (`SYSTEM_ADMIN`).
+- **Prioritized 6-Tile Pre-Auth Module Launcher (`components/ModuleLauncher.tsx`):** COMPLETED. Refactored to a symmetrical 3×2 desktop grid and centered `200×200px` mobile stack driven by `lib/moduleRegistry.ts` with active clickable modules in Row 1 (`Purchasing & Orders`, `Depot & Stock Management`, `User Management & RBAC`), upcoming modules in Row 2 (`Aftersales`, `Caesar Project Portfolio`, `Executive Dossiers & Reports`), and `Database & Dev Tools` permanently excluded.
+- **Hierarchical Collapsible Sidebar & Strict RBAC Routing (`components/DesktopSidebar.tsx`, `app/page.tsx`):** COMPLETED. Refactored `DesktopSidebar.tsx` to render expandable parent module groups (`Purchasing & Orders`, `Depot & Stock Management`, `Aftersales`, `Caesar Project Portfolio`), clean `User Management & RBAC` (Tiers `0–2`), and a dedicated bottom utility footer slot for `Database & Dev Tools` visible exclusively to Tier `0` (`SYSTEM_ADMIN`), while preserving strict post-auth `Access Denied` gating in `app/page.tsx` and 100% zero mutation of Depot operational files.
+- **Caesar Operations 4.4s Startup Splash Animation (`components/SplashOverlay.tsx`, `app/globals.css`, `app/layout.tsx`):** COMPLETED. Implemented a pure SVG + CSS/Tailwind v4 4.4s startup splash screen mounted at root DOM (`fixed inset-0 z-[999999]`) featuring dual Caesar Gold/Cobalt sweeping ribbons, radial halo + 5 geometric accents, official Caesar Emblem unveil, responsive horizontal desktop / vertical mobile wordmark clip-path reveal, stepped corner brackets, `sessionStorage` once-per-session persistence (`caesar_splash_seen_v295`), `Skip`/`Atla` pill after `1.2s`, `prefers-reduced-motion` support, and a hard `6.0s` failsafe auto-unmount timer.
+- **Localization & Version Sync (`lib/i18n.ts`):** COMPLETED. Bumped version to `v2.9.5` across EN and TR with clean UTF-8 Turkish diacritics for all reorganized modules, sub-sections, and splash controls.
+
+Milestone v2.9.6 is completed and verified clean:
+- **Canvas 2D Atomic Orbit Splash Engine (`lib/caesarSplashEngine.ts`, `components/SplashOverlay.tsx`, `app/globals.css`, `app/layout.tsx`):** COMPLETED. Ported the dependency-free 6500ms Canvas 2D perspective ribbon/electron splash renderer (`createCaesarSplash`) with quintic smootherstep easing, 3 corner strands curling into tilted 3D orbits (`tilt = [-0.65, 0.65, 1.57]`), 3 electrons with 28-segment `1px` fine trails, crisp unboxed Caesar emblem emergence (`ctx.shadowBlur = 0`, zero glow/container), complete orbit/electron render pass skip after `5.20s`, React 19 Strict Mode `destroy()` teardown, `sessionStorage` guard (`caesar_splash_seen_v296`), `Skip`/`Atla` pill after `1.2s`, and an `8.5s` hard failsafe auto-unmount timer.
+- **Global "CAESAR CENTRAL HUB" Rebrand (`app/layout.tsx`, `components/ModuleLauncher.tsx`, `components/DesktopSidebar.tsx`, `app/login/page.tsx`, `lib/i18n.ts`):** COMPLETED. Rebranded all primary brand headers, metadata, sidebar lockup, and login headers from `CAESAR OPERATIONS` to **`CAESAR CENTRAL HUB`** (`font-bold` 700) and **`INTERNAL OPERATIONS PORTAL`** / **`DAHİLİ OPERASYON PORTALI`** (`font-light` 300) with version badge **`v2.9.6`**.
+- **Categorized & Searchable Material Catalog Picker (`components/CatalogMaterialPicker.tsx`, `components/TechnicalIntakeModule.tsx`):** COMPLETED. Created `CatalogMaterialPicker.tsx` with domain segmented filtering (`CONSTRUCTION_MATERIALS`, `FURNISHING_AND_EQUIPMENT`, `ALL` — defaulting to `CONSTRUCTION_MATERIALS` in `TechnicalIntakeModule.tsx` with live SKU counts), dynamic `h-10` category dropdown + sticky category headers, Turkish-locale-aware search (`toLocaleLowerCase('tr-TR')`) across SKU/names/brand/spec/barcode, selected material summary bar, and standardized `h-10` cascading location controls while preserving `item_id` PK binding and `Number()` volume/budget calculations.
+- **Depot Protection & Workspace Hygiene:** COMPLETED. Zero modifications to any Depot operational files or database schemas, 0 unauthorized `.md` files on disk, and 100% clean `npx tsc --noEmit && npm run lint` verification.
+
+Milestone v2.9.7 is completed and verified clean:
+- **Full-Title Center-Aligned Domain Containers & Inline Reset (`✕`) Controls (`components/CatalogMaterialPicker.tsx`, `components/TechnicalIntakeModule.tsx`, `app/page.tsx`):** COMPLETED. Removed `truncate` on the 3 domain selector buttons (`Construction Materials`, `Furnishing & Equipment`, `All Domains` / `İnşaat Malzemeleri`, `Mobilya ve Ekipman`, `Tüm Alanlar`) so all titles and live SKU counts render centered and 100% visible in both EN and TR; added inline `h-10 w-10` `✕` reset buttons on all 3 cascading location dropdowns (`Project Selection *`, `Building Type *` / `Yapı Türü *`, `Building Block Selection *`), Category `<select>`, search input, and Selected Catalog Material summary card; prevented intake header clipping (`min-w-0 break-words leading-tight`); and wired the **`Open Depot & Catalog` / `Depo ve Kataloğu Aç`** quick jump button directly to `DEPOT_WORKSPACE`.
+- **Depot Hero Action Button Colors & Light Blue Table Headers (`components/DepoManagementWorkspace.tsx`):** COMPLETED. Applied strictly CSS-only class updates: updated hero `Inbound` (`Giriş`) button to dark orange (`bg-orange-600 hover:bg-orange-700 text-white`), hero `Outbound` (`Çıkış`) button to yellow with high-contrast dark slate text (`bg-yellow-400 hover:bg-yellow-500 text-slate-950`), and all 3 Depot ledger `<thead>` surfaces to light blue (`bg-blue-50/95 dark:bg-blue-950/45 border-b border-blue-200 dark:border-blue-800/60 text-blue-950 dark:text-blue-100`) while keeping the primary scanner button and 100% of Depot operational logic untouched.
+- **Localization & Version Sync (`lib/i18n.ts`):** COMPLETED. Bumped version to `v2.9.7` across EN and TR with clean UTF-8 Turkish diacritics.

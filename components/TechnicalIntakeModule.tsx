@@ -1,16 +1,18 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { 
-  InventoryCatalogItem, 
-  RoleTier, 
-  PortfolioProject, 
-  PortfolioBuilding 
+import {
+  InventoryCatalogItem,
+  RoleTier,
+  PortfolioProject,
+  PortfolioBuilding,
 } from '@/types/requisition';
 import { DICTIONARY } from '@/lib/i18n';
+import CatalogMaterialPicker from '@/components/CatalogMaterialPicker';
 
 interface TechnicalIntakeModuleProps {
   onBack: () => void;
+  onOpenDepot?: () => void;
   onSubmitTicket: (payload: {
     location_block_id: string;
     catalog_item_id: string;
@@ -28,6 +30,7 @@ interface TechnicalIntakeModuleProps {
 
 export default function TechnicalIntakeModule({
   onBack,
+  onOpenDepot,
   onSubmitTicket,
   catalogItems,
   portfolioProjects,
@@ -36,6 +39,7 @@ export default function TechnicalIntakeModule({
   lang,
 }: TechnicalIntakeModuleProps) {
   const d = DICTIONARY[lang].intake;
+  const tc = DICTIONARY[lang].catalogPicker;
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [selectedBuildingType, setSelectedBuildingType] = useState<string>('');
@@ -68,7 +72,7 @@ export default function TechnicalIntakeModule({
       .sort((a, b) => a.building_name.localeCompare(b.building_name));
   }, [selectedProjectId, selectedBuildingType, portfolioBuildings]);
 
-  // Cascading resets
+  // Cascading changes & inline reset handlers
   const handleProjectChange = (projectId: string) => {
     setSelectedProjectId(projectId);
     setSelectedBuildingType('');
@@ -80,18 +84,30 @@ export default function TechnicalIntakeModule({
     setSelectedBuildingId('');
   };
 
-  const selectedProject = portfolioProjects.find((p) => p.project_id === selectedProjectId);
-  const selectedBuilding = portfolioBuildings.find((b) => b.building_id === selectedBuildingId);
+  const selectedProject = portfolioProjects.find(
+    (p) => p.project_id === selectedProjectId
+  );
+  const selectedBuilding = portfolioBuildings.find(
+    (b) => b.building_id === selectedBuildingId
+  );
   const selectedItem = catalogItems.find((i) => i.item_id === selectedItemId);
 
-  const consumptionRate = selectedItem?.consumption_rate ? Number(selectedItem.consumption_rate) : 1;
+  const consumptionRate = selectedItem?.consumption_rate
+    ? Number(selectedItem.consumption_rate)
+    : 1;
   const calculatedQty = Number((targetVolume * consumptionRate).toFixed(2));
-  const baseCost = selectedItem?.base_cost_eur ? Number(selectedItem.base_cost_eur) : 0;
+  const baseCost = selectedItem?.base_cost_eur
+    ? Number(selectedItem.base_cost_eur)
+    : 0;
   const calculatedBudget = Number((calculatedQty * baseCost).toFixed(2));
 
   const handleGenerateTicket = async () => {
     if (!selectedBuildingId || !selectedItemId) {
-      alert(lang === 'tr' ? 'Lütfen proje, yapı tipi, blok ve malzeme seçimini eksiksiz tamamlayınız.' : 'Please select project, building type, building/block, and catalog material.');
+      alert(
+        lang === 'tr'
+          ? 'Lütfen proje, yapı türü, blok ve malzeme seçimini eksiksiz tamamlayınız.'
+          : 'Please select project, building type, building/block, and catalog material.'
+      );
       return;
     }
     setSubmitting(true);
@@ -125,20 +141,21 @@ export default function TechnicalIntakeModule({
 
   return (
     <div className="bg-slate-50 dark:bg-[#090d16] text-slate-800 dark:text-slate-100 p-6 font-sans transition-colors pb-16">
-      <div className="flex items-center justify-between pb-6 mb-6 border-b border-slate-200 dark:border-slate-800">
-        <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 pb-6 mb-6 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
           <button
+            type="button"
             onClick={onBack}
-            className="flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600 bg-white dark:bg-slate-900 px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-800 shadow-xs transition-colors cursor-pointer"
+            className="h-10 shrink-0 flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600 bg-white dark:bg-slate-900 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs transition-colors cursor-pointer"
           >
             <span>{d.btnBack}</span>
           </button>
-          <div className="h-4 w-px bg-slate-300 dark:bg-slate-700" />
-          <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white uppercase">
+          <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 shrink-0" />
+          <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white uppercase min-w-0 break-words leading-tight">
             {d.title}
           </h1>
         </div>
-        <div className="flex items-center space-x-2 text-xs font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded-full border border-blue-200 dark:border-blue-800">
+        <div className="flex items-center space-x-2 text-xs font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded-full border border-blue-200 dark:border-blue-800 shrink-0">
           <span>{lang === 'tr' ? 'Yetki Seviyesi:' : 'Authority Tier:'}</span>
           <span className="font-mono">{userRole}</span>
         </div>
@@ -146,52 +163,86 @@ export default function TechnicalIntakeModule({
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto">
         <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
-          {/* Section 1: 3-Tier Cascading Location Hierarchy */}
+          {/* Section 1: 3-Tier Cascading Location Hierarchy (Standardized h-10 Controls + Inline ✕ Reset Icons) */}
           <div className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 pb-2">
               {d.step1Title}
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Tier 1: Project */}
+              {/* Tier 1: Project Selection */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                   {d.lblProject}
                 </label>
-                <select
-                  value={selectedProjectId}
-                  onChange={(e) => handleProjectChange(e.target.value)}
-                  className="w-full text-xs font-bold px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">{lang === 'tr' ? 'Proje Seçiniz...' : 'Select Project...'}</option>
-                  {portfolioProjects.map((prj) => (
-                    <option key={prj.project_id} value={prj.project_id}>
-                      {prj.project_id} — {prj.project_name}
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={selectedProjectId}
+                    onChange={(e) => handleProjectChange(e.target.value)}
+                    className="w-full h-10 text-xs font-bold px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">
+                      {lang === 'tr' ? 'Proje Seçiniz...' : 'Select Project...'}
                     </option>
-                  ))}
-                </select>
+                    {portfolioProjects.map((prj) => (
+                      <option key={prj.project_id} value={prj.project_id}>
+                        {prj.project_id} — {prj.project_name}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedProjectId && (
+                    <button
+                      type="button"
+                      onClick={() => handleProjectChange('')}
+                      title={tc.clearSelection}
+                      aria-label={tc.clearSelection}
+                      className="h-10 w-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Tier 2: Building Type */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  {lang === 'tr' ? '2. Yapı Tipi' : '2. Building Type'}
+                  {d.lblBuildingType}
                 </label>
-                <select
-                  value={selectedBuildingType}
-                  onChange={(e) => handleBuildingTypeChange(e.target.value)}
-                  disabled={!selectedProjectId}
-                  className="w-full text-xs font-bold px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">
-                    {selectedProjectId ? (lang === 'tr' ? 'Yapı Tipi Seçiniz...' : 'Select Type...') : (lang === 'tr' ? 'Önce Proje Seçiniz...' : 'Select Project First...')}
-                  </option>
-                  {availableBuildingTypes.map((bType) => (
-                    <option key={bType} value={bType}>
-                      {bType}
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={selectedBuildingType}
+                    onChange={(e) => handleBuildingTypeChange(e.target.value)}
+                    disabled={!selectedProjectId}
+                    className="w-full h-10 text-xs font-bold px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {selectedProjectId
+                        ? lang === 'tr'
+                          ? 'Yapı Türü Seçiniz...'
+                          : 'Select Type...'
+                        : lang === 'tr'
+                        ? 'Önce Proje Seçiniz...'
+                        : 'Select Project First...'}
                     </option>
-                  ))}
-                </select>
+                    {availableBuildingTypes.map((bType) => (
+                      <option key={bType} value={bType}>
+                        {bType}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedBuildingType && (
+                    <button
+                      type="button"
+                      onClick={() => handleBuildingTypeChange('')}
+                      title={tc.clearSelection}
+                      aria-label={tc.clearSelection}
+                      className="h-10 w-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Tier 3: Building / Block Name */}
@@ -199,38 +250,61 @@ export default function TechnicalIntakeModule({
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                   {d.lblBuilding}
                 </label>
-                <select
-                  value={selectedBuildingId}
-                  onChange={(e) => setSelectedBuildingId(e.target.value)}
-                  disabled={!selectedBuildingType}
-                  className="w-full text-xs font-bold px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">
-                    {selectedBuildingType ? (lang === 'tr' ? 'Blok / Yapı Seçiniz...' : 'Select Building...') : (lang === 'tr' ? 'Önce Yapı Tipi Seçiniz...' : 'Select Type First...')}
-                  </option>
-                  {availableBuildings.map((bld) => (
-                    <option key={bld.building_id} value={bld.building_id}>
-                      {bld.building_name}
-                      {bld.category_name ? ` (${bld.category_name})` : ''}
-                      {bld.overall_completion_pct !== null && bld.overall_completion_pct !== undefined 
-                        ? ` [${bld.overall_completion_pct}%]` 
-                        : ''}
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={selectedBuildingId}
+                    onChange={(e) => setSelectedBuildingId(e.target.value)}
+                    disabled={!selectedBuildingType}
+                    className="w-full h-10 text-xs font-bold px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {selectedBuildingType
+                        ? lang === 'tr'
+                          ? 'Blok / Yapı Seçiniz...'
+                          : 'Select Building...'
+                        : lang === 'tr'
+                        ? 'Önce Yapı Türü Seçiniz...'
+                        : 'Select Type First...'}
                     </option>
-                  ))}
-                </select>
+                    {availableBuildings.map((bld) => (
+                      <option key={bld.building_id} value={bld.building_id}>
+                        {bld.building_name}
+                        {bld.category_name ? ` (${bld.category_name})` : ''}
+                        {bld.overall_completion_pct !== null &&
+                        bld.overall_completion_pct !== undefined
+                          ? ` [${bld.overall_completion_pct}%]`
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {selectedBuildingId && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedBuildingId('')}
+                      title={tc.clearSelection}
+                      aria-label={tc.clearSelection}
+                      className="h-10 w-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
             {selectedBuilding && (
-              <div className="flex items-center justify-between text-[11px] p-2.5 rounded-lg bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/60">
+              <div className="flex items-center justify-between text-[11px] p-2.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/60">
                 <div className="flex items-center space-x-2">
                   <span className="font-bold text-blue-700 dark:text-blue-400">
-                    {selectedProject?.project_name} • {selectedBuilding.building_name}
+                    {selectedProject?.project_name} •{' '}
+                    {selectedBuilding.building_name}
                   </span>
                   <span className="text-slate-400 font-light">•</span>
                   <span className="text-slate-600 dark:text-slate-400 font-light">
                     {selectedBuilding.building_type}
-                    {selectedBuilding.category_name ? ` (${selectedBuilding.category_name})` : ''}
+                    {selectedBuilding.category_name
+                      ? ` (${selectedBuilding.category_name})`
+                      : ''}
                   </span>
                 </div>
                 <span className="font-mono text-[10px] bg-blue-100 dark:bg-blue-900/80 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded font-bold">
@@ -240,32 +314,28 @@ export default function TechnicalIntakeModule({
             )}
           </div>
 
-          {/* Section 2: Material & Technical Specs */}
+          {/* Section 2: Categorized & Searchable Material Picker + Technical Specs */}
           <div className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 pb-2">
               {d.step2Title}
             </h2>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                 {d.lblMaterial}
               </label>
-              <select
-                value={selectedItemId}
-                onChange={(e) => setSelectedItemId(e.target.value)}
-                className="w-full text-xs font-bold px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">{lang === 'tr' ? 'Malzeme Listesinden Seçin...' : 'Select from Catalog...'}</option>
-                {catalogItems.map((item) => (
-                  <option key={item.item_id} value={item.item_id}>
-                    {item.legacy_code ? `[${item.legacy_code}] ` : ''}
-                    {lang === 'tr' ? item.item_name_tr : (item.item_name_en || item.item_name_tr)} ({item.unit_of_measure})
-                  </option>
-                ))}
-              </select>
+              <CatalogMaterialPicker
+                items={catalogItems}
+                selectedItemId={selectedItemId}
+                onSelect={(item) => setSelectedItemId(item.item_id)}
+                onClearSelection={() => setSelectedItemId('')}
+                onOpenDepot={onOpenDepot}
+                lang={lang}
+                defaultDomain="CONSTRUCTION_MATERIALS"
+              />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
                   {d.lblVolume}
@@ -275,10 +345,15 @@ export default function TechnicalIntakeModule({
                   min="1"
                   value={targetVolume}
                   onChange={(e) => setTargetVolume(Number(e.target.value))}
-                  className="w-full text-xs font-light px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-10 text-xs font-light px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-[10px] text-slate-400 font-light mt-1 block">
-                  {lang === 'tr' ? 'Hesaplama katsayı metriği:' : 'Consumption calculation metric:'} <span className="font-mono">{selectedItem?.consumption_metric || 'Standard'}</span>
+                  {lang === 'tr'
+                    ? 'Hesaplama katsayı metriği:'
+                    : 'Consumption calculation metric:'}{' '}
+                  <span className="font-mono">
+                    {selectedItem?.consumption_metric || 'Standard'}
+                  </span>
                 </span>
               </div>
 
@@ -288,10 +363,14 @@ export default function TechnicalIntakeModule({
                 </label>
                 <input
                   type="text"
-                  placeholder={lang === 'tr' ? 'Örn: Sika, Knauf veya muadili' : 'e.g. Sika, Knauf or equivalent'}
+                  placeholder={
+                    lang === 'tr'
+                      ? 'Örn: Sika, Knauf veya muadili'
+                      : 'e.g. Sika, Knauf or equivalent'
+                  }
                   value={brandPreference}
                   onChange={(e) => setBrandPreference(e.target.value)}
-                  className="w-full text-xs font-light px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-10 text-xs font-light px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -302,10 +381,14 @@ export default function TechnicalIntakeModule({
               </label>
               <textarea
                 rows={3}
-                placeholder={lang === 'tr' ? 'Tolerans oranları, saha koşulları ve özel lojistik gereksinimler...' : 'Tolerance thresholds, site constraints, delivery notes...'}
+                placeholder={
+                  lang === 'tr'
+                    ? 'Tolerans oranları, saha koşulları ve özel lojistik gereksinimler...'
+                    : 'Tolerance thresholds, site constraints, delivery notes...'
+                }
                 value={specialNotes}
                 onChange={(e) => setSpecialNotes(e.target.value)}
-                className="w-full text-xs font-light px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                className="w-full text-xs font-light px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>
@@ -320,48 +403,75 @@ export default function TechnicalIntakeModule({
 
             <div className="space-y-4">
               <div className="flex justify-between items-start py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-light text-slate-500 dark:text-slate-400">{lang === 'tr' ? 'Seçilen Lokasyon:' : 'Selected Location:'}</span>
+                <span className="text-xs font-light text-slate-500 dark:text-slate-400">
+                  {lang === 'tr' ? 'Seçilen Lokasyon:' : 'Selected Location:'}
+                </span>
                 <span className="text-xs font-bold text-slate-900 dark:text-white text-right">
                   {selectedBuilding ? (
                     <>
-                      <span>{selectedProject?.project_name} • {selectedBuilding.building_name}</span>
+                      <span>
+                        {selectedProject?.project_name} •{' '}
+                        {selectedBuilding.building_name}
+                      </span>
                       <span className="block text-[10px] font-mono text-blue-600 dark:text-blue-400 font-bold">
                         {selectedBuilding.building_id}
                       </span>
                     </>
-                  ) : '—'}
+                  ) : (
+                    '—'
+                  )}
                 </span>
               </div>
 
               <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-light text-slate-500 dark:text-slate-400">{lang === 'tr' ? 'Seçilen Malzeme:' : 'Selected Material:'}</span>
+                <span className="text-xs font-light text-slate-500 dark:text-slate-400">
+                  {lang === 'tr' ? 'Seçilen Malzeme:' : 'Selected Material:'}
+                </span>
                 <span className="text-xs font-bold text-slate-900 dark:text-white text-right">
-                  {selectedItem ? (lang === 'tr' ? selectedItem.item_name_tr : (selectedItem.item_name_en || selectedItem.item_name_tr)) : '—'}
+                  {selectedItem
+                    ? lang === 'tr'
+                      ? selectedItem.item_name_tr
+                      : selectedItem.item_name_en || selectedItem.item_name_tr
+                    : '—'}
                 </span>
               </div>
 
               <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-light text-slate-500 dark:text-slate-400">{lang === 'tr' ? 'Standart Tüketim Katsayısı:' : 'Consumption Rate:'}</span>
+                <span className="text-xs font-light text-slate-500 dark:text-slate-400">
+                  {lang === 'tr'
+                    ? 'Standart Tüketim Katsayısı:'
+                    : 'Consumption Rate:'}
+                </span>
                 <span className="text-xs font-light text-slate-900 dark:text-white">
-                  {selectedItem?.consumption_rate ? `${selectedItem.consumption_rate} (${selectedItem.consumption_metric})` : '1.00'}
+                  {selectedItem?.consumption_rate
+                    ? `${selectedItem.consumption_rate} (${selectedItem.consumption_metric})`
+                    : '1.00'}
                 </span>
               </div>
 
               <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-light text-slate-500 dark:text-slate-400">{d.calculatedQty}</span>
+                <span className="text-xs font-light text-slate-500 dark:text-slate-400">
+                  {d.calculatedQty}
+                </span>
                 <span className="text-sm font-light text-blue-600 dark:text-blue-400">
-                  <span className="font-bold">{calculatedQty.toLocaleString('en-US')}</span> {selectedItem?.unit_of_measure || 'units'}
+                  <span className="font-bold">
+                    {calculatedQty.toLocaleString('en-US')}
+                  </span>{' '}
+                  {selectedItem?.unit_of_measure || 'units'}
                 </span>
               </div>
 
               <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-xs font-light text-slate-500 dark:text-slate-400">{d.refUnitPrice}</span>
+                <span className="text-xs font-light text-slate-500 dark:text-slate-400">
+                  {d.refUnitPrice}
+                </span>
                 <span className="text-xs font-light text-slate-900 dark:text-white">
-                  €{baseCost.toFixed(2)} / {selectedItem?.unit_of_measure || 'unit'}
+                  €{baseCost.toFixed(2)} /{' '}
+                  {selectedItem?.unit_of_measure || 'unit'}
                 </span>
               </div>
 
-              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-lg p-4 flex justify-between items-center">
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-xl p-4 flex justify-between items-center">
                 <div>
                   <span className="block text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide">
                     {d.lockedCeiling}
@@ -371,15 +481,21 @@ export default function TechnicalIntakeModule({
                   </span>
                 </div>
                 <span className="text-xl font-light text-emerald-700 dark:text-emerald-400">
-                  €<span className="font-bold">{calculatedBudget.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  €
+                  <span className="font-bold">
+                    {calculatedBudget.toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                    })}
+                  </span>
                 </span>
               </div>
             </div>
 
             <button
+              type="button"
               onClick={handleGenerateTicket}
               disabled={submitting || !selectedItemId || !selectedBuildingId}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-bold text-xs rounded-lg transition-colors shadow-xs cursor-pointer disabled:cursor-not-allowed"
+              className="w-full h-10 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-bold text-xs rounded-xl transition-colors shadow-xs cursor-pointer disabled:cursor-not-allowed"
             >
               {submitting ? d.submitting : d.submitBtn}
             </button>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Oswald } from "next/font/google";
 import "./globals.css";
 import GlobalUtilityFab from "@/components/GlobalUtilityFab";
+import SplashOverlay from "@/components/SplashOverlay";
 
 const oswald = Oswald({
   variable: "--font-oswald",
@@ -11,8 +12,8 @@ const oswald = Oswald({
 });
 
 export const metadata: Metadata = {
-  title: "Caesar Satınalma Defteri | Caesar Purchasing Ledger",
-  description: "Afik Group Caesar Projects Construction Material Purchasing Sub-Ledger",
+  title: "CAESAR CENTRAL HUB — Internal Operations Portal",
+  description: "CAESAR CENTRAL HUB — Afik Group Caesar Projects Internal Operations Portal",
   icons: {
     icon: "https://res.cloudinary.com/iczztnnz/image/upload/v1793015175/CAESAR_EMBLEM_NO_TEXT.png",
   },
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-canvas-dark text-slate-100 dark:bg-canvas-dark dark:text-slate-100 selection:bg-amber-500 selection:text-slate-950">
+        <SplashOverlay />
         {children}
         <GlobalUtilityFab />
       </body>

@@ -1,4 +1,11 @@
 import { RoleTier, DepartmentCode, AuthorityTier } from '@/types/requisition';
+import {
+  ActiveModuleKey,
+  ModuleId,
+  PortalView,
+  getAllowedTiersForView,
+  getModuleById,
+} from '@/lib/moduleRegistry';
 
 export interface RoleMetadata {
   role: RoleTier;
@@ -178,13 +185,78 @@ export function getAssignableRoles(actorRole: RoleTier): RoleTier[] {
 }
 
 /**
- * Determines whether a role has access to the User Management / Personnel Workspace.
+ * Config-driven module clearance check backed by lib/moduleRegistry.ts.
  */
-export function canAccessUserManagement(role: RoleTier): boolean {
+export function hasModuleAccess(role: RoleTier, moduleId: ModuleId): boolean {
+  const meta = ROLE_METADATA[role];
+  const mod = getModuleById(moduleId);
+  if (!meta || !mod) return false;
+  return mod.allowedTiers.includes(meta.tier);
+}
+
+/**
+ * Config-driven sub-section / view clearance check backed by lib/moduleRegistry.ts.
+ * - Requisition Workspace ('WORKSPACE'): Tiers 0–3
+ * - Intake Engine Calculator ('TECHNICAL_INTAKE'): Tiers 0–4
+ * - Inventory & Stock ('DEPOT_WORKSPACE'): Tiers 0–4
+ * - User Management & RBAC ('USER_MANAGEMENT'): Tiers 0–2
+ * - Database & Dev Tools ('DEV_TOOLS'): Tier 0 only
+ */
+export function hasViewAccess(role: RoleTier, view: PortalView): boolean {
   const meta = ROLE_METADATA[role];
   if (!meta) return false;
-  // Accessible to Tiers 0, 1, 2, and PURCHASING_AGENT
-  return meta.tier <= 2 || role === 'PURCHASING_AGENT';
+  const allowedTiers = getAllowedTiersForView(view);
+  return allowedTiers.includes(meta.tier);
+}
+
+/**
+ * Resolves the default authorized PortalView for a given active module and user role.
+ * For example, in 'purchasing', Tiers 0–3 open 'WORKSPACE' while Tier 4 opens 'TECHNICAL_INTAKE'.
+ */
+export function getDefaultViewForModule(
+  role: RoleTier,
+  moduleId: ActiveModuleKey
+): PortalView | null {
+  if (!hasModuleAccess(role, moduleId)) return null;
+  const mod = getModuleById(moduleId);
+  if (!mod) return null;
+
+  if (mod.defaultView && hasViewAccess(role, mod.defaultView)) {
+    return mod.defaultView;
+  }
+
+  if (mod.subSections) {
+    const firstAllowedSub = mod.subSections.find(
+      (sub) => sub.status === 'ACTIVE' && sub.view && hasViewAccess(role, sub.view)
+    );
+    if (firstAllowedSub?.view) {
+      return firstAllowedSub.view;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Returns all active launcher module keys that the role has clearance to enter.
+ */
+export function getAuthorizedActiveModules(role: RoleTier): ActiveModuleKey[] {
+  const allActive: ActiveModuleKey[] = ['purchasing', 'depot', 'users'];
+  return allActive.filter((mod) => hasModuleAccess(role, mod));
+}
+
+/**
+ * Determines whether a role has access to User Management & RBAC (Tiers 0–2 per lib/moduleRegistry.ts).
+ */
+export function canAccessUserManagement(role: RoleTier): boolean {
+  return hasModuleAccess(role, 'users');
+}
+
+/**
+ * Determines whether a role has access to Database & Dev Tools (Strictly Tier 0 / SYSTEM_ADMIN only).
+ */
+export function canAccessDevTools(role: RoleTier): boolean {
+  return hasModuleAccess(role, 'devtools');
 }
 
 /**

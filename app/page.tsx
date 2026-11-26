@@ -9,13 +9,25 @@ import {
   PortfolioProject,
   PortfolioBuilding,
 } from '@/types/requisition';
-import { ROLE_METADATA } from '@/lib/rbac';
-import { DICTIONARY, useCaesarLanguage } from '@/lib/i18n';
+import {
+  ROLE_METADATA,
+  getAuthorizedActiveModules,
+  getDefaultViewForModule,
+  hasModuleAccess,
+  hasViewAccess,
+} from '@/lib/rbac';
 import {
   ActiveModuleKey,
+  MODULE_REGISTRY,
+  ModuleId,
+  PortalView,
+  formatTierRangeLabel,
+  getAllowedTiersForView,
+  getModuleById,
   isActiveModuleKey,
-  renderLauncherModuleIcon,
-} from '@/components/ModuleLauncher';
+} from '@/lib/moduleRegistry';
+import { DICTIONARY, useCaesarLanguage } from '@/lib/i18n';
+import { renderLauncherModuleIcon } from '@/components/ModuleLauncher';
 import CorporateHeader from '@/components/CorporateHeader';
 import DesktopSidebar from '@/components/DesktopSidebar';
 import TechnicalIntakeModule from '@/components/TechnicalIntakeModule';
@@ -24,44 +36,13 @@ import DepoManagementWorkspace from '@/components/DepoManagementWorkspace';
 import UserManagementWorkspace from '@/components/UserManagementWorkspace';
 import Toast from '@/components/Toast';
 
-type PortalView =
-  | 'WORKSPACE'
-  | 'TECHNICAL_INTAKE'
-  | 'DEPOT_WORKSPACE'
-  | 'USER_MANAGEMENT';
-
-/**
- * Post-Auth Module Clearance Matrix:
- * - 'users' (Personnel & RBAC): Strictly restricted to Tiers 0-1 (SYSTEM_ADMIN, EXECUTIVE)
- * - 'purchasing' & 'depot': Accessible to all authenticated operational tiers
- */
-function hasModuleClearance(
-  role: RoleTier,
-  moduleKey: ActiveModuleKey
-): boolean {
-  if (moduleKey === 'users') {
-    const meta = ROLE_METADATA[role];
-    return Boolean(meta && meta.tier <= 1);
-  }
-  return Boolean(ROLE_METADATA[role]);
-}
-
-function getAuthorizedModulesForRole(role: RoleTier): ActiveModuleKey[] {
-  const allActive: ActiveModuleKey[] = ['purchasing', 'depot', 'users'];
-  return allActive.filter((mod) => hasModuleClearance(role, mod));
-}
-
-function mapModuleKeyToView(moduleKey: ActiveModuleKey): PortalView {
-  if (moduleKey === 'depot') return 'DEPOT_WORKSPACE';
-  if (moduleKey === 'users') return 'USER_MANAGEMENT';
-  return 'WORKSPACE';
-}
-
 export default function PurchasingPortalPage() {
   const [lang] = useCaesarLanguage();
   const [view, setView] = useState<PortalView>('WORKSPACE');
-  const [accessDeniedModule, setAccessDeniedModule] =
-    useState<ActiveModuleKey | null>(null);
+  const [accessDeniedTarget, setAccessDeniedTarget] = useState<{
+    moduleKey: ModuleId;
+    requiredTierLabel: string;
+  } | null>(null);
   const [currentRole, setCurrentRole] = useState<RoleTier>('TECH_OFFICE_USER');
   const [authenticatedRole, setAuthenticatedRole] =
     useState<RoleTier>('TECH_OFFICE_USER');
@@ -89,17 +70,28 @@ export default function PurchasingPortalPage() {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     const requestedMod = params.get('module');
+
     if (!isActiveModuleKey(requestedMod)) {
-      setAccessDeniedModule(null);
+      setAccessDeniedTarget(null);
+      if (!hasViewAccess(resolvedRole, 'WORKSPACE')) {
+        setView('TECHNICAL_INTAKE');
+      }
       return;
     }
 
-    if (hasModuleClearance(resolvedRole, requestedMod)) {
-      setAccessDeniedModule(null);
-      setView(mapModuleKeyToView(requestedMod));
+    const defaultView = getDefaultViewForModule(resolvedRole, requestedMod);
+    if (defaultView && hasModuleAccess(resolvedRole, requestedMod)) {
+      setAccessDeniedTarget(null);
+      setView(defaultView);
     } else {
       // Strictly NO silent auto-redirect: surface explicit Access Denied screen
-      setAccessDeniedModule(requestedMod);
+      const modDef = getModuleById(requestedMod);
+      setAccessDeniedTarget({
+        moduleKey: requestedMod,
+        requiredTierLabel: formatTierRangeLabel(
+          modDef?.allowedTiers || [0, 1, 2]
+        ),
+      });
     }
   }, []);
 
@@ -237,20 +229,31 @@ export default function PurchasingPortalPage() {
   }, [fetchData, checkSession]);
 
   const handleSelectSidebarView = (nextView: PortalView) => {
-    if (
-      nextView === 'USER_MANAGEMENT' &&
-      !hasModuleClearance(currentRole, 'users')
-    ) {
-      setAccessDeniedModule('users');
+    if (!hasViewAccess(currentRole, nextView)) {
+      const mappedMod: ModuleId =
+        nextView === 'USER_MANAGEMENT'
+          ? 'users'
+          : nextView === 'DEV_TOOLS'
+          ? 'devtools'
+          : nextView === 'DEPOT_WORKSPACE'
+          ? 'depot'
+          : 'purchasing';
+      setAccessDeniedTarget({
+        moduleKey: mappedMod,
+        requiredTierLabel: formatTierRangeLabel(
+          getAllowedTiersForView(nextView)
+        ),
+      });
       return;
     }
-    setAccessDeniedModule(null);
+    setAccessDeniedTarget(null);
     setView(nextView);
   };
 
   const handleChooseAuthorizedModule = (modKey: ActiveModuleKey) => {
-    setAccessDeniedModule(null);
-    setView(mapModuleKeyToView(modKey));
+    const nextView = getDefaultViewForModule(currentRole, modKey) || 'WORKSPACE';
+    setAccessDeniedTarget(null);
+    setView(nextView);
     if (typeof window !== 'undefined') {
       const nextUrl = `${window.location.pathname}?module=${encodeURIComponent(
         modKey
@@ -333,7 +336,9 @@ export default function PurchasingPortalPage() {
     }
 
     await fetchData();
-    setView('WORKSPACE');
+    if (hasViewAccess(currentRole, 'WORKSPACE')) {
+      setView('WORKSPACE');
+    }
   };
 
   const handleApproveByTechManager = async (id: string) => {
@@ -516,8 +521,10 @@ export default function PurchasingPortalPage() {
   }
 
   const tl = DICTIONARY[lang].launcher;
+  const ts = DICTIONARY[lang].sidebar;
+  const td = DICTIONARY[lang].devtools;
   const roleMeta = ROLE_METADATA[currentRole];
-  const authorizedModules = getAuthorizedModulesForRole(currentRole);
+  const authorizedModules = getAuthorizedActiveModules(currentRole);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex transition-colors font-sans">
@@ -539,11 +546,25 @@ export default function PurchasingPortalPage() {
           onRoleChange={(nextRole) => {
             setCurrentRole(nextRole);
             if (
-              accessDeniedModule &&
-              hasModuleClearance(nextRole, accessDeniedModule)
+              accessDeniedTarget &&
+              isActiveModuleKey(accessDeniedTarget.moduleKey) &&
+              hasModuleAccess(nextRole, accessDeniedTarget.moduleKey)
             ) {
-              setView(mapModuleKeyToView(accessDeniedModule));
-              setAccessDeniedModule(null);
+              const targetView =
+                getDefaultViewForModule(
+                  nextRole,
+                  accessDeniedTarget.moduleKey
+                ) || 'WORKSPACE';
+              setView(targetView);
+              setAccessDeniedTarget(null);
+            } else if (
+              view === 'DEV_TOOLS' &&
+              !hasViewAccess(nextRole, 'DEV_TOOLS')
+            ) {
+              setAccessDeniedTarget({
+                moduleKey: 'devtools',
+                requiredTierLabel: 'Tier 0',
+              });
             }
           }}
           lang={lang}
@@ -557,7 +578,7 @@ export default function PurchasingPortalPage() {
 
         <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-1">
           {/* STRICT POST-AUTH RBAC ACCESS DENIED GATE (NO SILENT AUTO-REDIRECT) */}
-          {accessDeniedModule ? (
+          {accessDeniedTarget ? (
             <div className="max-w-2xl mx-auto my-8 bg-white dark:bg-[#0f172a] rounded-2xl border-2 border-rose-500/40 shadow-xl p-6 sm:p-8 space-y-6 animate-fade-in">
               <div className="flex items-start space-x-4">
                 <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center justify-center shrink-0">
@@ -580,7 +601,8 @@ export default function PurchasingPortalPage() {
                     403 RBAC • {tl.accessDeniedTitle}
                   </span>
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white uppercase">
-                    {tl.accessDeniedTitle} — {tl.modules[accessDeniedModule]}
+                    {tl.accessDeniedTitle} —{' '}
+                    {tl.modules[accessDeniedTarget.moduleKey]}
                   </h2>
                   <p className="text-xs font-light text-slate-600 dark:text-slate-300 leading-relaxed">
                     {tl.accessDeniedBody}
@@ -603,7 +625,8 @@ export default function PurchasingPortalPage() {
                     {tl.requestedModuleLabel}
                   </span>
                   <span className="font-bold text-rose-600 dark:text-rose-400 uppercase">
-                    {tl.modules[accessDeniedModule]} (Tier 0–1)
+                    {tl.modules[accessDeniedTarget.moduleKey]} (
+                    {accessDeniedTarget.requiredTierLabel})
                   </span>
                 </div>
               </div>
@@ -642,7 +665,8 @@ export default function PurchasingPortalPage() {
             </div>
           ) : view === 'TECHNICAL_INTAKE' ? (
             <TechnicalIntakeModule
-              onBack={() => setView('WORKSPACE')}
+              onBack={() => handleSelectSidebarView('WORKSPACE')}
+              onOpenDepot={() => handleSelectSidebarView('DEPOT_WORKSPACE')}
               onSubmitTicket={handleSubmitTicket}
               catalogItems={catalogItems}
               portfolioProjects={portfolioProjects}
@@ -657,7 +681,7 @@ export default function PurchasingPortalPage() {
               portfolioBuildings={portfolioBuildings}
               currentRole={currentRole}
               lang={lang}
-              onBackToRequisitions={() => setView('WORKSPACE')}
+              onBackToRequisitions={() => handleSelectSidebarView('WORKSPACE')}
               onItemRegistered={(newItem) =>
                 setCatalogItems((prev) => [newItem, ...prev])
               }
@@ -674,6 +698,128 @@ export default function PurchasingPortalPage() {
               portfolioProjects={portfolioProjects}
               onCurrentUserAvatarUpdated={setCurrentUserAvatarUrl}
             />
+          ) : view === 'DEV_TOOLS' ? (
+            /* Tier 0 (SYSTEM_ADMIN) Exclusive Database & Dev Tools Diagnostics Workspace */
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-purple-500/30 p-6 shadow-md">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-300 dark:border-purple-800 mb-2">
+                      {td.badgeTier0} • {ts.version}
+                    </span>
+                    <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white uppercase">
+                      {td.title}
+                    </h1>
+                    <p className="text-xs font-light text-slate-500 dark:text-slate-400 mt-1">
+                      {td.subtitle}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <span className="text-[10px] font-light text-slate-400 block">
+                        {td.catalogCountLabel}
+                      </span>
+                      <span className="text-base font-bold text-slate-900 dark:text-white">
+                        {catalogItems.length}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <span className="text-[10px] font-light text-slate-400 block">
+                        {td.requisitionCountLabel}
+                      </span>
+                      <span className="text-base font-bold text-slate-900 dark:text-white">
+                        {requisitions.length}
+                      </span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                      <span className="text-[10px] font-light text-slate-400 block">
+                        {td.projectCountLabel}
+                      </span>
+                      <span className="text-base font-bold text-slate-900 dark:text-white">
+                        {portfolioProjects.length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-md">
+                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    {td.registryTitle}
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                        <th className="py-3 px-4">{td.colModule}</th>
+                        <th className="py-3 px-4">{td.colStatus}</th>
+                        <th className="py-3 px-4">{td.colLauncher}</th>
+                        <th className="py-3 px-4">{td.colTiers}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {MODULE_REGISTRY.map((mod) => (
+                        <React.Fragment key={mod.id}>
+                          <tr className="bg-white dark:bg-[#0f172a]">
+                            <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                              {tl.modules[mod.id]}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span
+                                className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                  mod.status === 'ACTIVE'
+                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400'
+                                    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                }`}
+                              >
+                                {mod.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 font-light text-slate-600 dark:text-slate-300">
+                              {mod.showOnLauncher
+                                ? `#${mod.launcherOrder}`
+                                : '— (Footer Only)'}
+                            </td>
+                            <td className="py-3 px-4 font-bold text-blue-600 dark:text-blue-400">
+                              {formatTierRangeLabel(mod.allowedTiers)}
+                            </td>
+                          </tr>
+                          {mod.subSections?.map((sub) => (
+                            <tr
+                              key={`${mod.id}-${sub.id}`}
+                              className="bg-slate-50/60 dark:bg-slate-900/30"
+                            >
+                              <td className="py-2 px-4 pl-8 font-light text-slate-600 dark:text-slate-300">
+                                ↳ {ts.subSections[sub.id]}
+                              </td>
+                              <td className="py-2 px-4">
+                                <span
+                                  className={`inline-block px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                                    sub.status === 'ACTIVE'
+                                      ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400'
+                                      : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                                  }`}
+                                >
+                                  {sub.status}
+                                </span>
+                              </td>
+                              <td className="py-2 px-4 font-light text-slate-400">
+                                —
+                              </td>
+                              <td className="py-2 px-4 font-light text-slate-600 dark:text-slate-300">
+                                {formatTierRangeLabel(sub.allowedTiers)}
+                              </td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           ) : (
             <RequisitionWorkspace
               requisitions={requisitions}

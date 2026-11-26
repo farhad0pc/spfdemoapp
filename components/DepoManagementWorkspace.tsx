@@ -974,7 +974,7 @@ export default function DepoManagementWorkspace({
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => openInboundModal()}
-                className="flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs cursor-pointer"
+                className="flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white transition-colors shadow-xs cursor-pointer"
               >
                 <svg
                   className="w-3.5 h-3.5 shrink-0"
@@ -994,7 +994,7 @@ export default function DepoManagementWorkspace({
 
               <button
                 onClick={() => openOutboundModal()}
-                className="flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-xs cursor-pointer"
+                className="flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-yellow-400 hover:bg-yellow-500 text-slate-950 transition-colors shadow-xs cursor-pointer"
               >
                 <svg
                   className="w-3.5 h-3.5 shrink-0"
@@ -1380,7 +1380,7 @@ export default function DepoManagementWorkspace({
         {activeTab === 'BALANCES' && (
           <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold uppercase text-[10px] text-slate-400 tracking-wider">
+              <thead className="bg-blue-50/95 dark:bg-blue-950/45 border-b border-blue-200 dark:border-blue-800/60 font-bold uppercase text-[10px] text-blue-950 dark:text-blue-100 tracking-wider">
                 <tr>
                   <th className="px-4 py-3">{t.thBarcode}</th>
                   <th className="px-4 py-3">{t.thMaterial}</th>
@@ -1609,7 +1609,7 @@ export default function DepoManagementWorkspace({
         {activeTab === 'MOVEMENTS' && (
           <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold uppercase text-[10px] text-slate-400 tracking-wider">
+              <thead className="bg-blue-50/95 dark:bg-blue-950/45 border-b border-blue-200 dark:border-blue-800/60 font-bold uppercase text-[10px] text-blue-950 dark:text-blue-100 tracking-wider">
                 <tr>
                   <th className="px-4 py-3">{t.thTxCode}</th>
                   <th className="px-4 py-3">{t.thMaterial}</th>
@@ -1838,7 +1838,7 @@ export default function DepoManagementWorkspace({
         {activeTab === 'ASSETS' && (
           <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold uppercase text-[10px] text-slate-400 tracking-wider">
+              <thead className="bg-blue-50/95 dark:bg-blue-950/45 border-b border-blue-200 dark:border-blue-800/60 font-bold uppercase text-[10px] text-blue-950 dark:text-blue-100 tracking-wider">
                 <tr>
                   <th className="px-4 py-3">{t.thAssetTag}</th>
                   <th className="px-4 py-3">{t.thSerial}</th>

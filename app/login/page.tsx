@@ -48,8 +48,8 @@ export default function LoginPage() {
   const ts = DICTIONARY[lang].sidebar;
 
   const t = {
-    title: 'CAESAR OPERATIONS',
-    subtitle: lang === 'tr' ? 'Dahili Operasyonlar' : 'Internal Operations',
+    title: tl.title,
+    subtitle: tl.subtitle,
     badge: ts.version,
     lblEmail:
       lang === 'tr'
@@ -188,7 +188,7 @@ export default function LoginPage() {
             <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
               {t.title}
             </h2>
-            <p className="mt-1 text-xs font-light text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs font-light tracking-[0.15em] text-slate-500 dark:text-slate-400 uppercase">
               {t.subtitle}
             </p>
             <span className="inline-block mt-2 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300 dark:border-amber-800">
