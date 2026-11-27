@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getSessionFromRequest } from '@/lib/authSession';
-import { ROLE_METADATA } from '@/lib/rbac';
-import { RoleTier } from '@/types/requisition';
+import { ROLE_METADATA, isProtectedRootUser } from '@/lib/rbac';
+import { RoleTier, CorporateUserProfile } from '@/types/requisition';
 
 const STORAGE_BUCKET = 'inventory-media';
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024; // 2 MB
@@ -58,9 +58,9 @@ async function ensureBucketExists(): Promise<void> {
 
 /**
  * POST /api/users/avatar
- * Strictly restricted to Tiers 0-1 (SYSTEM_ADMIN, EXECUTIVE).
- * Uploads compressed WebP/JPEG/PNG avatar to inventory-media/avatars/${user_id}/${uuid}.${ext},
- * updates public.corporate_users, and deletes the replaced storage object.
+ * - Self-service: Any authenticated user (Tiers 0–4) may update their OWN profile avatar.
+ * - Admin service: Tiers 0–1 (SYSTEM_ADMIN, EXECUTIVE) may update another user's avatar
+ *   (except non-root cannot modify the protected root account).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -77,25 +77,56 @@ export async function POST(request: NextRequest) {
     const actorRoleOverride =
       (formData.get('actor_role') as RoleTier | null) || null;
 
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'user_id alanı zorunludur.' },
+        { status: 400 }
+      );
+    }
+
+    const { data: existingUserRaw, error: userFetchErr } = await supabaseAdmin
+      .from('corporate_users')
+      .select('id, email, avatar_storage_path, is_protected_root')
+      .eq('id', userId)
+      .single();
+
+    if (userFetchErr || !existingUserRaw) {
+      return NextResponse.json(
+        { error: 'Hedef kullanıcı kaydı bulunamadı.' },
+        { status: 404 }
+      );
+    }
+
+    const existingUser = existingUserRaw as Pick<
+      CorporateUserProfile,
+      'id' | 'email' | 'avatar_storage_path' | 'is_protected_root'
+    >;
+
+    const isSelf =
+      existingUser.email.trim().toLowerCase() ===
+      session.email.trim().toLowerCase();
     const effectiveRole = resolveEffectiveCallerRole(
       session.role,
       actorRoleOverride
     );
 
-    if (!isTier0Or1Admin(effectiveRole)) {
+    if (!isSelf && !isTier0Or1Admin(effectiveRole)) {
       return NextResponse.json(
         {
           error:
-            'Yetkisiz işlem (403): Profil fotoğrafı yönetimi yalnızca Kademe 0–1 (Sistem Yöneticisi ve Yönetim Kurulu) yetkisine açıktır.',
+            'Yetkisiz işlem (403): Başka bir personelin profil fotoğrafını yalnızca Kademe 0–1 (Sistem Yöneticisi ve Yönetim Kurulu) güncelleyebilir.',
         },
         { status: 403 }
       );
     }
 
-    if (!userId) {
+    if (isProtectedRootUser(existingUser) && session.role !== 'SYSTEM_ADMIN') {
       return NextResponse.json(
-        { error: 'user_id alanı zorunludur.' },
-        { status: 400 }
+        {
+          error:
+            'Yetkisiz işlem (403): Korumalı Root hesabının fotoğrafı başka kullanıcılar tarafından değiştirilemez.',
+        },
+        { status: 403 }
       );
     }
 
@@ -125,19 +156,6 @@ export async function POST(request: NextRequest) {
             'Profil fotoğrafı boyutu 2 MB sınırını aşamaz. / File size must be <= 2 MB.',
         },
         { status: 400 }
-      );
-    }
-
-    const { data: existingUser, error: userFetchErr } = await supabaseAdmin
-      .from('corporate_users')
-      .select('id, email, avatar_storage_path')
-      .eq('id', userId)
-      .single();
-
-    if (userFetchErr || !existingUser) {
-      return NextResponse.json(
-        { error: 'Hedef kullanıcı kaydı bulunamadı.' },
-        { status: 404 }
       );
     }
 
@@ -194,16 +212,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Best-effort cleanup of replaced avatar file
-    const oldPath = existingUser.avatar_storage_path as
-      | string
-      | null
-      | undefined;
+    const oldPath = existingUser.avatar_storage_path;
     if (oldPath && oldPath !== storagePath) {
       try {
         await supabaseAdmin.storage.from(STORAGE_BUCKET).remove([oldPath]);
       } catch {
         // Ignore cleanup failure
       }
+    }
+
+    // Best-effort audit log entry
+    try {
+      await supabaseAdmin.from('user_audit_logs').insert([
+        {
+          actor_user_id: session.userId || userId,
+          target_user_id: userId,
+          action_type: isSelf ? 'SELF_AVATAR_UPDATED' : 'ADMIN_AVATAR_UPDATED',
+          changes_payload: {
+            actor_email: session.email,
+            target_email: existingUser.email,
+            avatar_url: avatarUrl,
+          },
+        },
+      ]);
+    } catch {
+      // Ignore audit log error
     }
 
     return NextResponse.json({
@@ -219,8 +252,8 @@ export async function POST(request: NextRequest) {
 
 /**
  * DELETE /api/users/avatar?user_id=...
- * Strictly restricted to Tiers 0-1 (SYSTEM_ADMIN, EXECUTIVE).
- * Removes the avatar object from Supabase Storage and clears avatar_url & avatar_storage_path.
+ * - Self-service: Any authenticated user (Tiers 0–4) may remove their OWN profile avatar.
+ * - Admin service: Tiers 0–1 (SYSTEM_ADMIN, EXECUTIVE) may remove another user's avatar.
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -250,21 +283,6 @@ export async function DELETE(request: NextRequest) {
       }
     }
 
-    const effectiveRole = resolveEffectiveCallerRole(
-      session.role,
-      actorRoleOverride
-    );
-
-    if (!isTier0Or1Admin(effectiveRole)) {
-      return NextResponse.json(
-        {
-          error:
-            'Yetkisiz işlem (403): Profil fotoğrafı silme yetkisi yalnızca Kademe 0–1 (Sistem Yöneticisi ve Yönetim Kurulu) rollerine aittir.',
-        },
-        { status: 403 }
-      );
-    }
-
     if (!userId) {
       return NextResponse.json(
         { error: 'user_id parametresi zorunludur.' },
@@ -272,23 +290,53 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const { data: existingUser, error: fetchErr } = await supabaseAdmin
+    const { data: existingUserRaw, error: fetchErr } = await supabaseAdmin
       .from('corporate_users')
-      .select('id, avatar_storage_path')
+      .select('id, email, avatar_storage_path, is_protected_root')
       .eq('id', userId)
       .single();
 
-    if (fetchErr || !existingUser) {
+    if (fetchErr || !existingUserRaw) {
       return NextResponse.json(
         { error: 'Kullanıcı kaydı bulunamadı.' },
         { status: 404 }
       );
     }
 
-    const oldPath = existingUser.avatar_storage_path as
-      | string
-      | null
-      | undefined;
+    const existingUser = existingUserRaw as Pick<
+      CorporateUserProfile,
+      'id' | 'email' | 'avatar_storage_path' | 'is_protected_root'
+    >;
+
+    const isSelf =
+      existingUser.email.trim().toLowerCase() ===
+      session.email.trim().toLowerCase();
+    const effectiveRole = resolveEffectiveCallerRole(
+      session.role,
+      actorRoleOverride
+    );
+
+    if (!isSelf && !isTier0Or1Admin(effectiveRole)) {
+      return NextResponse.json(
+        {
+          error:
+            'Yetkisiz işlem (403): Başka bir personelin profil fotoğrafını silme yetkisi yalnızca Kademe 0–1 rollerine aittir.',
+        },
+        { status: 403 }
+      );
+    }
+
+    if (isProtectedRootUser(existingUser) && session.role !== 'SYSTEM_ADMIN') {
+      return NextResponse.json(
+        {
+          error:
+            'Yetkisiz işlem (403): Korumalı Root hesabının fotoğrafı başka kullanıcılar tarafından silinemez.',
+        },
+        { status: 403 }
+      );
+    }
+
+    const oldPath = existingUser.avatar_storage_path;
     if (oldPath) {
       try {
         await supabaseAdmin.storage.from(STORAGE_BUCKET).remove([oldPath]);
@@ -314,6 +362,22 @@ export async function DELETE(request: NextRequest) {
         },
         { status: 500 }
       );
+    }
+
+    try {
+      await supabaseAdmin.from('user_audit_logs').insert([
+        {
+          actor_user_id: session.userId || userId,
+          target_user_id: userId,
+          action_type: isSelf ? 'SELF_AVATAR_REMOVED' : 'ADMIN_AVATAR_REMOVED',
+          changes_payload: {
+            actor_email: session.email,
+            target_email: existingUser.email,
+          },
+        },
+      ]);
+    } catch {
+      // Ignore audit log error
     }
 
     return NextResponse.json({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   SESSION_COOKIE_NAME,
   LEGACY_FAILSAFE_COOKIE_NAME,
+  DEV_VAULT_COOKIE_NAME,
 } from '@/lib/authSession';
 
 export async function POST(request: NextRequest) {
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
 
   response.cookies.set(SESSION_COOKIE_NAME, '', expireOpts);
   response.cookies.set(LEGACY_FAILSAFE_COOKIE_NAME, '', expireOpts);
+  response.cookies.set(DEV_VAULT_COOKIE_NAME, '', expireOpts);
 
   // Also clear any Supabase auth cookies if present
   for (const cookie of request.cookies.getAll()) {

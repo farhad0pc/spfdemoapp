@@ -1,4 +1,9 @@
-import { RoleTier, DepartmentCode, AuthorityTier } from '@/types/requisition';
+import {
+  RoleTier,
+  DepartmentCode,
+  AuthorityTier,
+  CorporateUserProfile,
+} from '@/types/requisition';
 import {
   ActiveModuleKey,
   ModuleId,
@@ -6,6 +11,8 @@ import {
   getAllowedTiersForView,
   getModuleById,
 } from '@/lib/moduleRegistry';
+
+export const PROTECTED_ROOT_EMAIL = 'farhadmokhtari22@gmail.com';
 
 export interface RoleMetadata {
   role: RoleTier;
@@ -120,6 +127,144 @@ export const ROLE_METADATA: Record<RoleTier, RoleMetadata> = {
 };
 
 /**
+ * Checks whether a user record represents the permanently protected root developer account.
+ */
+export function isProtectedRootUser(
+  user?: Pick<CorporateUserProfile, 'email' | 'is_protected_root'> | null
+): boolean {
+  if (!user) return false;
+  if (user.is_protected_root === true) return true;
+  return (user.email || '').trim().toLowerCase() === PROTECTED_ROOT_EMAIL;
+}
+
+/**
+ * Only Tier 0 (SYSTEM_ADMIN) may see the protected root account in user rosters.
+ */
+export function canViewProtectedRoot(actorRole: RoleTier): boolean {
+  return actorRole === 'SYSTEM_ADMIN';
+}
+
+/**
+ * Option 1: Account Suspension (ACTIVE <-> SUSPENDED) is strictly reserved for
+ * Tier 0 (SYSTEM_ADMIN) and Tier 1 (EXECUTIVE), and is permanently forbidden on the protected root account.
+ */
+export function canSuspendAccount(
+  actorRole: RoleTier,
+  targetUser: Pick<CorporateUserProfile, 'role' | 'email' | 'is_protected_root'>
+): boolean {
+  if (isProtectedRootUser(targetUser)) return false;
+  if (actorRole === 'SYSTEM_ADMIN') return true;
+  if (actorRole === 'EXECUTIVE') {
+    const targetMeta = ROLE_METADATA[targetUser.role];
+    return Boolean(targetMeta && targetMeta.tier >= 1);
+  }
+  return false;
+}
+
+/**
+ * Option 1: Operational Status (ACTIVE <-> ON_LEAVE) can be managed by:
+ * - Tier 0 (SYSTEM_ADMIN) and Tier 1 (EXECUTIVE) for any non-root user
+ * - Tier 2 Team Leaders / Division Managers for Tier 3 & 4 members within their own team (or own department)
+ * Permanently locked to ACTIVE for the protected root account.
+ */
+export function canChangeOperationalStatus(
+  actorRole: RoleTier,
+  targetUser: Pick<
+    CorporateUserProfile,
+    'role' | 'department' | 'team_id' | 'email' | 'is_protected_root'
+  >,
+  actorTeamId?: string | null
+): boolean {
+  if (isProtectedRootUser(targetUser)) return false;
+  if (actorRole === 'SYSTEM_ADMIN') return true;
+
+  const actorMeta = ROLE_METADATA[actorRole];
+  const targetMeta = ROLE_METADATA[targetUser.role];
+  if (!actorMeta || !targetMeta) return false;
+
+  if (actorMeta.tier === 1) {
+    return targetMeta.tier >= 1;
+  }
+
+  if (actorMeta.tier === 2) {
+    if (targetMeta.tier !== 3 && targetMeta.tier !== 4) return false;
+    if (actorTeamId && targetUser.team_id) {
+      return actorTeamId === targetUser.team_id;
+    }
+    return actorMeta.department === (targetUser.department || targetMeta.department);
+  }
+
+  return false;
+}
+
+/**
+ * Checks whether the actor can change a target user's RoleTier.
+ * Protected root account's role is permanently locked at SYSTEM_ADMIN (Tier 0).
+ */
+export function canChangeUserRole(
+  actorRole: RoleTier,
+  targetUser: Pick<CorporateUserProfile, 'role' | 'email' | 'is_protected_root'>
+): boolean {
+  if (isProtectedRootUser(targetUser)) return false;
+  if (actorRole === 'SYSTEM_ADMIN') return true;
+  if (targetUser.role === 'SYSTEM_ADMIN') return false;
+
+  const actorMeta = ROLE_METADATA[actorRole];
+  const targetMeta = ROLE_METADATA[targetUser.role];
+  if (!actorMeta || !targetMeta) return false;
+
+  if (actorMeta.tier === 1) {
+    return targetMeta.tier >= 1;
+  }
+
+  if (actorMeta.tier === 2) {
+    return (
+      actorMeta.department === targetMeta.department &&
+      (targetMeta.tier === 3 || targetMeta.tier === 4)
+    );
+  }
+
+  return false;
+}
+
+/**
+ * Checks whether the actor can edit a user's profile details (job_title, phone_number, team_id, etc.)
+ * in the UserDetailDrawer.
+ * Note: Editing the protected root user's metadata is restricted to SYSTEM_ADMIN with Developer Vault elevation.
+ */
+export function canEditUserDetails(
+  actorRole: RoleTier,
+  targetUser: Pick<
+    CorporateUserProfile,
+    'role' | 'department' | 'team_id' | 'email' | 'is_protected_root'
+  >,
+  actorTeamId?: string | null
+): boolean {
+  if (isProtectedRootUser(targetUser)) {
+    return actorRole === 'SYSTEM_ADMIN';
+  }
+  if (actorRole === 'SYSTEM_ADMIN') return true;
+
+  const actorMeta = ROLE_METADATA[actorRole];
+  const targetMeta = ROLE_METADATA[targetUser.role];
+  if (!actorMeta || !targetMeta) return false;
+
+  if (actorMeta.tier === 1) {
+    return targetMeta.tier >= 1;
+  }
+
+  if (actorMeta.tier === 2) {
+    if (targetMeta.tier !== 3 && targetMeta.tier !== 4) return false;
+    if (actorTeamId && targetUser.team_id) {
+      return actorTeamId === targetUser.team_id;
+    }
+    return actorMeta.department === (targetUser.department || targetMeta.department);
+  }
+
+  return false;
+}
+
+/**
  * Checks if the caller role is authorized to invite/delegate the target role.
  */
 export function canInviteRole(actorRole: RoleTier, targetRole: RoleTier): boolean {
@@ -151,7 +296,7 @@ export function canInviteRole(actorRole: RoleTier, targetRole: RoleTier): boolea
 }
 
 /**
- * Checks if the caller role can modify or revoke a target user.
+ * Checks if the caller role can modify or manage a target user (legacy helper preserved for compatibility).
  */
 export function canManageUser(actorRole: RoleTier, targetUserRole: RoleTier): boolean {
   if (actorRole === 'SYSTEM_ADMIN') return true;

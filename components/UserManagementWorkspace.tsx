@@ -14,12 +14,17 @@ import {
   CorporateUserProfile,
   UserInvitation,
   PortfolioProject,
+  TeamRecord,
 } from '@/types/requisition';
 import {
   ROLE_METADATA,
+  canChangeOperationalStatus,
+  canChangeUserRole,
   canInviteRole,
-  canManageUser,
+  canSuspendAccount,
+  canViewProtectedRoot,
   getAssignableRoles,
+  isProtectedRootUser,
 } from '@/lib/rbac';
 import { DICTIONARY } from '@/lib/i18n';
 import {
@@ -28,6 +33,8 @@ import {
   formatBytesLabel,
 } from '@/lib/imageCompression';
 import WebcamCaptureModal from '@/components/WebcamCaptureModal';
+import UserDetailDrawer from '@/components/UserDetailDrawer';
+import DevVaultModal from '@/components/DevVaultModal';
 
 interface UserManagementWorkspaceProps {
   currentRole: RoleTier;
@@ -69,19 +76,28 @@ export default function UserManagementWorkspace({
   const d = DICTIONARY[lang].personnel;
   const common = DICTIONARY[lang].common;
 
-  // Strictly Tiers 0-1 (SYSTEM_ADMIN, EXECUTIVE) can upload/change/delete user profile avatars
+  // Strictly Tiers 0-1 (SYSTEM_ADMIN, EXECUTIVE) can upload/change/delete other users' profile avatars
   const canManageAvatars =
     currentRole === 'SYSTEM_ADMIN' || currentRole === 'EXECUTIVE';
 
   // Data State
   const [users, setUsers] = useState<CorporateUserProfile[]>([]);
   const [invitations, setInvitations] = useState<UserInvitation[]>([]);
+  const [teams, setTeams] = useState<TeamRecord[]>([]);
+  const [callerTeamId, setCallerTeamId] = useState<string | null>(null);
+  const [isDevElevated, setIsDevElevated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
-  const [activeTab, setActiveTab] = useState<'ROSTER' | 'INVITATIONS'>(
-    'ROSTER'
-  );
+  const [teamFilter, setTeamFilter] = useState<string>('ALL');
+  const [activeTab, setActiveTab] = useState<
+    'ROSTER' | 'TEAMS' | 'INVITATIONS'
+  >('ROSTER');
+
+  // Governance Drawer & Security Vault State
+  const [selectedUserForDrawer, setSelectedUserForDrawer] =
+    useState<CorporateUserProfile | null>(null);
+  const [isDevVaultOpen, setIsDevVaultOpen] = useState<boolean>(false);
 
   // Invite Modal State
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -121,14 +137,23 @@ export default function UserManagementWorkspace({
     };
   }, [avatarPreview]);
 
-  // Fetch Users & Invites
+  // Fetch Users, Teams & Invites
   const fetchPersonnelData = useCallback(async () => {
     try {
       const res = await fetch(`/api/users?role=${currentRole}`);
       const data = await res.json();
       if (res.ok) {
-        setUsers(data.users || []);
-        setInvitations(data.invitations || []);
+        const fetchedUsers = (data.users || []) as CorporateUserProfile[];
+        setUsers(fetchedUsers);
+        setInvitations((data.invitations || []) as UserInvitation[]);
+        setTeams((data.teams || []) as TeamRecord[]);
+        setCallerTeamId((data.callerTeamId as string | null) ?? null);
+        setIsDevElevated(Boolean(data.isDevElevated));
+
+        setSelectedUserForDrawer((prev) => {
+          if (!prev) return null;
+          return fetchedUsers.find((u) => u.id === prev.id) || prev;
+        });
       }
     } catch {
       // Offline fallback state
@@ -144,8 +169,11 @@ export default function UserManagementWorkspace({
         const res = await fetch(`/api/users?role=${currentRole}`);
         const data = await res.json();
         if (!ignore && res.ok) {
-          setUsers(data.users || []);
-          setInvitations(data.invitations || []);
+          setUsers((data.users || []) as CorporateUserProfile[]);
+          setInvitations((data.invitations || []) as UserInvitation[]);
+          setTeams((data.teams || []) as TeamRecord[]);
+          setCallerTeamId((data.callerTeamId as string | null) ?? null);
+          setIsDevElevated(Boolean(data.isDevElevated));
         }
       } catch {
         // Offline fallback
@@ -166,21 +194,72 @@ export default function UserManagementWorkspace({
     return getAssignableRoles(currentRole);
   }, [currentRole]);
 
+  // Visibility-Filtered Users (Hides Protected Root from Tiers 1–4 even during Role Preview)
+  const visibleUsers = useMemo(() => {
+    const allowRootView = canViewProtectedRoot(currentRole);
+    return users.filter((u) => allowRootView || !isProtectedRootUser(u));
+  }, [users, currentRole]);
+
   // Filtered Users
   const filteredUsers = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    return users.filter((u) => {
+    return visibleUsers.filter((u) => {
       const nameMatch =
         u.full_name?.toLowerCase().includes(q) ||
-        u.email?.toLowerCase().includes(q);
+        u.email?.toLowerCase().includes(q) ||
+        u.job_title?.toLowerCase().includes(q) ||
+        u.team?.name?.toLowerCase().includes(q);
       const roleMatch =
         u.role?.toLowerCase().includes(q) ||
         u.department?.toLowerCase().includes(q);
       const deptMatch =
         departmentFilter === 'ALL' || u.department === departmentFilter;
-      return (nameMatch || roleMatch) && deptMatch;
+      const tmMatch =
+        teamFilter === 'ALL'
+          ? true
+          : teamFilter === 'UNASSIGNED'
+          ? !u.team_id
+          : u.team_id === teamFilter;
+      return (!q || nameMatch || roleMatch) && deptMatch && tmMatch;
     });
-  }, [users, searchQuery, departmentFilter]);
+  }, [visibleUsers, searchQuery, departmentFilter, teamFilter]);
+
+  // Grouped Team Roster for Asana/ClickUp-style Team Hierarchy View
+  const teamGroups = useMemo(() => {
+    const groups: Array<{
+      id: string;
+      name: string;
+      code: string;
+      department: string;
+      leaderId: string | null;
+      members: CorporateUserProfile[];
+    }> = teams.map((t) => ({
+      id: t.id,
+      name: t.name,
+      code: t.code || 'TEAM',
+      department: t.department,
+      leaderId: t.leader_user_id || null,
+      members: filteredUsers.filter((u) => u.team_id === t.id),
+    }));
+
+    const assignedTeamIds = new Set(teams.map((t) => t.id));
+    const unassignedMembers = filteredUsers.filter(
+      (u) => !u.team_id || !assignedTeamIds.has(u.team_id)
+    );
+
+    if (unassignedMembers.length > 0 || teams.length === 0) {
+      groups.push({
+        id: 'UNASSIGNED',
+        name: d.unassignedTeam,
+        code: 'HUB-GEN',
+        department: 'CENTRAL',
+        leaderId: null,
+        members: unassignedMembers,
+      });
+    }
+
+    return groups;
+  }, [teams, filteredUsers, d.unassignedTeam]);
 
   // Filtered Invitations
   const filteredInvitations = useMemo(() => {
@@ -195,20 +274,24 @@ export default function UserManagementWorkspace({
       const deptMatch =
         departmentFilter === 'ALL' ||
         inv.target_department === departmentFilter;
-      return (nameMatch || roleMatch) && deptMatch;
+      return (!q || nameMatch || roleMatch) && deptMatch;
     });
   }, [invitations, searchQuery, departmentFilter]);
 
   // KPI Computations
   const kpiStats = useMemo(() => {
-    const total = users.length;
-    const active = users.filter((u) => u.account_status === 'ACTIVE').length;
+    const total = visibleUsers.length;
+    const active = visibleUsers.filter(
+      (u) => u.account_status === 'ACTIVE' && u.operational_status !== 'ON_LEAVE'
+    ).length;
     const pendingInvites = invitations.filter(
       (i) => i.status === 'PENDING'
     ).length;
-    const depts = new Set(users.map((u) => u.department).filter(Boolean)).size;
+    const depts = new Set(
+      visibleUsers.map((u) => u.department).filter(Boolean)
+    ).size;
     return { total, active, pendingInvites, depts };
-  }, [users, invitations]);
+  }, [visibleUsers, invitations]);
 
   // Calculate live countdown for 48h expiration using external clock store
   const getRemainingTimeBadge = (expiresAtStr: string, status: string) => {
@@ -359,16 +442,21 @@ export default function UserManagementWorkspace({
     }
   };
 
-  // Handle Status Toggle (Active / Suspend)
+  // Handle Account Status Toggle (Active / Suspend — Tier 0 & Tier 1 Only)
   const handleToggleUserStatus = async (user: CorporateUserProfile) => {
+    if (isProtectedRootUser(user) || !canSuspendAccount(currentRole, user)) {
+      return;
+    }
     const nextStatus = user.account_status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
     try {
       const res = await fetch('/api/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: user.id,
           user_id: user.id,
           new_status: nextStatus,
+          operational_status: nextStatus,
           actor_role: currentRole,
         }),
       });
@@ -387,9 +475,43 @@ export default function UserManagementWorkspace({
     }
   };
 
+  // Handle Operational Duty Toggle (ACTIVE / ON_LEAVE — Tier 0, Tier 1, or Tier 2 Own-Team Leader)
+  const handleToggleOperationalStatus = async (user: CorporateUserProfile) => {
+    if (
+      isProtectedRootUser(user) ||
+      !canChangeOperationalStatus(currentRole, user, callerTeamId)
+    ) {
+      return;
+    }
+    const nextOp = user.operational_status === 'ON_LEAVE' ? 'ACTIVE' : 'ON_LEAVE';
+    try {
+      const res = await fetch('/api/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: user.id,
+          operational_status: nextOp,
+        }),
+      });
+      if (res.ok) {
+        void fetchPersonnelData();
+      } else {
+        const data = await res.json();
+        alert(
+          data.error ||
+            (lang === 'tr'
+              ? 'Operasyonel durum güncellenemedi.'
+              : 'Failed to update operational status.')
+        );
+      }
+    } catch {
+      // Ignore
+    }
+  };
+
   // Handle Role Update
   const handleSaveUserRole = async () => {
-    if (!editingUser || !editRole) return;
+    if (!editingUser || !editRole || isProtectedRootUser(editingUser)) return;
     setEditSubmitting(true);
 
     try {
@@ -397,6 +519,7 @@ export default function UserManagementWorkspace({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: editingUser.id,
           user_id: editingUser.id,
           new_role: editRole,
           actor_role: currentRole,
@@ -421,6 +544,7 @@ export default function UserManagementWorkspace({
   // Milestone v2.9.4 Avatar Modal Handlers
   const openAvatarModal = (user: CorporateUserProfile) => {
     if (!canManageAvatars) return;
+    if (isProtectedRootUser(user) && currentRole !== 'SYSTEM_ADMIN') return;
     if (avatarPreview?.previewUrl) {
       URL.revokeObjectURL(avatarPreview.previewUrl);
     }
@@ -569,6 +693,38 @@ export default function UserManagementWorkspace({
     }
   };
 
+  const renderStatusBadges = (u: CorporateUserProfile) => {
+    const isRoot = isProtectedRootUser(u);
+    const opStatus = u.operational_status || 'ACTIVE';
+
+    return (
+      <div className="flex flex-wrap items-center justify-center gap-1">
+        {isRoot && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-300 dark:border-purple-700">
+            🔒 {d.protectedRootBadge}
+          </span>
+        )}
+        {u.account_status === 'SUSPENDED' ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400">
+            ✕ {d.statusSuspended}
+          </span>
+        ) : u.account_status === 'INVITED' ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
+            ⏳ {d.statusInvited}
+          </span>
+        ) : opStatus === 'ON_LEAVE' ? (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
+            ◐ {d.statusOnLeave}
+          </span>
+        ) : (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400">
+            ✓ {d.statusActive}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 animate-fade-in pb-16 font-sans">
       {/* Header Banner */}
@@ -592,36 +748,61 @@ export default function UserManagementWorkspace({
             </p>
           </div>
 
-          {/* Action: Open Invite Modal (if authorized) */}
-          {assignableRoles.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                setIsInviteModalOpen(true);
-                setInviteSuccessUrl(null);
-                setInviteError(null);
-                setInviteEmail('');
-                setInviteFullName('');
-                setInviteRole(assignableRoles[0] || '');
-              }}
-              className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center space-x-2 cursor-pointer"
-            >
-              <svg
-                className="w-4 h-4 shrink-0"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+          <div className="flex flex-wrap items-center gap-2">
+            {currentRole === 'SYSTEM_ADMIN' && (
+              <button
+                type="button"
+                onClick={() => setIsDevVaultOpen(true)}
+                className={`w-full sm:w-auto min-h-[44px] px-3.5 py-2 rounded-xl text-xs font-bold border transition-colors flex items-center justify-center space-x-1.5 cursor-pointer ${
+                  isDevElevated
+                    ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                    : 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-800'
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-                />
-              </svg>
-              <span>{d.btnInvite}</span>
-            </button>
-          )}
+                <span>{isDevElevated ? '●' : '🔒'}</span>
+                <span>
+                  {isDevElevated
+                    ? lang === 'tr'
+                      ? 'Root Kasası Açık'
+                      : 'Root Vault Active'
+                    : lang === 'tr'
+                    ? 'Root Kasası'
+                    : 'Root Vault'}
+                </span>
+              </button>
+            )}
+
+            {/* Action: Open Invite Modal (if authorized) */}
+            {assignableRoles.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsInviteModalOpen(true);
+                  setInviteSuccessUrl(null);
+                  setInviteError(null);
+                  setInviteEmail('');
+                  setInviteFullName('');
+                  setInviteRole(assignableRoles[0] || '');
+                }}
+                className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center space-x-2 cursor-pointer"
+              >
+                <svg
+                  className="w-4 h-4 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                  />
+                </svg>
+                <span>{d.btnInvite}</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -679,7 +860,6 @@ export default function UserManagementWorkspace({
 
       {/* 4-Stat Telemetry Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* KPI 1: Total Users */}
         <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs min-w-0">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             {d.kpiTotalUsers}
@@ -694,7 +874,6 @@ export default function UserManagementWorkspace({
           </div>
         </div>
 
-        {/* KPI 2: Active Accounts */}
         <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs min-w-0">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             {d.kpiActiveUsers}
@@ -709,7 +888,6 @@ export default function UserManagementWorkspace({
           </div>
         </div>
 
-        {/* KPI 3: Pending Invites */}
         <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs min-w-0">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             {d.kpiPendingInvites}
@@ -724,14 +902,13 @@ export default function UserManagementWorkspace({
           </div>
         </div>
 
-        {/* KPI 4: Active Departments */}
         <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs min-w-0">
           <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             {d.kpiDepartments}
           </span>
           <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span className="text-xl sm:text-2xl font-light text-blue-600 dark:text-blue-400">
-              {kpiStats.depts}
+              {kpiStats.depts} / {teams.length || 1}
             </span>
             <span className="text-xs font-light text-slate-400">
               {d.kpiDepartmentsSub}
@@ -742,8 +919,8 @@ export default function UserManagementWorkspace({
 
       {/* Tabs & Filter Bar */}
       <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
-          {/* Tabs */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+          {/* Tabs: Roster | Teams | Invitations */}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -754,7 +931,21 @@ export default function UserManagementWorkspace({
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
-              {d.tabRoster} <span className="font-light">({users.length})</span>
+              {d.tabRoster}{' '}
+              <span className="font-light">({visibleUsers.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('TEAMS')}
+              className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'TEAMS'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              {d.tabTeams}{' '}
+              <span className="font-light">({teams.length || 1})</span>
             </button>
 
             <button
@@ -776,12 +967,12 @@ export default function UserManagementWorkspace({
             </button>
           </div>
 
-          {/* Department Filter */}
-          <div className="flex items-center w-full md:w-auto">
+          {/* Department & Team Filters */}
+          <div className="flex flex-col sm:flex-row items-center gap-2 w-full lg:w-auto">
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="w-full md:w-auto min-h-[44px] h-11 sm:h-10 text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
+              className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10 text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
             >
               <option value="ALL">{d.allDepartments}</option>
               <option value="SYSTEM">SYSTEM</option>
@@ -790,6 +981,22 @@ export default function UserManagementWorkspace({
               <option value="PURCHASING">PURCHASING</option>
               <option value="DEPOT">DEPOT</option>
             </select>
+
+            {activeTab !== 'INVITATIONS' && (
+              <select
+                value={teamFilter}
+                onChange={(e) => setTeamFilter(e.target.value)}
+                className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10 text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
+              >
+                <option value="ALL">{d.allTeams}</option>
+                {teams.map((tm) => (
+                  <option key={tm.id} value={tm.id}>
+                    {tm.name}
+                  </option>
+                ))}
+                <option value="UNASSIGNED">{d.unassignedTeam}</option>
+              </select>
+            )}
           </div>
         </div>
 
@@ -830,25 +1037,35 @@ export default function UserManagementWorkspace({
                 </div>
               ) : filteredUsers.length === 0 ? (
                 <div className="p-8 text-center text-xs font-light text-slate-400 rounded-xl border border-slate-200 dark:border-slate-800">
-                  {lang === 'tr'
-                    ? 'Kriterlere uygun personel bulunamadı.'
-                    : 'No personnel matching filter criteria.'}
+                  {d.emptyRoster}
                 </div>
               ) : (
                 filteredUsers.map((u) => {
                   const roleMeta = ROLE_METADATA[u.role];
-                  const isManageable = canManageUser(currentRole, u.role);
+                  const isRoot = isProtectedRootUser(u);
+                  const allowSuspend = canSuspendAccount(currentRole, u);
+                  const allowOpToggle = canChangeOperationalStatus(
+                    currentRole,
+                    u,
+                    callerTeamId
+                  );
+                  const allowRoleEdit = canChangeUserRole(currentRole, u);
                   const initialLetter =
                     u.full_name?.charAt(0).toUpperCase() || 'U';
 
                   return (
                     <div
                       key={`mob-usr-${u.id}`}
-                      className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 p-3.5 space-y-3"
+                      className={`rounded-2xl border p-3.5 space-y-3 ${
+                        isRoot
+                          ? 'border-purple-400/60 dark:border-purple-800 bg-purple-50/30 dark:bg-purple-950/20'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60'
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center space-x-3 min-w-0">
-                          {canManageAvatars ? (
+                          {canManageAvatars &&
+                          (!isRoot || currentRole === 'SYSTEM_ADMIN') ? (
                             <button
                               type="button"
                               onClick={() => openAvatarModal(u)}
@@ -880,30 +1097,25 @@ export default function UserManagementWorkspace({
                           )}
 
                           <div className="min-w-0">
-                            <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedUserForDrawer(u)}
+                              className="text-xs font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block text-left cursor-pointer"
+                            >
                               {u.full_name}
-                            </div>
+                            </button>
                             <div className="text-[11px] font-mono font-light text-slate-400 truncate">
                               {u.email}
                             </div>
+                            {u.job_title && (
+                              <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate">
+                                {u.job_title}
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {u.account_status === 'ACTIVE' && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 shrink-0">
-                            ✓ {d.statusActive}
-                          </span>
-                        )}
-                        {u.account_status === 'INVITED' && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 shrink-0">
-                            ⏳ {d.statusInvited}
-                          </span>
-                        )}
-                        {u.account_status === 'SUSPENDED' && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400 shrink-0">
-                            ✕ {d.statusSuspended}
-                          </span>
-                        )}
+                        {renderStatusBadges(u)}
                       </div>
 
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
@@ -916,7 +1128,8 @@ export default function UserManagementWorkspace({
                               : u.role}
                           </span>
                           <span className="text-[10px] font-mono font-light text-slate-400">
-                            {u.department} • {u.role}
+                            {u.department}
+                            {u.team?.name ? ` • ${u.team.name}` : ''}
                           </span>
                         </div>
                         <span
@@ -936,8 +1149,30 @@ export default function UserManagementWorkspace({
                         </span>
                       </div>
 
-                      {isManageable && (
-                        <div className="flex items-center gap-2 pt-1">
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedUserForDrawer(u)}
+                          className="flex-1 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
+                        >
+                          {d.btnInspectUser}
+                        </button>
+
+                        {!isRoot &&
+                          allowOpToggle &&
+                          u.account_status === 'ACTIVE' && (
+                            <button
+                              type="button"
+                              onClick={() => handleToggleOperationalStatus(u)}
+                              className="flex-1 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-300 dark:border-amber-800 transition-colors cursor-pointer"
+                            >
+                              {u.operational_status === 'ON_LEAVE'
+                                ? d.btnSetActiveDuty
+                                : d.btnSetOnLeave}
+                            </button>
+                          )}
+
+                        {!isRoot && allowSuspend && (
                           <button
                             type="button"
                             onClick={() => handleToggleUserStatus(u)}
@@ -951,6 +1186,9 @@ export default function UserManagementWorkspace({
                               ? d.btnSuspend
                               : d.btnActivate}
                           </button>
+                        )}
+
+                        {!isRoot && allowRoleEdit && (
                           <button
                             type="button"
                             onClick={() => {
@@ -961,8 +1199,8 @@ export default function UserManagementWorkspace({
                           >
                             {d.btnChangeRole}
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   );
                 })
@@ -999,26 +1237,36 @@ export default function UserManagementWorkspace({
                         colSpan={7}
                         className="px-4 py-8 text-center text-slate-400 font-light"
                       >
-                        {lang === 'tr'
-                          ? 'Kriterlere uygun personel bulunamadı.'
-                          : 'No personnel matching filter criteria.'}
+                        {d.emptyRoster}
                       </td>
                     </tr>
                   ) : (
                     filteredUsers.map((u) => {
                       const roleMeta = ROLE_METADATA[u.role];
-                      const isManageable = canManageUser(currentRole, u.role);
+                      const isRoot = isProtectedRootUser(u);
+                      const allowSuspend = canSuspendAccount(currentRole, u);
+                      const allowOpToggle = canChangeOperationalStatus(
+                        currentRole,
+                        u,
+                        callerTeamId
+                      );
+                      const allowRoleEdit = canChangeUserRole(currentRole, u);
                       const initialLetter =
                         u.full_name?.charAt(0).toUpperCase() || 'U';
 
                       return (
                         <tr
                           key={u.id}
-                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                          className={`transition-colors ${
+                            isRoot
+                              ? 'bg-purple-50/30 dark:bg-purple-950/20 hover:bg-purple-50/60 dark:hover:bg-purple-950/35'
+                              : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
+                          }`}
                         >
                           <td className="px-4 py-3">
                             <div className="flex items-center space-x-3">
-                              {canManageAvatars ? (
+                              {canManageAvatars &&
+                              (!isRoot || currentRole === 'SYSTEM_ADMIN') ? (
                                 <button
                                   type="button"
                                   onClick={() => openAvatarModal(u)}
@@ -1070,19 +1318,33 @@ export default function UserManagementWorkspace({
                                 </div>
                               )}
                               <div>
-                                <div className="font-bold text-slate-900 dark:text-white">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedUserForDrawer(u)}
+                                  className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 text-left cursor-pointer"
+                                >
                                   {u.full_name}
-                                </div>
+                                </button>
                                 <div className="text-[11px] font-mono font-light text-slate-400">
                                   {u.email}
                                 </div>
+                                {u.phone_number && (
+                                  <div className="text-[10px] font-mono text-slate-400">
+                                    {u.phone_number}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 font-bold text-slate-800 dark:text-slate-200 uppercase">
-                            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                          <td className="px-4 py-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
                               {u.department}
                             </span>
+                            {u.team?.name && (
+                              <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mt-1">
+                                {u.team.name}
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <div className="font-bold text-blue-600 dark:text-blue-400">
@@ -1093,6 +1355,7 @@ export default function UserManagementWorkspace({
                                 : u.role}
                             </div>
                             <div className="text-[10px] font-mono font-light text-slate-400">
+                              {u.job_title ? `${u.job_title} • ` : ''}
                               {u.role}
                             </div>
                           </td>
@@ -1114,21 +1377,7 @@ export default function UserManagementWorkspace({
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center">
-                            {u.account_status === 'ACTIVE' && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400">
-                                ✓ {d.statusActive}
-                              </span>
-                            )}
-                            {u.account_status === 'INVITED' && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
-                                ⏳ {d.statusInvited}
-                              </span>
-                            )}
-                            {u.account_status === 'SUSPENDED' && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400">
-                                ✕ {d.statusSuspended}
-                              </span>
-                            )}
+                            {renderStatusBadges(u)}
                           </td>
                           <td className="px-4 py-3 font-mono font-light text-[11px] text-slate-500">
                             {u.last_login_at
@@ -1138,8 +1387,32 @@ export default function UserManagementWorkspace({
                               : '-'}
                           </td>
                           <td className="px-4 py-3 text-center">
-                            {isManageable ? (
-                              <div className="flex items-center justify-center space-x-1.5">
+                            <div className="flex items-center justify-center flex-wrap gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedUserForDrawer(u)}
+                                className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors cursor-pointer"
+                              >
+                                {d.btnInspectUser}
+                              </button>
+
+                              {!isRoot &&
+                                allowOpToggle &&
+                                u.account_status === 'ACTIVE' && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleToggleOperationalStatus(u)
+                                    }
+                                    className="px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 border border-amber-300 dark:border-amber-800 transition-colors cursor-pointer"
+                                  >
+                                    {u.operational_status === 'ON_LEAVE'
+                                      ? d.btnSetActiveDuty
+                                      : d.btnSetOnLeave}
+                                  </button>
+                                )}
+
+                              {!isRoot && allowSuspend && (
                                 <button
                                   type="button"
                                   onClick={() => handleToggleUserStatus(u)}
@@ -1153,6 +1426,9 @@ export default function UserManagementWorkspace({
                                     ? d.btnSuspend
                                     : d.btnActivate}
                                 </button>
+                              )}
+
+                              {!isRoot && allowRoleEdit && (
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1163,12 +1439,8 @@ export default function UserManagementWorkspace({
                                 >
                                   {d.btnChangeRole}
                                 </button>
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 text-[10px] font-light">
-                                -
-                              </span>
-                            )}
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1181,7 +1453,118 @@ export default function UserManagementWorkspace({
         )}
 
         {/* =============================================================== */}
-        {/* TAB 2: INVITATIONS (MOBILE CARDS < md + DESKTOP TABLE)          */}
+        {/* TAB 2: ASANA / CLICKUP-STYLE TEAMS & UNIT HIERARCHY VIEW        */}
+        {/* =============================================================== */}
+        {activeTab === 'TEAMS' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {teamGroups.map((tg) => {
+              const leader = tg.leaderId
+                ? visibleUsers.find((u) => u.id === tg.leaderId)
+                : tg.members.find((u) => u.authority_tier <= 2);
+
+              return (
+                <div
+                  key={tg.id}
+                  className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 p-4 space-y-3 flex flex-col justify-between"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300 dark:border-blue-800">
+                            {tg.code}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase text-slate-400">
+                            {tg.department}
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase mt-1">
+                          {tg.name}
+                        </h3>
+                      </div>
+
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 shrink-0">
+                        {tg.members.length}{' '}
+                        {lang === 'tr' ? 'Üye' : 'Members'}
+                      </span>
+                    </div>
+
+                    {leader && (
+                      <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/60 text-xs">
+                        <span className="text-[10px] font-bold uppercase text-blue-700 dark:text-blue-300">
+                          {d.teamLeadBadge}:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedUserForDrawer(leader)}
+                          className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer truncate"
+                        >
+                          {leader.full_name} (Tier {leader.authority_tier})
+                        </button>
+                      </div>
+                    )}
+
+                    {tg.members.length === 0 ? (
+                      <div className="py-6 text-center text-xs font-light text-slate-400">
+                        {lang === 'tr'
+                          ? 'Bu ekipte filtreye uygun personel yok.'
+                          : 'No matching members in this team.'}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {tg.members.map((member) => {
+                          const rm = ROLE_METADATA[member.role];
+                          return (
+                            <div
+                              key={`tm-mem-${member.id}`}
+                              onClick={() => setSelectedUserForDrawer(member)}
+                              className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 hover:border-blue-500/50 transition-colors flex items-center justify-between gap-2 cursor-pointer"
+                            >
+                              <div className="flex items-center space-x-2.5 min-w-0">
+                                {member.avatar_url ? (
+                                  <img
+                                    src={member.avatar_url}
+                                    alt={member.full_name}
+                                    className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center shrink-0">
+                                    {(member.full_name || 'U')
+                                      .charAt(0)
+                                      .toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <span className="text-xs font-bold text-slate-900 dark:text-white block truncate">
+                                    {member.full_name}
+                                  </span>
+                                  <span className="text-[10px] font-light text-slate-500 dark:text-slate-400 block truncate">
+                                    {member.job_title ||
+                                      (lang === 'tr'
+                                        ? rm?.titleTr
+                                        : rm?.titleEn)}{' '}
+                                    • Tier {member.authority_tier}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="shrink-0">
+                                {renderStatusBadges(member)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* =============================================================== */}
+        {/* TAB 3: INVITATIONS (MOBILE CARDS < md + DESKTOP TABLE)          */}
         {/* =============================================================== */}
         {activeTab === 'INVITATIONS' && (
           <>
@@ -1193,9 +1576,7 @@ export default function UserManagementWorkspace({
                 </div>
               ) : filteredInvitations.length === 0 ? (
                 <div className="p-8 text-center text-xs font-light text-slate-400 rounded-xl border border-slate-200 dark:border-slate-800">
-                  {lang === 'tr'
-                    ? 'Kayıtlı davet bulunamadı.'
-                    : 'No invitations found.'}
+                  {d.emptyInvites}
                 </div>
               ) : (
                 filteredInvitations.map((inv) => {
@@ -1304,9 +1685,7 @@ export default function UserManagementWorkspace({
                         colSpan={5}
                         className="px-4 py-8 text-center text-slate-400 font-light"
                       >
-                        {lang === 'tr'
-                          ? 'Kayıtlı davet bulunamadı.'
-                          : 'No invitations found.'}
+                        {d.emptyInvites}
                       </td>
                     </tr>
                   ) : (
@@ -1364,11 +1743,6 @@ export default function UserManagementWorkspace({
                                       handleResendInvite(inv.invitation_id)
                                     }
                                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900 transition-colors cursor-pointer"
-                                    title={
-                                      lang === 'tr'
-                                        ? '48 saatlik süreyi sıfırla ve yeni link üret'
-                                        : 'Reset 48h clock and generate new link'
-                                    }
                                   >
                                     {d.btnResend}
                                   </button>
@@ -1399,7 +1773,39 @@ export default function UserManagementWorkspace({
       </div>
 
       {/* ================================================= */}
-      {/* MODAL 1: INVITE TEAM MEMBER DIALOG */}
+      {/* DRAWER: PERSONNEL GOVERNANCE & TEAM DRAWER         */}
+      {/* ================================================= */}
+      <UserDetailDrawer
+        isOpen={Boolean(selectedUserForDrawer)}
+        user={selectedUserForDrawer}
+        teams={teams}
+        currentRole={currentRole}
+        callerTeamId={callerTeamId}
+        isDevElevated={isDevElevated}
+        lang={lang}
+        onClose={() => setSelectedUserForDrawer(null)}
+        onRequireDevVault={() => setIsDevVaultOpen(true)}
+        onUpdated={() => {
+          void fetchPersonnelData();
+        }}
+        onOpenAvatarModal={(targetUser) => openAvatarModal(targetUser)}
+      />
+
+      {/* ================================================= */}
+      {/* MODAL: TIER 0 DEVELOPER SECURITY VAULT             */}
+      {/* ================================================= */}
+      <DevVaultModal
+        isOpen={isDevVaultOpen}
+        onClose={() => setIsDevVaultOpen(false)}
+        onVerified={() => {
+          setIsDevElevated(true);
+          void fetchPersonnelData();
+        }}
+        lang={lang}
+      />
+
+      {/* ================================================= */}
+      {/* MODAL 1: INVITE TEAM MEMBER DIALOG                */}
       {/* ================================================= */}
       {isInviteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
@@ -1445,11 +1851,7 @@ export default function UserManagementWorkspace({
                       d="M5 13l4 4L19 7"
                     />
                   </svg>
-                  <span>
-                    {lang === 'tr'
-                      ? 'Davet oluşturuldu ve 48 saatlik aktivasyon bağlantısı hazır!'
-                      : 'Invitation generated and 48-hour secure link is ready!'}
-                  </span>
+                  <span>{d.inviteSuccessNotice}</span>
                 </div>
 
                 <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1608,7 +2010,7 @@ export default function UserManagementWorkspace({
       )}
 
       {/* ================================================= */}
-      {/* MODAL 2: EDIT USER ROLE MODAL */}
+      {/* MODAL 2: EDIT USER ROLE MODAL                     */}
       {/* ================================================= */}
       {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
@@ -1663,7 +2065,7 @@ export default function UserManagementWorkspace({
       )}
 
       {/* ================================================= */}
-      {/* MODAL 3: MILESTONE v2.9.4 UPDATE USER PHOTO MODAL (TIER 0-1) */}
+      {/* MODAL 3: MILESTONE v2.9.4 UPDATE USER PHOTO MODAL */}
       {/* ================================================= */}
       {avatarEditingUser && canManageAvatars && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">

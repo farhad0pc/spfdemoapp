@@ -15,6 +15,7 @@ interface CorporateHeaderProps {
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   onOpenMobileDrawer?: () => void;
+  onOpenProfile?: () => void;
   currentUserEmail?: string | null;
   avatarUrl?: string | null;
   isLoggedIn?: boolean;
@@ -39,6 +40,7 @@ export default function CorporateHeader({
   lang,
   onToggleSidebar,
   onOpenMobileDrawer,
+  onOpenProfile,
   currentUserEmail,
   avatarUrl,
   isLoggedIn = false,
@@ -54,6 +56,8 @@ export default function CorporateHeader({
     (lang === 'tr' ? activeMeta?.titleTr : activeMeta?.titleEn) ||
     currentUserEmail ||
     t.activeUser;
+
+  const profileTooltip = lang === 'tr' ? 'Profilim' : 'My Profile';
 
   return (
     <header className="bg-white dark:bg-[#090d16] border-b border-slate-200 dark:border-slate-800 transition-colors sticky top-0 z-30 select-none font-sans pt-[env(safe-area-inset-top)]">
@@ -115,10 +119,15 @@ export default function CorporateHeader({
             </div>
           </div>
 
-          {/* Mobile (< md) Center: Centered User Photo + Name/Identity (Tier Card Removed) */}
-          <div className="flex md:hidden items-center justify-center gap-2 min-w-0 flex-1 px-1">
+          {/* Mobile (< md) Center: Centered User Photo + Name/Identity (Triggers Personal Profile Modal) */}
+          <div className="flex md:hidden items-center justify-center min-w-0 flex-1 px-1">
             {isLoggedIn && (
-              <>
+              <button
+                type="button"
+                onClick={onOpenProfile}
+                title={profileTooltip}
+                className="flex items-center justify-center gap-2 min-w-0 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer"
+              >
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
@@ -130,14 +139,14 @@ export default function CorporateHeader({
                     {(displayIdentity || 'U').charAt(0).toUpperCase()}
                   </div>
                 )}
-                <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate max-w-[175px]">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate max-w-[165px]">
                   {displayIdentity}
                 </span>
-              </>
+              </button>
             )}
           </div>
 
-          {/* Desktop (md:+) Right: Session Role Badge + User Identity + Sign In / Sign Out */}
+          {/* Desktop (md:+) Right: Session Role Badge + User Identity (Opens Profile) + Sign In / Sign Out */}
           <div className="hidden md:flex items-center justify-end gap-3 min-w-0 flex-1">
             <div className="flex items-center space-x-2 bg-slate-50 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs min-w-0 overflow-hidden">
               <span
@@ -154,27 +163,34 @@ export default function CorporateHeader({
 
             {isLoggedIn ? (
               <div className="flex items-center space-x-2.5 pl-2 border-l border-slate-200 dark:border-slate-800 shrink-0">
-                {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt={currentUserEmail || t.activeUser}
-                    className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800"
-                  />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/20 shrink-0">
-                    {currentUserEmail
-                      ? currentUserEmail.charAt(0).toUpperCase()
-                      : 'U'}
+                <button
+                  type="button"
+                  onClick={onOpenProfile}
+                  title={profileTooltip}
+                  className="flex items-center space-x-2.5 px-2 py-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer group"
+                >
+                  {avatarUrl ? (
+                    <img
+                      src={avatarUrl}
+                      alt={currentUserEmail || t.activeUser}
+                      className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 group-hover:ring-2 group-hover:ring-blue-500/50 shrink-0 bg-slate-100 dark:bg-slate-800 transition-all"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/20 group-hover:ring-2 group-hover:ring-blue-500/50 shrink-0 transition-all">
+                      {currentUserEmail
+                        ? currentUserEmail.charAt(0).toUpperCase()
+                        : 'U'}
+                    </div>
+                  )}
+                  <div className="hidden lg:flex flex-col text-left">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 max-w-[140px] truncate">
+                      {currentUserEmail || t.activeUser}
+                    </span>
+                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                      {profileTooltip}
+                    </span>
                   </div>
-                )}
-                <div className="hidden lg:flex flex-col text-left">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 max-w-[140px] truncate">
-                    {currentUserEmail || t.activeUser}
-                  </span>
-                  <span className="text-[10px] font-light text-slate-400">
-                    {t.loggedIn}
-                  </span>
-                </div>
+                </button>
                 {onLogout && (
                   <button
                     type="button"

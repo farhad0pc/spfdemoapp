@@ -34,6 +34,8 @@ import TechnicalIntakeModule from '@/components/TechnicalIntakeModule';
 import RequisitionWorkspace from '@/components/RequisitionWorkspace';
 import DepoManagementWorkspace from '@/components/DepoManagementWorkspace';
 import UserManagementWorkspace from '@/components/UserManagementWorkspace';
+import UserProfileModal from '@/components/UserProfileModal';
+import DevVaultModal from '@/components/DevVaultModal';
 import Toast from '@/components/Toast';
 
 export default function PurchasingPortalPage() {
@@ -62,6 +64,10 @@ export default function PurchasingPortalPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isDevVaultModalOpen, setIsDevVaultModalOpen] =
+    useState<boolean>(false);
+  const [isDevVaultElevated, setIsDevVaultElevated] = useState<boolean>(false);
   const [toastState, setToastState] = useState<{
     message: string;
     subMessage?: string;
@@ -139,6 +145,20 @@ export default function PurchasingPortalPage() {
           setCurrentRole(resolvedRole);
           setAuthenticatedRole(resolvedRole);
           applyRequestedModuleRouting(resolvedRole);
+
+          if (resolvedRole === 'SYSTEM_ADMIN') {
+            try {
+              const vaultRes = await fetch('/api/auth/dev-verify', {
+                method: 'GET',
+              });
+              if (vaultRes.ok) {
+                const vaultData = await vaultRes.json();
+                setIsDevVaultElevated(Boolean(vaultData.elevated));
+              }
+            } catch {
+              // Ignore vault status check
+            }
+          }
           return;
         }
       }
@@ -535,6 +555,7 @@ export default function PurchasingPortalPage() {
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isMobileOpen={isMobileDrawerOpen}
         onCloseMobile={() => setIsMobileDrawerOpen(false)}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
         currentView={view}
         onSelectView={handleSelectSidebarView}
         onUpcomingClick={handleUpcomingClick}
@@ -578,6 +599,7 @@ export default function PurchasingPortalPage() {
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           onOpenMobileDrawer={() => setIsMobileDrawerOpen(true)}
+          onOpenProfile={() => setIsProfileModalOpen(true)}
           currentUserEmail={currentUserEmail}
           avatarUrl={currentUserAvatarUrl}
           isLoggedIn={isLoggedIn}
@@ -712,9 +734,28 @@ export default function PurchasingPortalPage() {
               <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-purple-500/30 p-5 sm:p-6 shadow-md">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
-                    <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-300 dark:border-purple-800 mb-2">
-                      {td.badgeTier0} • {ts.version}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+                        {td.badgeTier0} • {ts.version}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsDevVaultModalOpen(true)}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors cursor-pointer ${
+                          isDevVaultElevated
+                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                            : 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                        }`}
+                      >
+                        {isDevVaultElevated
+                          ? lang === 'tr'
+                            ? '● Güvenlik Kasası Açık'
+                            : '● Security Vault Unlocked'
+                          : lang === 'tr'
+                          ? '🔒 Güvenlik Kasasını Doğrula'
+                          : '🔒 Verify Security Vault'}
+                      </button>
+                    </div>
                     <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white uppercase">
                       {td.title}
                     </h1>
@@ -844,6 +885,38 @@ export default function PurchasingPortalPage() {
           )}
         </main>
       </div>
+
+      {/* Personal Self-Service Profile Modal (Accessible by All Tiers 0–4) */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        lang={lang}
+        currentRole={currentRole}
+        onProfileUpdated={(patch) => {
+          if (patch.avatarUrl !== undefined) {
+            setCurrentUserAvatarUrl(patch.avatarUrl);
+          }
+        }}
+        onOpenDevVault={() => setIsDevVaultModalOpen(true)}
+      />
+
+      {/* Tier 0 Developer Security Vault Modal */}
+      <DevVaultModal
+        isOpen={isDevVaultModalOpen}
+        onClose={() => setIsDevVaultModalOpen(false)}
+        onVerified={() => {
+          setIsDevVaultElevated(true);
+          handleShowToast(
+            lang === 'tr'
+              ? 'Geliştirici Güvenlik Kasası Açıldı'
+              : 'Developer Security Vault Unlocked',
+            lang === 'tr'
+              ? 'Root yönetişim yetkisi 15 dakika boyunca aktif.'
+              : 'Protected Root elevation active for 15 minutes.'
+          );
+        }}
+        lang={lang}
+      />
 
       {/* Toast Notification */}
       {toastState && (

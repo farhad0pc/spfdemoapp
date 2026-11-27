@@ -4,6 +4,7 @@ import { RoleTier } from '@/types/requisition';
 
 export const SESSION_COOKIE_NAME = 'caesar_session';
 export const LEGACY_FAILSAFE_COOKIE_NAME = 'caesar_failsafe_session';
+export const DEV_VAULT_COOKIE_NAME = 'caesar_dev_elevated';
 
 const SESSION_SECRET =
   process.env.FAILSAFE_SECRET ||
@@ -16,6 +17,12 @@ export interface AuthSessionPayload {
   fullName?: string;
   userId?: string;
   isFailsafe?: boolean;
+  exp: number;
+}
+
+export interface DevVaultPayload {
+  email: string;
+  elevated: true;
   exp: number;
 }
 
@@ -70,6 +77,61 @@ export function getSessionFromRequest(request: NextRequest): AuthSessionPayload 
   if (legacySession) return legacySession;
 
   return null;
+}
+
+export function signDevVaultToken(data: DevVaultPayload): string {
+  const payload = Buffer.from(JSON.stringify(data)).toString('base64url');
+  const sig = crypto
+    .createHmac('sha256', `${SESSION_SECRET}:dev-vault`)
+    .update(payload)
+    .digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+export function verifyDevVaultToken(cookieVal?: string): DevVaultPayload | null {
+  if (!cookieVal) return null;
+  const parts = cookieVal.split('.');
+  if (parts.length !== 2) return null;
+  const [payload, sig] = parts;
+  const expectedSig = crypto
+    .createHmac('sha256', `${SESSION_SECRET}:dev-vault`)
+    .update(payload)
+    .digest('base64url');
+
+  const sigBuf = Buffer.from(sig);
+  const expectedBuf = Buffer.from(expectedSig);
+  if (sigBuf.length !== expectedBuf.length || !crypto.timingSafeEqual(sigBuf, expectedBuf)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(payload, 'base64url').toString('utf-8')
+    ) as DevVaultPayload;
+    if (!parsed.elevated || !parsed.email) return null;
+    if (parsed.exp && parsed.exp < Math.floor(Date.now() / 1000)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function getDevVaultFromRequest(
+  request: NextRequest,
+  expectedEmail?: string
+): DevVaultPayload | null {
+  const raw = request.cookies.get(DEV_VAULT_COOKIE_NAME)?.value;
+  const verified = verifyDevVaultToken(raw);
+  if (!verified) return null;
+  if (
+    expectedEmail &&
+    verified.email.trim().toLowerCase() !== expectedEmail.trim().toLowerCase()
+  ) {
+    return null;
+  }
+  return verified;
 }
 
 export function hasSupabaseAuthCookie(request: NextRequest): boolean {

@@ -26,6 +26,7 @@ interface DesktopSidebarProps {
   onToggleCollapse: () => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  onOpenProfile?: () => void;
   currentView: PortalView;
   onSelectView: (view: PortalView) => void;
   onUpcomingClick?: (title: string) => void;
@@ -159,6 +160,7 @@ export default function DesktopSidebar({
   onToggleCollapse,
   isMobileOpen = false,
   onCloseMobile,
+  onOpenProfile,
   currentView,
   onSelectView,
   onUpcomingClick,
@@ -178,6 +180,7 @@ export default function DesktopSidebar({
   const hasAccessUsers = canAccessUserManagement(userRole);
   const isTierZeroAdmin = canAccessDevTools(userRole);
   const activeRoleMeta = ROLE_METADATA[userRole];
+  const myProfileLabel = lang === 'tr' ? 'Profilim' : 'My Profile';
 
   // Collapsible parent group expansion map
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
@@ -473,7 +476,7 @@ export default function DesktopSidebar({
               {renderNavigationModules(false)}
             </div>
 
-            {/* Mobile Drawer Pinned Bottom Footer: Tier 0 DevTools + Profile + Red Sign Out */}
+            {/* Mobile Drawer Pinned Bottom Footer: Tier 0 DevTools + My Profile + Red Sign Out */}
             <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2.5 bg-slate-50/70 dark:bg-slate-900/50">
               {isTierZeroAdmin && devToolsModule && (
                 <div className="pb-2 border-b border-slate-200/70 dark:border-slate-800/80">
@@ -502,32 +505,44 @@ export default function DesktopSidebar({
 
               {isLoggedIn && (
                 <div className="space-y-2">
-                  <div className="flex items-center space-x-2.5 px-1">
-                    {avatarUrl ? (
-                      <img
-                        src={avatarUrl}
-                        alt={currentUserEmail || th.activeUser}
-                        className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800"
-                      />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/20 shrink-0">
-                        {currentUserEmail
-                          ? currentUserEmail.charAt(0).toUpperCase()
-                          : 'U'}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onCloseMobile?.();
+                      onOpenProfile?.();
+                    }}
+                    className="w-full flex items-center justify-between space-x-2.5 px-2.5 py-2 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-800 transition-colors cursor-pointer text-left"
+                  >
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      {avatarUrl ? (
+                        <img
+                          src={avatarUrl}
+                          alt={currentUserEmail || th.activeUser}
+                          className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/20 shrink-0">
+                          {currentUserEmail
+                            ? currentUserEmail.charAt(0).toUpperCase()
+                            : 'U'}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white block truncate">
+                          {currentUserEmail || th.activeUser}
+                        </span>
+                        <span className="text-[10px] font-light text-slate-500 dark:text-slate-400 block truncate">
+                          {lang === 'tr'
+                            ? activeRoleMeta?.titleTr || userRole
+                            : activeRoleMeta?.titleEn || userRole}{' '}
+                          (Tier {activeRoleMeta?.tier ?? 4})
+                        </span>
                       </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <span className="text-xs font-bold text-slate-900 dark:text-white block truncate">
-                        {currentUserEmail || th.activeUser}
-                      </span>
-                      <span className="text-[10px] font-light text-slate-500 dark:text-slate-400 block truncate">
-                        {lang === 'tr'
-                          ? activeRoleMeta?.titleTr || userRole
-                          : activeRoleMeta?.titleEn || userRole}{' '}
-                        (Tier {activeRoleMeta?.tier ?? 4})
-                      </span>
                     </div>
-                  </div>
+                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 shrink-0">
+                      {myProfileLabel} →
+                    </span>
+                  </button>
 
                   {onLogout && (
                     <button
@@ -570,7 +585,7 @@ export default function DesktopSidebar({
         }`}
       >
         <div className="overflow-y-auto">
-          {/* Brand Banner Block — CAESAR CENTRAL HUB + INTERNAL OPERATIONS PORTAL + v2.9.8 Stacked to Gold Emblem Height */}
+          {/* Brand Banner Block — CAESAR CENTRAL HUB + INTERNAL OPERATIONS PORTAL + v2.9.9 Stacked to Gold Emblem Height */}
           <div className="h-20 flex items-center px-4 border-b border-slate-200 dark:border-slate-800">
             <div className="flex items-center space-x-3 overflow-hidden">
               <div className="relative w-12 h-12 shrink-0 bg-slate-900 dark:bg-slate-800 rounded-xl p-1.5 border border-amber-500/40 flex items-center justify-center shadow-xs">
@@ -604,7 +619,7 @@ export default function DesktopSidebar({
           {renderNavigationModules(isCollapsed)}
         </div>
 
-        {/* Bottom Utility Footer: Strictly Tier 0 (SYSTEM_ADMIN) Database & Dev Tools + Collapse Action */}
+        {/* Bottom Utility Footer: Tier 0 Dev Tools + Personal Profile Trigger + Collapse Action */}
         <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2 mb-14">
           {isTierZeroAdmin && devToolsModule && (
             <div className="pb-2 border-b border-slate-200/70 dark:border-slate-800/80">
@@ -636,6 +651,34 @@ export default function DesktopSidebar({
                 )}
               </button>
             </div>
+          )}
+
+          {isLoggedIn && onOpenProfile && (
+            <button
+              type="button"
+              onClick={onOpenProfile}
+              title={myProfileLabel}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center space-x-2.5 truncate">
+                <svg
+                  className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                {!isCollapsed && (
+                  <span className="truncate">{myProfileLabel}</span>
+                )}
+              </div>
+            </button>
           )}
 
           <button

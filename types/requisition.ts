@@ -218,13 +218,24 @@ export interface AssetRegisterItem {
 }
 
 // ==========================================
-// STEP D: 2D RBAC, DELEGATION & USER MANAGEMENT
+// STEP D & MILESTONE v2.9.9: 2D RBAC, TEAMS, ROOT VAULT & USER GOVERNANCE
 // ==========================================
 
 export type DepartmentCode = 'SYSTEM' | 'EXECUTIVE' | 'TECH_OFFICE' | 'PURCHASING' | 'DEPOT';
 export type AuthorityTier = 0 | 1 | 2 | 3 | 4;
 export type UserAccountStatus = 'ACTIVE' | 'INVITED' | 'SUSPENDED';
+export type OperationalStatus = 'ACTIVE' | 'ON_LEAVE' | 'SUSPENDED';
 export type InvitationStatus = 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+
+export interface TeamRecord {
+  id: string;
+  name: string;
+  code?: string | null;
+  department: DepartmentCode;
+  leader_user_id?: string | null;
+  description?: string | null;
+  created_at?: string;
+}
 
 export interface CorporateUserProfile {
   id: string; // UUID in public.corporate_users
@@ -235,6 +246,13 @@ export interface CorporateUserProfile {
   department: DepartmentCode;
   authority_tier: AuthorityTier;
   account_status: UserAccountStatus;
+  operational_status?: OperationalStatus | null;
+  phone_number?: string | null;
+  job_title?: string | null;
+  team_id?: string | null;
+  team?: TeamRecord | null;
+  is_protected_root?: boolean | null;
+  hr_metadata?: Record<string, unknown> | null;
   allowed_project_ids?: string[] | null;
   allowed_depot_ids?: string[] | null;
   failsafe_password_hash?: string | null;
@@ -243,6 +261,17 @@ export interface CorporateUserProfile {
   last_login_at?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface UserAuditLog {
+  id: string;
+  actor_user_id?: string | null;
+  actor_email?: string | null;
+  target_user_id?: string | null;
+  target_email?: string | null;
+  action_type: string;
+  changes_payload?: Record<string, unknown> | null;
+  created_at: string;
 }
 
 export interface UserInvitation {
