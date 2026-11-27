@@ -158,7 +158,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex flex-col justify-center py-10 sm:px-6 lg:px-8 transition-colors select-none font-sans">
+    <div className="min-h-[100dvh] w-full max-w-full overflow-x-hidden bg-slate-50 dark:bg-[#090d16] flex flex-col justify-center pt-[max(1.25rem,env(safe-area-inset-top))] pb-24 px-4 sm:px-6 lg:px-8 transition-colors select-none font-sans">
       {/* STEP 1: PRE-AUTHENTICATION PRIMARY MODULE LAUNCHER */}
       {!selectedModule ? (
         <ModuleLauncher
@@ -171,8 +171,8 @@ export default function LoginPage() {
         />
       ) : (
         /* STEP 2: CREDENTIAL AUTHENTICATION FORM */
-        <div className="animate-fade-in pb-16">
-          <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+        <div className="w-full max-w-md mx-auto animate-fade-in">
+          <div className="w-full text-center px-2">
             {/* Emblem */}
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900 border border-amber-500/40 p-2 shadow-xl mb-3">
               <Image
@@ -185,10 +185,10 @@ export default function LoginPage() {
               />
             </div>
 
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white uppercase break-words">
               {t.title}
             </h2>
-            <p className="mt-1 text-xs font-light tracking-[0.15em] text-slate-500 dark:text-slate-400 uppercase">
+            <p className="mt-1 text-xs font-light tracking-[0.15em] text-slate-500 dark:text-slate-400 uppercase break-words">
               {t.subtitle}
             </p>
             <span className="inline-block mt-2 text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 border border-amber-300 dark:border-amber-800">
@@ -196,21 +196,21 @@ export default function LoginPage() {
             </span>
           </div>
 
-          <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md px-4">
-            <div className="bg-white dark:bg-[#0f172a] py-7 px-6 sm:px-9 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 space-y-5">
-              {/* Target Module Banner & <- Change Module Action */}
-              <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800">
-                <div className="flex items-center space-x-2.5 min-w-0">
+          <div className="mt-5 w-full">
+            <div className="w-full max-w-md mx-auto overflow-hidden bg-white dark:bg-[#0f172a] py-6 px-4 sm:py-7 sm:px-8 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800 space-y-5">
+              {/* Target Module Banner & <- Change Module Action (Wraps Cleanly on Mobile) */}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800">
+                <div className="flex items-center space-x-2.5 min-w-0 flex-1">
                   <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
                     <div className="scale-75">
                       {renderLauncherModuleIcon(selectedModule)}
                     </div>
                   </div>
-                  <div className="min-w-0">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
                       {tl.targetWorkspace}
                     </span>
-                    <span className="text-xs font-bold text-slate-900 dark:text-white uppercase truncate block">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white uppercase break-words leading-snug block">
                       {tl.modules[selectedModule]}
                     </span>
                   </div>
@@ -223,7 +223,7 @@ export default function LoginPage() {
                     setSuccessMessage(null);
                     setSelectedModule(null);
                   }}
-                  className="h-9 px-3 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-bold shrink-0 transition-colors cursor-pointer"
+                  className="min-h-[40px] px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[11px] font-bold shrink-0 transition-colors cursor-pointer"
                 >
                   {tl.changeModule}
                 </button>
@@ -245,7 +245,7 @@ export default function LoginPage() {
                       d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <span>{errorMessage}</span>
+                  <span className="break-words">{errorMessage}</span>
                 </div>
               )}
 
@@ -264,7 +264,7 @@ export default function LoginPage() {
                       d="M5 13l4 4L19 7"
                     />
                   </svg>
-                  <span>{successMessage}</span>
+                  <span className="break-words">{successMessage}</span>
                 </div>
               )}
 
@@ -280,12 +280,12 @@ export default function LoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="name@caesar-projects.com"
-                    className="w-full h-10 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    className="w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
                     <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">
                       {t.lblPassword}
                     </label>
@@ -306,14 +306,14 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full h-10 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    className="w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-10 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-xs cursor-pointer"
+                  className="w-full min-h-[44px] h-11 sm:h-10 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-colors shadow-xs cursor-pointer"
                 >
                   {loading ? '...' : t.btnLogin}
                 </button>
@@ -326,7 +326,7 @@ export default function LoginPage() {
       {/* FORGOT PASSWORD MODAL */}
       {showForgotModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4">
+          <div className="w-[calc(100vw-1rem)] sm:w-full max-w-sm max-h-[90dvh] overflow-y-auto bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-2xl space-y-4">
             <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase">
               {t.forgotTitle}
             </h3>
@@ -347,21 +347,21 @@ export default function LoginPage() {
                 value={forgotEmail}
                 onChange={(e) => setForgotEmail(e.target.value)}
                 placeholder="name@caesar-projects.com"
-                className="w-full h-10 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                className="w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
               />
 
               <div className="flex justify-end space-x-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowForgotModal(false)}
-                  className="h-10 px-4 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                  className="min-h-[44px] h-10 px-4 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
                 >
                   {t.btnCancel}
                 </button>
                 <button
                   type="submit"
                   disabled={forgotLoading}
-                  className="h-10 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
+                  className="min-h-[44px] h-10 px-4 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
                 >
                   {forgotLoading ? '...' : t.btnSendReset}
                 </button>

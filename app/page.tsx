@@ -61,6 +61,7 @@ export default function PurchasingPortalPage() {
   >([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState<boolean>(false);
   const [toastState, setToastState] = useState<{
     message: string;
     subMessage?: string;
@@ -527,20 +528,26 @@ export default function PurchasingPortalPage() {
   const authorizedModules = getAuthorizedActiveModules(currentRole);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] flex transition-colors font-sans">
-      {/* Desktop Left Sidebar Rail */}
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-slate-50 dark:bg-[#090d16] flex transition-colors font-sans">
+      {/* Desktop Left Sidebar Rail & Mobile Slide-Over Overlay Drawer */}
       <DesktopSidebar
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        isMobileOpen={isMobileDrawerOpen}
+        onCloseMobile={() => setIsMobileDrawerOpen(false)}
         currentView={view}
         onSelectView={handleSelectSidebarView}
         onUpcomingClick={handleUpcomingClick}
         lang={lang}
         userRole={currentRole}
+        currentUserEmail={currentUserEmail}
+        avatarUrl={currentUserAvatarUrl}
+        isLoggedIn={isLoggedIn}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 w-full overflow-x-hidden">
         <CorporateHeader
           currentRole={currentRole}
           onRoleChange={(nextRole) => {
@@ -570,17 +577,18 @@ export default function PurchasingPortalPage() {
           lang={lang}
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onOpenMobileDrawer={() => setIsMobileDrawerOpen(true)}
           currentUserEmail={currentUserEmail}
           avatarUrl={currentUserAvatarUrl}
           isLoggedIn={isLoggedIn}
           onLogout={handleLogout}
         />
 
-        <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-1">
+        <main className="max-w-7xl mx-auto w-full min-w-0 overflow-x-hidden px-3 sm:px-6 lg:px-8 py-4 sm:py-6 flex-1">
           {/* STRICT POST-AUTH RBAC ACCESS DENIED GATE (NO SILENT AUTO-REDIRECT) */}
           {accessDeniedTarget ? (
-            <div className="max-w-2xl mx-auto my-8 bg-white dark:bg-[#0f172a] rounded-2xl border-2 border-rose-500/40 shadow-xl p-6 sm:p-8 space-y-6 animate-fade-in">
-              <div className="flex items-start space-x-4">
+            <div className="max-w-2xl mx-auto my-4 sm:my-8 bg-white dark:bg-[#0f172a] rounded-2xl border-2 border-rose-500/40 shadow-xl p-5 sm:p-8 space-y-6 animate-fade-in">
+              <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center justify-center shrink-0">
                   <svg
                     className="w-6 h-6"
@@ -596,11 +604,11 @@ export default function PurchasingPortalPage() {
                     />
                   </svg>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 min-w-0">
                   <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-100 text-rose-800 dark:bg-rose-950/70 dark:text-rose-300 border border-rose-300 dark:border-rose-800">
                     403 RBAC • {tl.accessDeniedTitle}
                   </span>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white uppercase">
+                  <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white uppercase break-words">
                     {tl.accessDeniedTitle} —{' '}
                     {tl.modules[accessDeniedTarget.moduleKey]}
                   </h2>
@@ -615,7 +623,7 @@ export default function PurchasingPortalPage() {
                   <span className="text-[10px] font-bold uppercase text-slate-400 block">
                     {tl.authenticatedAsLabel}
                   </span>
-                  <span className="font-bold text-slate-900 dark:text-white">
+                  <span className="font-bold text-slate-900 dark:text-white break-words">
                     {lang === 'tr' ? roleMeta?.titleTr : roleMeta?.titleEn} (Tier{' '}
                     {roleMeta?.tier ?? '—'})
                   </span>
@@ -624,7 +632,7 @@ export default function PurchasingPortalPage() {
                   <span className="text-[10px] font-bold uppercase text-slate-400 block">
                     {tl.requestedModuleLabel}
                   </span>
-                  <span className="font-bold text-rose-600 dark:text-rose-400 uppercase">
+                  <span className="font-bold text-rose-600 dark:text-rose-400 uppercase break-words">
                     {tl.modules[accessDeniedTarget.moduleKey]} (
                     {accessDeniedTarget.requiredTierLabel})
                   </span>
@@ -641,7 +649,7 @@ export default function PurchasingPortalPage() {
                       key={modKey}
                       type="button"
                       onClick={() => handleChooseAuthorizedModule(modKey)}
-                      className="group p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50/40 dark:hover:bg-blue-950/30 flex items-center justify-between text-left transition-all cursor-pointer"
+                      className="group min-h-[56px] p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/60 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50/40 dark:hover:bg-blue-950/30 flex items-center justify-between text-left transition-all cursor-pointer"
                     >
                       <div className="flex items-center space-x-3 min-w-0">
                         <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
@@ -701,7 +709,7 @@ export default function PurchasingPortalPage() {
           ) : view === 'DEV_TOOLS' ? (
             /* Tier 0 (SYSTEM_ADMIN) Exclusive Database & Dev Tools Diagnostics Workspace */
             <div className="space-y-6 animate-fade-in">
-              <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-purple-500/30 p-6 shadow-md">
+              <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-purple-500/30 p-5 sm:p-6 shadow-md">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                   <div>
                     <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-800 dark:bg-purple-950/70 dark:text-purple-300 border border-purple-300 dark:border-purple-800 mb-2">
@@ -744,12 +752,12 @@ export default function PurchasingPortalPage() {
               </div>
 
               <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-md">
-                <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="px-5 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-800">
                   <h2 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                     {td.registryTitle}
                   </h2>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="w-full overflow-x-auto touch-scroll-x">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-slate-800 text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">

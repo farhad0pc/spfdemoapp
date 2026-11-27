@@ -147,9 +147,9 @@ export default function ModuleLauncher({
   const launcherModules = getLauncherModules();
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-8 md:py-14 flex flex-col items-center justify-center select-none font-sans animate-fade-in">
+    <div className="w-full max-w-5xl mx-auto px-2 sm:px-6 py-4 md:py-12 overflow-x-hidden flex flex-col items-center justify-center select-none font-sans animate-fade-in">
       {/* Top Header: Official Caesar Emblem & CAESAR CENTRAL HUB / INTERNAL OPERATIONS PORTAL Lockup */}
-      <div className="flex flex-col items-center text-center mb-8 md:mb-10">
+      <div className="flex flex-col items-center text-center mb-6 md:mb-10 px-2">
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900 dark:bg-slate-950 border border-amber-500/40 p-2 shadow-xl mb-3">
           <img
             src="https://i.ibb.co/p6CSmYL7/CAESAR-EMBLEM-NO-TEXT.png"
@@ -165,10 +165,10 @@ export default function ModuleLauncher({
             className="w-12 h-12 md:w-13 md:h-13 object-contain"
           />
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 dark:text-white uppercase break-words">
           {tl.title}
         </h1>
-        <p className="mt-1 text-xs font-light tracking-[0.15em] text-amber-600 dark:text-amber-400/90 uppercase">
+        <p className="mt-1 text-xs font-light tracking-[0.15em] text-amber-600 dark:text-amber-400/90 uppercase break-words">
           {tl.subtitle}
         </p>
         <p className="mt-1.5 text-xs font-light text-slate-500 dark:text-slate-400">
@@ -176,12 +176,12 @@ export default function ModuleLauncher({
         </p>
       </div>
 
-      {/* Prioritized 6-Tile 3x2 Responsive Grid (Milestone v2.9.6):
+      {/* Prioritized 6-Tile 3x2 Responsive Grid (Milestone v2.9.6 & v2.9.8):
           Row 1 (ACTIVE, clickable): Purchasing & Orders | Depot & Stock Management | User Management & RBAC
           Row 2 (COMING SOON, greyed-out): Aftersales | Caesar Project Portfolio | Executive Dossiers & Reports
           Mobile (< md): Centered single-column vertical stack of exact 200x200px square tiles.
           Desktop (md:+): Centered 3-column grid (max-w-3xl mx-auto) of aspect-square max-w-[230px] tiles. */}
-      <div className="w-full flex flex-col items-center gap-4 md:grid md:grid-cols-3 md:gap-6 md:max-w-3xl md:mx-auto pb-16">
+      <div className="w-full flex flex-col items-center gap-4 md:grid md:grid-cols-3 md:gap-6 md:max-w-3xl md:mx-auto pb-8">
         {launcherModules.map((mod) => {
           const title = tl.modules[mod.id];
           const isActive = mod.status === 'ACTIVE';

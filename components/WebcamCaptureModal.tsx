@@ -189,10 +189,15 @@ export default function WebcamCaptureModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-4 bg-slate-950/85 backdrop-blur-sm animate-fade-in font-sans select-none">
-      <div className="relative w-full max-w-lg bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+    <div className="fixed inset-0 z-[80] flex items-end md:items-center justify-center md:p-4 bg-slate-950/85 backdrop-blur-sm animate-fade-in font-sans select-none">
+      <div className="relative w-full md:w-[calc(100vw-1rem)] md:max-w-lg max-h-[90dvh] overflow-y-auto bg-white dark:bg-[#0f172a] rounded-t-2xl md:rounded-2xl shadow-2xl border-t md:border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
+        {/* Mobile Bottom-Sheet Drag Handle Pill */}
+        <div className="md:hidden flex justify-center pt-2.5 pb-1 bg-slate-50 dark:bg-slate-900/60">
+          <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+        </div>
+
+        {/* Sticky Header */}
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 shrink-0">
           <div>
             <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white uppercase tracking-wide">
               📷 {tc.modalTitle}
@@ -204,7 +209,7 @@ export default function WebcamCaptureModal({
           <button
             type="button"
             onClick={handleClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
             title={common.close}
           >
             ✕
@@ -222,7 +227,7 @@ export default function WebcamCaptureModal({
         />
 
         {/* Live Video Viewfinder */}
-        <div className="p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3">
           <div className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-slate-950 border border-slate-800 flex items-center justify-center">
             <video
               ref={videoRef}
@@ -247,7 +252,7 @@ export default function WebcamCaptureModal({
                 <button
                   type="button"
                   onClick={() => fallbackInputRef.current?.click()}
-                  className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+                  className="min-h-[44px] px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs cursor-pointer"
                 >
                   📁 {tc.cameraFallback}
                 </button>
@@ -257,12 +262,12 @@ export default function WebcamCaptureModal({
 
           {/* Action Controls */}
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {videoDevices.length > 1 && (
                 <button
                   type="button"
                   onClick={handleSwitchCamera}
-                  className="h-10 px-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                  className="min-h-[44px] h-11 sm:h-10 px-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
                 >
                   🔄 {tc.switchCamera}
                 </button>
@@ -270,17 +275,17 @@ export default function WebcamCaptureModal({
               <button
                 type="button"
                 onClick={() => fallbackInputRef.current?.click()}
-                className="h-10 px-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                className="min-h-[44px] h-11 sm:h-10 px-3.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
               >
                 📁 {tc.cameraFallback}
               </button>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-auto">
               <button
                 type="button"
                 onClick={handleClose}
-                className="h-10 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer"
+                className="min-h-[44px] h-11 sm:h-10 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer"
               >
                 {common.cancel}
               </button>
@@ -288,7 +293,7 @@ export default function WebcamCaptureModal({
                 type="button"
                 disabled={!cameraReady || capturing}
                 onClick={() => void handleCaptureFrame()}
-                className="h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center space-x-1.5 cursor-pointer"
+                className="min-h-[44px] h-11 sm:h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center space-x-1.5 cursor-pointer"
               >
                 <span>
                   {capturing ? tm.compressing : `📸 ${tc.captureShutter}`}

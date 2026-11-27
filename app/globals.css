@@ -40,10 +40,39 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100%;
+}
+
 body {
   font-family: var(--font-family-oswald);
   font-optical-sizing: auto;
   letter-spacing: 0.03em;
+}
+
+/* Touch-Screen Momentum Horizontal Scroll & Safe-Area Helpers */
+.touch-scroll-x {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.safe-area-pt {
+  padding-top: max(1.25rem, env(safe-area-inset-top));
+}
+
+.safe-area-pb {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* Prevent iOS Safari Auto-Zoom on Form Focus (< 768px) */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
 }
 
 /* 3-Tier Typographic Hierarchy Classes */

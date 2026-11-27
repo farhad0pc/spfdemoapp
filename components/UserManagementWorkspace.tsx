@@ -1,18 +1,25 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback, useRef, useSyncExternalStore } from 'react';
-import { 
-  RoleTier, 
-  CorporateUserProfile, 
-  UserInvitation, 
-  PortfolioProject 
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+  useSyncExternalStore,
+} from 'react';
+import {
+  RoleTier,
+  CorporateUserProfile,
+  UserInvitation,
+  PortfolioProject,
 } from '@/types/requisition';
-import { 
-  ROLE_METADATA, 
-  canInviteRole, 
-  canManageUser, 
-  getAssignableRoles 
+import {
+  ROLE_METADATA,
+  canInviteRole,
+  canManageUser,
+  getAssignableRoles,
 } from '@/lib/rbac';
 import { DICTIONARY } from '@/lib/i18n';
 import {
@@ -54,12 +61,17 @@ export default function UserManagementWorkspace({
   authenticatedRole,
   onCurrentUserAvatarUpdated,
 }: UserManagementWorkspaceProps) {
-  const currentClockSec = useSyncExternalStore(subscribeToClock, getClockSnapshot, getServerSnapshot);
+  const currentClockSec = useSyncExternalStore(
+    subscribeToClock,
+    getClockSnapshot,
+    getServerSnapshot
+  );
   const d = DICTIONARY[lang].personnel;
   const common = DICTIONARY[lang].common;
 
   // Strictly Tiers 0-1 (SYSTEM_ADMIN, EXECUTIVE) can upload/change/delete user profile avatars
-  const canManageAvatars = currentRole === 'SYSTEM_ADMIN' || currentRole === 'EXECUTIVE';
+  const canManageAvatars =
+    currentRole === 'SYSTEM_ADMIN' || currentRole === 'EXECUTIVE';
 
   // Data State
   const [users, setUsers] = useState<CorporateUserProfile[]>([]);
@@ -67,7 +79,9 @@ export default function UserManagementWorkspace({
   const [loading, setLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('ALL');
-  const [activeTab, setActiveTab] = useState<'ROSTER' | 'INVITATIONS'>('ROSTER');
+  const [activeTab, setActiveTab] = useState<'ROSTER' | 'INVITATIONS'>(
+    'ROSTER'
+  );
 
   // Invite Modal State
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -81,13 +95,17 @@ export default function UserManagementWorkspace({
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Role Edit Modal State
-  const [editingUser, setEditingUser] = useState<CorporateUserProfile | null>(null);
+  const [editingUser, setEditingUser] = useState<CorporateUserProfile | null>(
+    null
+  );
   const [editRole, setEditRole] = useState<RoleTier | ''>('');
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   // Milestone v2.9.4 Profile Avatar Modal State (Tier 0-1 Only)
-  const [avatarEditingUser, setAvatarEditingUser] = useState<CorporateUserProfile | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<CompressedImageResult | null>(null);
+  const [avatarEditingUser, setAvatarEditingUser] =
+    useState<CorporateUserProfile | null>(null);
+  const [avatarPreview, setAvatarPreview] =
+    useState<CompressedImageResult | null>(null);
   const [avatarCompressing, setAvatarCompressing] = useState(false);
   const [avatarSaving, setAvatarSaving] = useState(false);
   const [avatarRemoving, setAvatarRemoving] = useState(false);
@@ -152,9 +170,14 @@ export default function UserManagementWorkspace({
   const filteredUsers = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     return users.filter((u) => {
-      const nameMatch = u.full_name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
-      const roleMatch = u.role?.toLowerCase().includes(q) || u.department?.toLowerCase().includes(q);
-      const deptMatch = departmentFilter === 'ALL' || u.department === departmentFilter;
+      const nameMatch =
+        u.full_name?.toLowerCase().includes(q) ||
+        u.email?.toLowerCase().includes(q);
+      const roleMatch =
+        u.role?.toLowerCase().includes(q) ||
+        u.department?.toLowerCase().includes(q);
+      const deptMatch =
+        departmentFilter === 'ALL' || u.department === departmentFilter;
       return (nameMatch || roleMatch) && deptMatch;
     });
   }, [users, searchQuery, departmentFilter]);
@@ -163,9 +186,15 @@ export default function UserManagementWorkspace({
   const filteredInvitations = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     return invitations.filter((inv) => {
-      const nameMatch = inv.full_name?.toLowerCase().includes(q) || inv.email?.toLowerCase().includes(q);
-      const roleMatch = inv.target_role?.toLowerCase().includes(q) || inv.target_department?.toLowerCase().includes(q);
-      const deptMatch = departmentFilter === 'ALL' || inv.target_department === departmentFilter;
+      const nameMatch =
+        inv.full_name?.toLowerCase().includes(q) ||
+        inv.email?.toLowerCase().includes(q);
+      const roleMatch =
+        inv.target_role?.toLowerCase().includes(q) ||
+        inv.target_department?.toLowerCase().includes(q);
+      const deptMatch =
+        departmentFilter === 'ALL' ||
+        inv.target_department === departmentFilter;
       return (nameMatch || roleMatch) && deptMatch;
     });
   }, [invitations, searchQuery, departmentFilter]);
@@ -174,7 +203,9 @@ export default function UserManagementWorkspace({
   const kpiStats = useMemo(() => {
     const total = users.length;
     const active = users.filter((u) => u.account_status === 'ACTIVE').length;
-    const pendingInvites = invitations.filter((i) => i.status === 'PENDING').length;
+    const pendingInvites = invitations.filter(
+      (i) => i.status === 'PENDING'
+    ).length;
     const depts = new Set(users.map((u) => u.department).filter(Boolean)).size;
     return { total, active, pendingInvites, depts };
   }, [users, invitations]);
@@ -216,9 +247,11 @@ export default function UserManagementWorkspace({
     const mins = Math.floor((diffSec % 3600) / 60);
 
     return (
-      <span className="text-[10px] font-mono font-light px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 flex items-center gap-1">
+      <span className="text-[10px] font-mono font-light px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 inline-flex items-center gap-1">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-        <span className="font-bold">{hours}</span>{lang === 'tr' ? 's' : 'h'} <span className="font-bold">{mins}</span>{lang === 'tr' ? 'd' : 'm'} {lang === 'tr' ? 'kaldı' : 'left'}
+        <span className="font-bold">{hours}</span>
+        {lang === 'tr' ? 's' : 'h'} <span className="font-bold">{mins}</span>
+        {lang === 'tr' ? 'd' : 'm'} {lang === 'tr' ? 'kaldı' : 'left'}
       </span>
     );
   };
@@ -247,7 +280,12 @@ export default function UserManagementWorkspace({
 
       const data = await res.json();
       if (!res.ok) {
-        setInviteError(data.error || (lang === 'tr' ? 'Davet oluşturulamadı.' : 'Failed to generate invitation.'));
+        setInviteError(
+          data.error ||
+            (lang === 'tr'
+              ? 'Davet oluşturulamadı.'
+              : 'Failed to generate invitation.')
+        );
         setInviteSubmitting(false);
         return;
       }
@@ -277,10 +315,16 @@ export default function UserManagementWorkspace({
       const data = await res.json();
       if (res.ok && data.invite_url) {
         await navigator.clipboard.writeText(data.invite_url);
-        alert(lang === 'tr' ? 'Davet yenilendi ve 48 saatlik yeni bağlantı panoya kopyalandı!' : 'Invite refreshed! New 48-hour link copied to clipboard.');
+        alert(
+          lang === 'tr'
+            ? 'Davet yenilendi ve 48 saatlik yeni bağlantı panoya kopyalandı!'
+            : 'Invite refreshed! New 48-hour link copied to clipboard.'
+        );
         void fetchPersonnelData();
       } else {
-        alert(data.error || (lang === 'tr' ? 'İşlem başarısız.' : 'Action failed.'));
+        alert(
+          data.error || (lang === 'tr' ? 'İşlem başarısız.' : 'Action failed.')
+        );
       }
     } catch {
       alert(lang === 'tr' ? 'İstek gönderilemedi.' : 'Network error.');
@@ -289,7 +333,14 @@ export default function UserManagementWorkspace({
 
   // Handle Revoke Invite
   const handleRevokeInvite = async (invitationId: string) => {
-    if (!confirm(lang === 'tr' ? 'Bu daveti iptal etmek istediğinize emin misiniz?' : 'Revoke this invitation?')) return;
+    if (
+      !confirm(
+        lang === 'tr'
+          ? 'Bu daveti iptal etmek istediğinize emin misiniz?'
+          : 'Revoke this invitation?'
+      )
+    )
+      return;
     try {
       const res = await fetch('/api/auth/revoke-invite', {
         method: 'POST',
@@ -326,7 +377,10 @@ export default function UserManagementWorkspace({
         void fetchPersonnelData();
       } else {
         const data = await res.json();
-        alert(data.error || (lang === 'tr' ? 'İşlem başarısız.' : 'Operation failed.'));
+        alert(
+          data.error ||
+            (lang === 'tr' ? 'İşlem başarısız.' : 'Operation failed.')
+        );
       }
     } catch {
       // Ignore
@@ -354,7 +408,10 @@ export default function UserManagementWorkspace({
         void fetchPersonnelData();
       } else {
         const data = await res.json();
-        alert(data.error || (lang === 'tr' ? 'Rol güncellenemedi.' : 'Failed to update role.'));
+        alert(
+          data.error ||
+            (lang === 'tr' ? 'Rol güncellenemedi.' : 'Failed to update role.')
+        );
       }
     } finally {
       setEditSubmitting(false);
@@ -422,7 +479,10 @@ export default function UserManagementWorkspace({
 
       const data = await res.json();
       if (!res.ok) {
-        setAvatarError(data.error || (lang === 'tr' ? 'Fotoğraf kaydedilemedi.' : 'Failed to save photo.'));
+        setAvatarError(
+          data.error ||
+            (lang === 'tr' ? 'Fotoğraf kaydedilemedi.' : 'Failed to save photo.')
+        );
         setAvatarSaving(false);
         return;
       }
@@ -436,7 +496,8 @@ export default function UserManagementWorkspace({
 
       if (
         currentUserEmail &&
-        avatarEditingUser.email?.toLowerCase() === currentUserEmail.toLowerCase()
+        avatarEditingUser.email?.toLowerCase() ===
+          currentUserEmail.toLowerCase()
       ) {
         onCurrentUserAvatarUpdated?.(nextUrl);
       }
@@ -444,7 +505,11 @@ export default function UserManagementWorkspace({
       closeAvatarModal();
     } catch (err: unknown) {
       setAvatarError(
-        err instanceof Error ? err.message : lang === 'tr' ? 'Ağ hatası.' : 'Network error.'
+        err instanceof Error
+          ? err.message
+          : lang === 'tr'
+          ? 'Ağ hatası.'
+          : 'Network error.'
       );
     } finally {
       setAvatarSaving(false);
@@ -466,7 +531,12 @@ export default function UserManagementWorkspace({
 
       const data = await res.json();
       if (!res.ok) {
-        setAvatarError(data.error || (lang === 'tr' ? 'Fotoğraf kaldırılamadı.' : 'Failed to remove photo.'));
+        setAvatarError(
+          data.error ||
+            (lang === 'tr'
+              ? 'Fotoğraf kaldırılamadı.'
+              : 'Failed to remove photo.')
+        );
         setAvatarRemoving(false);
         return;
       }
@@ -479,7 +549,8 @@ export default function UserManagementWorkspace({
 
       if (
         currentUserEmail &&
-        avatarEditingUser.email?.toLowerCase() === currentUserEmail.toLowerCase()
+        avatarEditingUser.email?.toLowerCase() ===
+          currentUserEmail.toLowerCase()
       ) {
         onCurrentUserAvatarUpdated?.(null);
       }
@@ -487,7 +558,11 @@ export default function UserManagementWorkspace({
       closeAvatarModal();
     } catch (err: unknown) {
       setAvatarError(
-        err instanceof Error ? err.message : lang === 'tr' ? 'Ağ hatası.' : 'Network error.'
+        err instanceof Error
+          ? err.message
+          : lang === 'tr'
+          ? 'Ağ hatası.'
+          : 'Network error.'
       );
     } finally {
       setAvatarRemoving(false);
@@ -496,17 +571,16 @@ export default function UserManagementWorkspace({
 
   return (
     <div className="space-y-6 animate-fade-in pb-16 font-sans">
-      
       {/* Header Banner */}
-      <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs">
+      <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase">
+          <div className="space-y-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse shrink-0" />
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-900 dark:text-white uppercase break-words">
                 {d.title}
               </h1>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-300 dark:border-blue-800">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-300 dark:border-blue-800 shrink-0">
                 2D RBAC
               </span>
               <span className="text-[10px] font-mono font-bold text-slate-400 hidden sm:inline">
@@ -521,6 +595,7 @@ export default function UserManagementWorkspace({
           {/* Action: Open Invite Modal (if authorized) */}
           {assignableRoles.length > 0 && (
             <button
+              type="button"
               onClick={() => {
                 setIsInviteModalOpen(true);
                 setInviteSuccessUrl(null);
@@ -529,10 +604,20 @@ export default function UserManagementWorkspace({
                 setInviteFullName('');
                 setInviteRole(assignableRoles[0] || '');
               }}
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center space-x-2 cursor-pointer"
+              className="w-full sm:w-auto min-h-[44px] px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center space-x-2 cursor-pointer"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              <svg
+                className="w-4 h-4 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                />
               </svg>
               <span>{d.btnInvite}</span>
             </button>
@@ -546,8 +631,18 @@ export default function UserManagementWorkspace({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center space-x-3">
               <span className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 shrink-0">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+                  />
                 </svg>
               </span>
               <div>
@@ -559,17 +654,20 @@ export default function UserManagementWorkspace({
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2 shrink-0">
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
               <select
                 value={currentRole}
-                onChange={(e) => onRolePreviewChange(e.target.value as RoleTier)}
-                className="text-xs font-bold bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700 focus:outline-hidden focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-xs"
+                onChange={(e) =>
+                  onRolePreviewChange(e.target.value as RoleTier)
+                }
+                className="w-full sm:w-auto min-h-[44px] h-11 sm:h-10 text-xs font-bold bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-700 focus:outline-hidden focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-xs"
               >
                 {(Object.keys(ROLE_METADATA) as RoleTier[]).map((r) => {
                   const m = ROLE_METADATA[r];
                   return (
                     <option key={r} value={r}>
-                      [{m.department}] {lang === 'tr' ? m.titleTr : m.titleEn} (Tier {m.tier})
+                      [{m.department}] {lang === 'tr' ? m.titleTr : m.titleEn}{' '}
+                      (Tier {m.tier})
                     </option>
                   );
                 })}
@@ -580,71 +678,77 @@ export default function UserManagementWorkspace({
       )}
 
       {/* 4-Stat Telemetry Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* KPI 1: Total Users */}
-        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             {d.kpiTotalUsers}
           </span>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-light text-slate-900 dark:text-white">
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-xl sm:text-2xl font-light text-slate-900 dark:text-white">
               {kpiStats.total}
             </span>
-            <span className="text-xs font-light text-slate-400">{d.kpiTotalUsersSub}</span>
+            <span className="text-xs font-light text-slate-400">
+              {d.kpiTotalUsersSub}
+            </span>
           </div>
         </div>
 
         {/* KPI 2: Active Accounts */}
-        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             {d.kpiActiveUsers}
           </span>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-light text-emerald-600 dark:text-emerald-400">
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-xl sm:text-2xl font-light text-emerald-600 dark:text-emerald-400">
               {kpiStats.active}
             </span>
-            <span className="text-xs font-light text-slate-400">{d.kpiActiveUsersSub}</span>
+            <span className="text-xs font-light text-slate-400">
+              {d.kpiActiveUsersSub}
+            </span>
           </div>
         </div>
 
         {/* KPI 3: Pending Invites */}
-        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             {d.kpiPendingInvites}
           </span>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-light text-amber-600 dark:text-amber-400">
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-xl sm:text-2xl font-light text-amber-600 dark:text-amber-400">
               {kpiStats.pendingInvites}
             </span>
-            <span className="text-xs font-light text-slate-400">{d.kpiPendingInvitesSub}</span>
+            <span className="text-xs font-light text-slate-400">
+              {d.kpiPendingInvitesSub}
+            </span>
           </div>
         </div>
 
         {/* KPI 4: Active Departments */}
-        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             {d.kpiDepartments}
           </span>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-light text-blue-600 dark:text-blue-400">
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-xl sm:text-2xl font-light text-blue-600 dark:text-blue-400">
               {kpiStats.depts}
             </span>
-            <span className="text-xs font-light text-slate-400">{d.kpiDepartmentsSub}</span>
+            <span className="text-xs font-light text-slate-400">
+              {d.kpiDepartmentsSub}
+            </span>
           </div>
         </div>
-
       </div>
 
       {/* Tabs & Filter Bar */}
-      <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs space-y-4">
-        
+      <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
           {/* Tabs */}
-          <div className="flex space-x-2">
+          <div className="flex flex-wrap gap-2">
             <button
+              type="button"
               onClick={() => setActiveTab('ROSTER')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'ROSTER'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -654,14 +758,16 @@ export default function UserManagementWorkspace({
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('INVITATIONS')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all relative cursor-pointer ${
+              className={`min-h-[40px] px-4 py-2 rounded-xl text-xs font-bold transition-all relative cursor-pointer ${
                 activeTab === 'INVITATIONS'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
               }`}
             >
-              {d.tabInvites} <span className="font-light">({invitations.length})</span>
+              {d.tabInvites}{' '}
+              <span className="font-light">({invitations.length})</span>
               {kpiStats.pendingInvites > 0 && (
                 <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500 text-white">
                   {kpiStats.pendingInvites}
@@ -671,11 +777,11 @@ export default function UserManagementWorkspace({
           </div>
 
           {/* Department Filter */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center w-full md:w-auto">
             <select
               value={departmentFilter}
               onChange={(e) => setDepartmentFilter(e.target.value)}
-              className="text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-2.5 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
+              className="w-full md:w-auto min-h-[44px] h-11 sm:h-10 text-xs font-bold bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5 text-slate-700 dark:text-slate-300 focus:outline-hidden cursor-pointer"
             >
               <option value="ALL">{d.allDepartments}</option>
               <option value="SYSTEM">SYSTEM</option>
@@ -694,295 +800,624 @@ export default function UserManagementWorkspace({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={d.searchPlaceholder}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-light text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full min-h-[44px] h-11 sm:h-10 pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-light text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           />
-          <svg className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg
+            className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
         </div>
 
-        {/* TAB 1: ACTIVE TEAM ROSTER TABLE */}
+        {/* =============================================================== */}
+        {/* TAB 1: ACTIVE TEAM ROSTER (MOBILE CARDS < md + DESKTOP TABLE)   */}
+        {/* =============================================================== */}
         {activeTab === 'ROSTER' && (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold uppercase text-[10px] text-slate-400 tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">{d.thUser}</th>
-                  <th className="px-4 py-3">{d.thDepartment}</th>
-                  <th className="px-4 py-3">{d.thRole}</th>
-                  <th className="px-4 py-3 text-center">{d.thTier}</th>
-                  <th className="px-4 py-3 text-center">{d.thStatus}</th>
-                  <th className="px-4 py-3">{d.thLastLogin}</th>
-                  <th className="px-4 py-3 text-center">{d.thActions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-light text-slate-700 dark:text-slate-300">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-slate-400 font-light">
-                      {common.loading}
-                    </td>
-                  </tr>
-                ) : filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-slate-400 font-light">
-                      {lang === 'tr' ? 'Kriterlere uygun personel bulunamadı.' : 'No personnel matching filter criteria.'}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredUsers.map((u) => {
-                    const roleMeta = ROLE_METADATA[u.role];
-                    const isManageable = canManageUser(currentRole, u.role);
-                    const initialLetter = u.full_name?.charAt(0).toUpperCase() || 'U';
+          <>
+            {/* Mobile (< md) Roster Cards */}
+            <div className="md:hidden space-y-3">
+              {loading ? (
+                <div className="p-8 text-center text-xs font-light text-slate-400 rounded-xl border border-slate-200 dark:border-slate-800">
+                  {common.loading}
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <div className="p-8 text-center text-xs font-light text-slate-400 rounded-xl border border-slate-200 dark:border-slate-800">
+                  {lang === 'tr'
+                    ? 'Kriterlere uygun personel bulunamadı.'
+                    : 'No personnel matching filter criteria.'}
+                </div>
+              ) : (
+                filteredUsers.map((u) => {
+                  const roleMeta = ROLE_METADATA[u.role];
+                  const isManageable = canManageUser(currentRole, u.role);
+                  const initialLetter =
+                    u.full_name?.charAt(0).toUpperCase() || 'U';
 
-                    return (
-                      <tr key={u.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="flex items-center space-x-3">
-                            {canManageAvatars ? (
-                              <button
-                                type="button"
-                                onClick={() => openAvatarModal(u)}
-                                title={d.updateProfilePhoto}
-                                className="group relative w-9 h-9 rounded-full shrink-0 overflow-hidden border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                              >
-                                {u.avatar_url ? (
-                                  <img
-                                    src={u.avatar_url}
-                                    alt={u.full_name}
-                                    className="w-9 h-9 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs">
-                                    {initialLetter}
-                                  </div>
-                                )}
-                                <div className="absolute inset-0 bg-slate-900/65 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth="2"
-                                      d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
-                                    />
-                                    <circle cx="12" cy="13" r="3" strokeWidth="2" />
-                                  </svg>
+                  return (
+                    <div
+                      key={`mob-usr-${u.id}`}
+                      className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 p-3.5 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center space-x-3 min-w-0">
+                          {canManageAvatars ? (
+                            <button
+                              type="button"
+                              onClick={() => openAvatarModal(u)}
+                              title={d.updateProfilePhoto}
+                              className="group relative w-11 h-11 rounded-full shrink-0 overflow-hidden border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                            >
+                              {u.avatar_url ? (
+                                <img
+                                  src={u.avatar_url}
+                                  alt={u.full_name}
+                                  className="w-11 h-11 rounded-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs">
+                                  {initialLetter}
                                 </div>
-                              </button>
-                            ) : u.avatar_url ? (
-                              <img
-                                src={u.avatar_url}
-                                alt={u.full_name}
-                                className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                              />
-                            ) : (
-                              <div className="w-9 h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs shrink-0">
-                                {initialLetter}
-                              </div>
-                            )}
-                            <div>
-                              <div className="font-bold text-slate-900 dark:text-white">
-                                {u.full_name}
-                              </div>
-                              <div className="text-[11px] font-mono font-light text-slate-400">
-                                {u.email}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 font-bold text-slate-800 dark:text-slate-200 uppercase">
-                          <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                            {u.department}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-bold text-blue-600 dark:text-blue-400">
-                            {roleMeta ? (lang === 'tr' ? roleMeta.titleTr : roleMeta.titleEn) : u.role}
-                          </div>
-                          <div className="text-[10px] font-mono font-light text-slate-400">
-                            {u.role}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                            u.authority_tier === 0 ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300' :
-                            u.authority_tier === 1 ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-300' :
-                            u.authority_tier === 2 ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300' :
-                            u.authority_tier === 3 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300' :
-                            'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300'
-                          }`}>
-                            Tier {u.authority_tier}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {u.account_status === 'ACTIVE' && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400">
-                              ✓ {d.statusActive}
-                            </span>
-                          )}
-                          {u.account_status === 'INVITED' && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
-                              ⏳ {d.statusInvited}
-                            </span>
-                          )}
-                          {u.account_status === 'SUSPENDED' && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400">
-                              ✕ {d.statusSuspended}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 font-mono font-light text-[11px] text-slate-500">
-                          {u.last_login_at ? new Date(u.last_login_at).toLocaleDateString(lang === 'tr' ? 'tr-TR' : 'en-US') : '-'}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {isManageable ? (
-                            <div className="flex items-center justify-center space-x-1.5">
-                              <button
-                                onClick={() => handleToggleUserStatus(u)}
-                                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
-                                  u.account_status === 'ACTIVE'
-                                    ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-400'
-                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-400'
-                                }`}
-                              >
-                                {u.account_status === 'ACTIVE' ? d.btnSuspend : d.btnActivate}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditingUser(u);
-                                  setEditRole(u.role);
-                                }}
-                                className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors cursor-pointer"
-                              >
-                                {d.btnChangeRole}
-                              </button>
-                            </div>
+                              )}
+                            </button>
+                          ) : u.avatar_url ? (
+                            <img
+                              src={u.avatar_url}
+                              alt={u.full_name}
+                              className="w-11 h-11 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                            />
                           ) : (
-                            <span className="text-slate-400 text-[10px] font-light">-</span>
+                            <div className="w-11 h-11 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs shrink-0">
+                              {initialLetter}
+                            </div>
                           )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                              {u.full_name}
+                            </div>
+                            <div className="text-[11px] font-mono font-light text-slate-400 truncate">
+                              {u.email}
+                            </div>
+                          </div>
+                        </div>
+
+                        {u.account_status === 'ACTIVE' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 shrink-0">
+                            ✓ {d.statusActive}
+                          </span>
+                        )}
+                        {u.account_status === 'INVITED' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400 shrink-0">
+                            ⏳ {d.statusInvited}
+                          </span>
+                        )}
+                        {u.account_status === 'SUSPENDED' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400 shrink-0">
+                            ✕ {d.statusSuspended}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
+                        <div>
+                          <span className="font-bold text-blue-600 dark:text-blue-400 block">
+                            {roleMeta
+                              ? lang === 'tr'
+                                ? roleMeta.titleTr
+                                : roleMeta.titleEn
+                              : u.role}
+                          </span>
+                          <span className="text-[10px] font-mono font-light text-slate-400">
+                            {u.department} • {u.role}
+                          </span>
+                        </div>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                            u.authority_tier === 0
+                              ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300'
+                              : u.authority_tier === 1
+                              ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-300'
+                              : u.authority_tier === 2
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300'
+                              : u.authority_tier === 3
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300'
+                              : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300'
+                          }`}
+                        >
+                          Tier {u.authority_tier}
+                        </span>
+                      </div>
+
+                      {isManageable && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleUserStatus(u)}
+                            className={`flex-1 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                              u.account_status === 'ACTIVE'
+                                ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-400'
+                                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-400'
+                            }`}
+                          >
+                            {u.account_status === 'ACTIVE'
+                              ? d.btnSuspend
+                              : d.btnActivate}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingUser(u);
+                              setEditRole(u.role);
+                            }}
+                            className="flex-1 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors cursor-pointer"
+                          >
+                            {d.btnChangeRole}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop (md:+) Roster Table */}
+            <div className="hidden md:block w-full overflow-x-auto touch-scroll-x rounded-xl border border-slate-200 dark:border-slate-800">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold uppercase text-[10px] text-slate-400 tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">{d.thUser}</th>
+                    <th className="px-4 py-3">{d.thDepartment}</th>
+                    <th className="px-4 py-3">{d.thRole}</th>
+                    <th className="px-4 py-3 text-center">{d.thTier}</th>
+                    <th className="px-4 py-3 text-center">{d.thStatus}</th>
+                    <th className="px-4 py-3">{d.thLastLogin}</th>
+                    <th className="px-4 py-3 text-center">{d.thActions}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-light text-slate-700 dark:text-slate-300">
+                  {loading ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-4 py-8 text-center text-slate-400 font-light"
+                      >
+                        {common.loading}
+                      </td>
+                    </tr>
+                  ) : filteredUsers.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-4 py-8 text-center text-slate-400 font-light"
+                      >
+                        {lang === 'tr'
+                          ? 'Kriterlere uygun personel bulunamadı.'
+                          : 'No personnel matching filter criteria.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredUsers.map((u) => {
+                      const roleMeta = ROLE_METADATA[u.role];
+                      const isManageable = canManageUser(currentRole, u.role);
+                      const initialLetter =
+                        u.full_name?.charAt(0).toUpperCase() || 'U';
+
+                      return (
+                        <tr
+                          key={u.id}
+                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center space-x-3">
+                              {canManageAvatars ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openAvatarModal(u)}
+                                  title={d.updateProfilePhoto}
+                                  className="group relative w-9 h-9 rounded-full shrink-0 overflow-hidden border border-slate-200 dark:border-slate-700 focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                >
+                                  {u.avatar_url ? (
+                                    <img
+                                      src={u.avatar_url}
+                                      alt={u.full_name}
+                                      className="w-9 h-9 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs">
+                                      {initialLetter}
+                                    </div>
+                                  )}
+                                  <div className="absolute inset-0 bg-slate-900/65 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                    <svg
+                                      className="w-4 h-4"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth="2"
+                                        d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                                      />
+                                      <circle
+                                        cx="12"
+                                        cy="13"
+                                        r="3"
+                                        strokeWidth="2"
+                                      />
+                                    </svg>
+                                  </div>
+                                </button>
+                              ) : u.avatar_url ? (
+                                <img
+                                  src={u.avatar_url}
+                                  alt={u.full_name}
+                                  className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                                />
+                              ) : (
+                                <div className="w-9 h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs shrink-0">
+                                  {initialLetter}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-bold text-slate-900 dark:text-white">
+                                  {u.full_name}
+                                </div>
+                                <div className="text-[11px] font-mono font-light text-slate-400">
+                                  {u.email}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-bold text-slate-800 dark:text-slate-200 uppercase">
+                            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                              {u.department}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-blue-600 dark:text-blue-400">
+                              {roleMeta
+                                ? lang === 'tr'
+                                  ? roleMeta.titleTr
+                                  : roleMeta.titleEn
+                                : u.role}
+                            </div>
+                            <div className="text-[10px] font-mono font-light text-slate-400">
+                              {u.role}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                                u.authority_tier === 0
+                                  ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300'
+                                  : u.authority_tier === 1
+                                  ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-300'
+                                  : u.authority_tier === 2
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300'
+                                  : u.authority_tier === 3
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300'
+                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300'
+                              }`}
+                            >
+                              Tier {u.authority_tier}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {u.account_status === 'ACTIVE' && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400">
+                                ✓ {d.statusActive}
+                              </span>
+                            )}
+                            {u.account_status === 'INVITED' && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
+                                ⏳ {d.statusInvited}
+                              </span>
+                            )}
+                            {u.account_status === 'SUSPENDED' && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400">
+                                ✕ {d.statusSuspended}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 font-mono font-light text-[11px] text-slate-500">
+                            {u.last_login_at
+                              ? new Date(u.last_login_at).toLocaleDateString(
+                                  lang === 'tr' ? 'tr-TR' : 'en-US'
+                                )
+                              : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {isManageable ? (
+                              <div className="flex items-center justify-center space-x-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleUserStatus(u)}
+                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                                    u.account_status === 'ACTIVE'
+                                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-300 dark:bg-rose-950/60 dark:text-rose-400'
+                                      : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-400'
+                                  }`}
+                                >
+                                  {u.account_status === 'ACTIVE'
+                                    ? d.btnSuspend
+                                    : d.btnActivate}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingUser(u);
+                                    setEditRole(u.role);
+                                  }}
+                                  className="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700 transition-colors cursor-pointer"
+                                >
+                                  {d.btnChangeRole}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-[10px] font-light">
+                                -
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
-        {/* TAB 2: INVITATIONS TABLE */}
+        {/* =============================================================== */}
+        {/* TAB 2: INVITATIONS (MOBILE CARDS < md + DESKTOP TABLE)          */}
+        {/* =============================================================== */}
         {activeTab === 'INVITATIONS' && (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold uppercase text-[10px] text-slate-400 tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">{d.thInvitee}</th>
-                  <th className="px-4 py-3">{d.thTargetRole}</th>
-                  <th className="px-4 py-3">{d.thExpiresIn}</th>
-                  <th className="px-4 py-3 text-center">{d.thInviteStatus}</th>
-                  <th className="px-4 py-3 text-center">{d.thActions}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-light text-slate-700 dark:text-slate-300">
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400 font-light">
-                      {common.loading}
-                    </td>
-                  </tr>
-                ) : filteredInvitations.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-slate-400 font-light">
-                      {lang === 'tr' ? 'Kayıtlı davet bulunamadı.' : 'No invitations found.'}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredInvitations.map((inv) => {
-                    const isManageable = canInviteRole(currentRole, inv.target_role);
+          <>
+            {/* Mobile (< md) Invitation Cards */}
+            <div className="md:hidden space-y-3">
+              {loading ? (
+                <div className="p-8 text-center text-xs font-light text-slate-400 rounded-xl border border-slate-200 dark:border-slate-800">
+                  {common.loading}
+                </div>
+              ) : filteredInvitations.length === 0 ? (
+                <div className="p-8 text-center text-xs font-light text-slate-400 rounded-xl border border-slate-200 dark:border-slate-800">
+                  {lang === 'tr'
+                    ? 'Kayıtlı davet bulunamadı.'
+                    : 'No invitations found.'}
+                </div>
+              ) : (
+                filteredInvitations.map((inv) => {
+                  const isManageable = canInviteRole(
+                    currentRole,
+                    inv.target_role
+                  );
 
-                    return (
-                      <tr key={inv.invitation_id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="px-4 py-3">
-                          <div className="font-bold text-slate-900 dark:text-white">
+                  return (
+                    <div
+                      key={`mob-inv-${inv.invitation_id}`}
+                      className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 p-3.5 space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-slate-900 dark:text-white truncate">
                             {inv.full_name}
                           </div>
-                          <div className="text-[11px] font-mono font-light text-slate-400">
+                          <div className="text-[11px] font-mono font-light text-slate-400 truncate">
                             {inv.email}
                           </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-bold text-blue-600 dark:text-blue-400">
-                            {ROLE_METADATA[inv.target_role]?.titleTr || inv.target_role}
-                          </div>
-                          <div className="text-[10px] uppercase font-mono font-light text-slate-400">
-                            {inv.target_department} • Tier {inv.target_tier}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {getRemainingTimeBadge(inv.expires_at, inv.status)}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            inv.status === 'PENDING' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400' :
-                            inv.status === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400' :
-                            'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400'
-                          }`}>
-                            {inv.status}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          {isManageable && (
-                            <div className="flex items-center justify-center space-x-1.5">
-                              {inv.status === 'PENDING' && (
-                                <button
-                                  onClick={() => handleResendInvite(inv.invitation_id)}
-                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900 transition-colors cursor-pointer"
-                                  title={lang === 'tr' ? '48 saatlik süreyi sıfırla ve yeni link üret' : 'Reset 48h clock and generate new link'}
-                                >
-                                  {d.btnResend}
-                                </button>
-                              )}
-                              {inv.status === 'PENDING' && (
-                                <button
-                                  onClick={() => handleRevokeInvite(inv.invitation_id)}
-                                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-900 transition-colors cursor-pointer"
-                                >
-                                  {d.btnRevoke}
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+                            inv.status === 'PENDING'
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400'
+                              : inv.status === 'ACCEPTED'
+                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400'
+                              : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400'
+                          }`}
+                        >
+                          {inv.status}
+                        </span>
+                      </div>
 
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
+                        <div>
+                          <span className="font-bold text-blue-600 dark:text-blue-400 block">
+                            {ROLE_METADATA[inv.target_role]?.titleTr ||
+                              inv.target_role}
+                          </span>
+                          <span className="text-[10px] uppercase font-mono font-light text-slate-400">
+                            {inv.target_department} • Tier {inv.target_tier}
+                          </span>
+                        </div>
+                        <div>
+                          {getRemainingTimeBadge(inv.expires_at, inv.status)}
+                        </div>
+                      </div>
+
+                      {isManageable && inv.status === 'PENDING' && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleResendInvite(inv.invitation_id)
+                            }
+                            className="flex-1 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900 transition-colors cursor-pointer"
+                          >
+                            {d.btnResend}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleRevokeInvite(inv.invitation_id)
+                            }
+                            className="flex-1 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-900 transition-colors cursor-pointer"
+                          >
+                            {d.btnRevoke}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop (md:+) Invitations Table */}
+            <div className="hidden md:block w-full overflow-x-auto touch-scroll-x rounded-xl border border-slate-200 dark:border-slate-800">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold uppercase text-[10px] text-slate-400 tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">{d.thInvitee}</th>
+                    <th className="px-4 py-3">{d.thTargetRole}</th>
+                    <th className="px-4 py-3">{d.thExpiresIn}</th>
+                    <th className="px-4 py-3 text-center">
+                      {d.thInviteStatus}
+                    </th>
+                    <th className="px-4 py-3 text-center">{d.thActions}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-light text-slate-700 dark:text-slate-300">
+                  {loading ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-4 py-8 text-center text-slate-400 font-light"
+                      >
+                        {common.loading}
+                      </td>
+                    </tr>
+                  ) : filteredInvitations.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="px-4 py-8 text-center text-slate-400 font-light"
+                      >
+                        {lang === 'tr'
+                          ? 'Kayıtlı davet bulunamadı.'
+                          : 'No invitations found.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredInvitations.map((inv) => {
+                      const isManageable = canInviteRole(
+                        currentRole,
+                        inv.target_role
+                      );
+
+                      return (
+                        <tr
+                          key={inv.invitation_id}
+                          className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-900 dark:text-white">
+                              {inv.full_name}
+                            </div>
+                            <div className="text-[11px] font-mono font-light text-slate-400">
+                              {inv.email}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-blue-600 dark:text-blue-400">
+                              {ROLE_METADATA[inv.target_role]?.titleTr ||
+                                inv.target_role}
+                            </div>
+                            <div className="text-[10px] uppercase font-mono font-light text-slate-400">
+                              {inv.target_department} • Tier {inv.target_tier}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {getRemainingTimeBadge(inv.expires_at, inv.status)}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                inv.status === 'PENDING'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400'
+                                  : inv.status === 'ACCEPTED'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400'
+                                  : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-400'
+                              }`}
+                            >
+                              {inv.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {isManageable && (
+                              <div className="flex items-center justify-center space-x-1.5">
+                                {inv.status === 'PENDING' && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleResendInvite(inv.invitation_id)
+                                    }
+                                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-400 border border-blue-200 dark:border-blue-900 transition-colors cursor-pointer"
+                                    title={
+                                      lang === 'tr'
+                                        ? '48 saatlik süreyi sıfırla ve yeni link üret'
+                                        : 'Reset 48h clock and generate new link'
+                                    }
+                                  >
+                                    {d.btnResend}
+                                  </button>
+                                )}
+                                {inv.status === 'PENDING' && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleRevokeInvite(inv.invitation_id)
+                                    }
+                                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border border-rose-200 dark:border-rose-900 transition-colors cursor-pointer"
+                                  >
+                                    {d.btnRevoke}
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ================================================= */}
       {/* MODAL 1: INVITE TEAM MEMBER DIALOG */}
       {/* ================================================= */}
       {isInviteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-lg bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-[calc(100vw-1rem)] sm:w-full max-w-lg bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl space-y-4 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase">
                   {d.modalInviteTitle}
                 </h3>
                 <p className="text-xs font-light text-slate-400">
-                  {lang === 'tr' ? 'Delegatör:' : 'Delegator:'} <span className="font-bold">{currentRole}</span>
+                  {lang === 'tr' ? 'Delegatör:' : 'Delegator:'}{' '}
+                  <span className="font-bold">{currentRole}</span>
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setIsInviteModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -997,23 +1432,38 @@ export default function UserManagementWorkspace({
             {inviteSuccessUrl ? (
               <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 rounded-2xl space-y-3">
                 <div className="flex items-center space-x-2 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
-                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                  <svg
+                    className="w-5 h-5 text-emerald-600 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
-                  <span>{lang === 'tr' ? 'Davet oluşturuldu ve 48 saatlik aktivasyon bağlantısı hazır!' : 'Invitation generated and 48-hour secure link is ready!'}</span>
+                  <span>
+                    {lang === 'tr'
+                      ? 'Davet oluşturuldu ve 48 saatlik aktivasyon bağlantısı hazır!'
+                      : 'Invitation generated and 48-hour secure link is ready!'}
+                  </span>
                 </div>
 
-                <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-900 flex items-center justify-between gap-2">
-                  <span className="font-mono font-light text-[11px] text-slate-700 dark:text-slate-300 truncate">
+                <div className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-emerald-200 dark:border-emerald-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <span className="font-mono font-light text-[11px] text-slate-700 dark:text-slate-300 break-all">
                     {inviteSuccessUrl}
                   </span>
                   <button
+                    type="button"
                     onClick={() => {
                       void navigator.clipboard.writeText(inviteSuccessUrl);
                       setCopiedLink(true);
                       setTimeout(() => setCopiedLink(false), 2000);
                     }}
-                    className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold whitespace-nowrap cursor-pointer"
+                    className="min-h-[40px] px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer shrink-0"
                   >
                     {copiedLink ? d.copySuccess : d.btnCopy}
                   </button>
@@ -1021,11 +1471,12 @@ export default function UserManagementWorkspace({
 
                 <div className="flex justify-end pt-2">
                   <button
+                    type="button"
                     onClick={() => {
                       setIsInviteModalOpen(false);
                       setInviteSuccessUrl(null);
                     }}
-                    className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                    className="min-h-[44px] px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
                   >
                     {common.close}
                   </button>
@@ -1043,7 +1494,7 @@ export default function UserManagementWorkspace({
                     value={inviteFullName}
                     onChange={(e) => setInviteFullName(e.target.value)}
                     placeholder="Ahmet Yılmaz"
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className="w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
                   />
                 </div>
 
@@ -1057,7 +1508,7 @@ export default function UserManagementWorkspace({
                     value={inviteEmail}
                     onChange={(e) => setInviteEmail(e.target.value)}
                     placeholder="ahmet@caesar-projects.com"
-                    className="w-full px-3 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
+                    className="w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden"
                   />
                 </div>
 
@@ -1069,11 +1520,12 @@ export default function UserManagementWorkspace({
                     required
                     value={inviteRole}
                     onChange={(e) => setInviteRole(e.target.value as RoleTier)}
-                    className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden cursor-pointer"
+                    className="w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden cursor-pointer"
                   >
                     {assignableRoles.map((role) => (
                       <option key={role} value={role}>
-                        {ROLE_METADATA[role]?.titleTr || role} (Tier {ROLE_METADATA[role]?.tier})
+                        {ROLE_METADATA[role]?.titleTr || role} (Tier{' '}
+                        {ROLE_METADATA[role]?.tier})
                       </option>
                     ))}
                   </select>
@@ -1099,21 +1551,30 @@ export default function UserManagementWorkspace({
                   </label>
                   <div className="max-h-28 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-300 dark:border-slate-700 space-y-1">
                     {portfolioProjects.map((p) => (
-                      <label key={p.project_id} className="flex items-center space-x-2 text-xs cursor-pointer">
+                      <label
+                        key={p.project_id}
+                        className="min-h-[34px] flex items-center space-x-2 text-xs cursor-pointer"
+                      >
                         <input
                           type="checkbox"
                           checked={inviteProjects.includes(p.project_id)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setInviteProjects((prev) => [...prev, p.project_id]);
+                              setInviteProjects((prev) => [
+                                ...prev,
+                                p.project_id,
+                              ]);
                             } else {
-                              setInviteProjects((prev) => prev.filter((id) => id !== p.project_id));
+                              setInviteProjects((prev) =>
+                                prev.filter((id) => id !== p.project_id)
+                              );
                             }
                           }}
                           className="rounded border-slate-300 dark:border-slate-700 text-blue-600"
                         />
                         <span className="font-bold text-slate-800 dark:text-slate-200">
-                          {p.project_name} <span className="font-light">({p.project_id})</span>
+                          {p.project_name}{' '}
+                          <span className="font-light">({p.project_id})</span>
                         </span>
                       </label>
                     ))}
@@ -1124,21 +1585,24 @@ export default function UserManagementWorkspace({
                   <button
                     type="button"
                     onClick={() => setIsInviteModalOpen(false)}
-                    className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                    className="min-h-[44px] px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
                   >
                     {common.cancel}
                   </button>
                   <button
                     type="submit"
                     disabled={inviteSubmitting || !inviteRole}
-                    className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+                    className="min-h-[44px] px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
                   >
-                    {inviteSubmitting ? (lang === 'tr' ? 'Oluşturuluyor...' : 'Generating...') : d.btnSendInvite}
+                    {inviteSubmitting
+                      ? lang === 'tr'
+                        ? 'Oluşturuluyor...'
+                        : 'Generating...'
+                      : d.btnSendInvite}
                   </button>
                 </div>
               </form>
             )}
-
           </div>
         </div>
       )}
@@ -1147,12 +1611,12 @@ export default function UserManagementWorkspace({
       {/* MODAL 2: EDIT USER ROLE MODAL */}
       {/* ================================================= */}
       {editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-sm bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-[calc(100vw-1rem)] sm:w-full max-w-sm max-h-[90dvh] overflow-y-auto bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl space-y-4">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase break-words">
               {d.btnChangeRole}: {editingUser.full_name}
             </h3>
-            <p className="text-xs font-mono font-light text-slate-400">
+            <p className="text-xs font-mono font-light text-slate-400 break-all">
               {editingUser.email}
             </p>
 
@@ -1163,7 +1627,7 @@ export default function UserManagementWorkspace({
               <select
                 value={editRole}
                 onChange={(e) => setEditRole(e.target.value as RoleTier)}
-                className="w-full px-3 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white cursor-pointer"
+                className="w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white cursor-pointer"
               >
                 {assignableRoles.map((role) => (
                   <option key={role} value={role}>
@@ -1177,7 +1641,7 @@ export default function UserManagementWorkspace({
               <button
                 type="button"
                 onClick={() => setEditingUser(null)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                className="min-h-[44px] px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
               >
                 {common.cancel}
               </button>
@@ -1185,9 +1649,13 @@ export default function UserManagementWorkspace({
                 type="button"
                 onClick={handleSaveUserRole}
                 disabled={editSubmitting || !editRole}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
+                className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
               >
-                {editSubmitting ? (lang === 'tr' ? 'Kaydediliyor...' : 'Saving...') : common.save}
+                {editSubmitting
+                  ? lang === 'tr'
+                    ? 'Kaydediliyor...'
+                    : 'Saving...'
+                  : common.save}
               </button>
             </div>
           </div>
@@ -1198,8 +1666,8 @@ export default function UserManagementWorkspace({
       {/* MODAL 3: MILESTONE v2.9.4 UPDATE USER PHOTO MODAL (TIER 0-1) */}
       {/* ================================================= */}
       {avatarEditingUser && canManageAvatars && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-[calc(100vw-1rem)] sm:w-full max-w-md max-h-[90dvh] overflow-y-auto bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl space-y-5">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase">
@@ -1212,7 +1680,7 @@ export default function UserManagementWorkspace({
               <button
                 type="button"
                 onClick={closeAvatarModal}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -1229,13 +1697,18 @@ export default function UserManagementWorkspace({
               <div className="relative w-28 h-28 rounded-full overflow-hidden border-2 border-blue-500/40 bg-slate-100 dark:bg-slate-800 flex items-center justify-center shadow-md">
                 {avatarPreview?.previewUrl || avatarEditingUser.avatar_url ? (
                   <img
-                    src={avatarPreview?.previewUrl || avatarEditingUser.avatar_url || ''}
+                    src={
+                      avatarPreview?.previewUrl ||
+                      avatarEditingUser.avatar_url ||
+                      ''
+                    }
                     alt={avatarEditingUser.full_name}
                     className="w-full h-full object-cover"
                   />
                 ) : (
                   <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                    {avatarEditingUser.full_name?.charAt(0).toUpperCase() || 'U'}
+                    {avatarEditingUser.full_name?.charAt(0).toUpperCase() ||
+                      'U'}
                   </span>
                 )}
               </div>
@@ -1244,7 +1717,7 @@ export default function UserManagementWorkspace({
                 <div className="text-sm font-bold text-slate-900 dark:text-white">
                   {avatarEditingUser.full_name}
                 </div>
-                <div className="text-xs font-mono font-light text-slate-400">
+                <div className="text-xs font-mono font-light text-slate-400 break-all">
                   {avatarEditingUser.email}
                 </div>
                 {avatarPreview && (
@@ -1257,14 +1730,19 @@ export default function UserManagementWorkspace({
             </div>
 
             {/* Dual Source Buttons: Take Photo (WebcamCaptureModal) & Upload from Device */}
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <button
                 type="button"
                 disabled={avatarCompressing || avatarSaving || avatarRemoving}
                 onClick={() => setIsAvatarCameraOpen(true)}
-                className="h-10 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center space-x-2 transition-colors cursor-pointer shadow-xs"
+                className="min-h-[44px] h-11 sm:h-10 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold flex items-center justify-center space-x-2 transition-colors cursor-pointer shadow-xs"
               >
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-4 h-4 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1280,9 +1758,14 @@ export default function UserManagementWorkspace({
                 type="button"
                 disabled={avatarCompressing || avatarSaving || avatarRemoving}
                 onClick={() => avatarFileInputRef.current?.click()}
-                className="h-10 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 text-xs font-bold flex items-center justify-center space-x-2 transition-colors cursor-pointer"
+                className="min-h-[44px] h-11 sm:h-10 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 text-xs font-bold flex items-center justify-center space-x-2 transition-colors cursor-pointer"
               >
-                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg
+                  className="w-4 h-4 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1307,13 +1790,13 @@ export default function UserManagementWorkspace({
             </div>
 
             {/* Footer Actions: Remove Photo (if existing) + Cancel + Save Photo */}
-            <div className="flex items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800 gap-2">
+            <div className="flex flex-wrap items-center justify-between pt-3 border-t border-slate-200 dark:border-slate-800 gap-2">
               {avatarEditingUser.avatar_url ? (
                 <button
                   type="button"
                   disabled={avatarRemoving || avatarSaving}
                   onClick={handleRemoveAvatar}
-                  className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/70 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  className="min-h-[44px] px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/70 text-rose-700 dark:text-rose-300 border border-rose-300 dark:border-rose-800 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {avatarRemoving ? common.loading : d.removePhoto}
                 </button>
@@ -1325,15 +1808,17 @@ export default function UserManagementWorkspace({
                 <button
                   type="button"
                   onClick={closeAvatarModal}
-                  className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
                 >
                   {common.cancel}
                 </button>
                 <button
                   type="button"
-                  disabled={!avatarPreview || avatarSaving || avatarCompressing}
+                  disabled={
+                    !avatarPreview || avatarSaving || avatarCompressing
+                  }
                   onClick={handleSaveAvatar}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs transition-colors cursor-pointer"
                 >
                   {avatarSaving ? common.saving : d.savePhoto}
                 </button>
@@ -1353,7 +1838,6 @@ export default function UserManagementWorkspace({
           void handleAvatarFileSelected(captured.file);
         }}
       />
-
     </div>
   );
 }

@@ -29,7 +29,7 @@ import {
 } from '@/lib/imageCompression';
 
 const CONTROL_CLASS =
-  'w-full h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
+  'w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
 
 const MAX_STAGED_BARCODES = 5;
 
@@ -113,7 +113,11 @@ function getNewBarcodePriorityScore(entry: StagedBarcodeEntry): number {
   if (fmt.includes('ean_13') || fmt.includes('ean-13')) score += 60;
   else if (fmt.includes('upc_a') || fmt.includes('upc-a')) score += 55;
   else if (fmt.includes('ean_8') || fmt.includes('upc_e')) score += 50;
-  else if (fmt.includes('code_128') || fmt.includes('code_39') || fmt.includes('itf'))
+  else if (
+    fmt.includes('code_128') ||
+    fmt.includes('code_39') ||
+    fmt.includes('itf')
+  )
     score += 45;
   else if (fmt === 'manual') score += 35;
   else if (fmt.includes('qr') || fmt.includes('data_matrix')) score += 10;
@@ -952,7 +956,9 @@ export default function MobileBarcodeScannerModal({
   );
 
   // Explicit "Add New Item" transition using strictly the ONE selected barcode
-  const handleProceedToAddNewItem = (targetEntry?: StagedBarcodeEntry | null) => {
+  const handleProceedToAddNewItem = (
+    targetEntry?: StagedBarcodeEntry | null
+  ) => {
     const entry = targetEntry || selectedNewEntry;
     if (!entry) return;
 
@@ -1052,10 +1058,9 @@ export default function MobileBarcodeScannerModal({
           actor_role: currentRole,
           project_id: regProjectId,
           product_domain: regProductDomain,
-          depot_id:
-            depotLocations.some((dl) => dl.depot_id === targetDepot)
-              ? targetDepot
-              : activeDepotId,
+          depot_id: depotLocations.some((dl) => dl.depot_id === targetDepot)
+            ? targetDepot
+            : activeDepotId,
           category: regCategory.trim(),
           subcategory: regSubcategory.trim() || null,
           item_name_tr: regNameTr.trim(),
@@ -1225,10 +1230,15 @@ export default function MobileBarcodeScannerModal({
       : [{ project_id: 'PRJ-02', project_name: 'Caesar Resort & Spa' }];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in font-sans">
-      <div className="relative w-full max-w-2xl bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in font-sans">
+      <div className="relative w-full md:w-[calc(100vw-1rem)] md:max-w-2xl bg-white dark:bg-[#0f172a] rounded-t-2xl md:rounded-2xl shadow-2xl border-t md:border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90dvh]">
+        {/* Mobile Bottom-Sheet Drag Handle Pill */}
+        <div className="md:hidden flex justify-center pt-2.5 pb-1 bg-slate-50 dark:bg-slate-900/60">
+          <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+        </div>
+
+        {/* Sticky Modal Header */}
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 shrink-0">
           <div className="flex items-center space-x-3 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20 shrink-0">
               <svg
@@ -1263,8 +1273,9 @@ export default function MobileBarcodeScannerModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
             title={common.close}
           >
             <svg
@@ -1284,12 +1295,12 @@ export default function MobileBarcodeScannerModal({
         </div>
 
         {/* Top Dual-Mode Switcher: Scan / Lookup vs Manual Add */}
-        <div className="px-4 sm:px-5 pt-3 bg-white dark:bg-[#0f172a]">
+        <div className="px-4 sm:px-5 pt-3 bg-white dark:bg-[#0f172a] shrink-0">
           <div className="grid grid-cols-2 rounded-xl bg-slate-100 dark:bg-slate-900 p-1 border border-slate-200 dark:border-slate-800">
             <button
               type="button"
               onClick={handleSwitchToScanLookup}
-              className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              className={`min-h-[42px] py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 activeMode === 'SCAN_LOOKUP' && !isRegistering
                   ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -1300,7 +1311,7 @@ export default function MobileBarcodeScannerModal({
             <button
               type="button"
               onClick={handleSwitchToManualAdd}
-              className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+              className={`min-h-[42px] py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                 activeMode === 'MANUAL_ADD' || isRegistering
                   ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -1334,7 +1345,7 @@ export default function MobileBarcodeScannerModal({
                     <select
                       value={selectedDeviceId}
                       onChange={(e) => handleCameraChange(e.target.value)}
-                      className="h-9 px-3 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-hidden cursor-pointer"
+                      className="min-h-[40px] h-10 px-3 rounded-xl text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-hidden cursor-pointer"
                     >
                       {videoDevices.map((dev, idx) => (
                         <option key={dev.deviceId || idx} value={dev.deviceId}>
@@ -1352,7 +1363,7 @@ export default function MobileBarcodeScannerModal({
                   <button
                     type="button"
                     onClick={() => setCameraPaused((prev) => !prev)}
-                    className={`h-9 px-3 rounded-lg text-xs font-bold border transition-colors cursor-pointer ${
+                    className={`min-h-[40px] h-10 px-3 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
                       cameraPaused
                         ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600'
                         : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'
@@ -1367,7 +1378,7 @@ export default function MobileBarcodeScannerModal({
                     <button
                       type="button"
                       onClick={handleClearTray}
-                      className="h-9 px-3 rounded-lg text-xs font-bold bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
+                      className="min-h-[40px] h-10 px-3 rounded-xl text-xs font-bold bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer"
                     >
                       {d.btnClearTray}
                     </button>
@@ -1417,7 +1428,7 @@ export default function MobileBarcodeScannerModal({
                     <button
                       type="button"
                       onClick={() => setCameraPaused(false)}
-                      className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
+                      className="min-h-[40px] px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer"
                     >
                       ▶ {d.btnResumeCamera}
                     </button>
@@ -1437,13 +1448,16 @@ export default function MobileBarcodeScannerModal({
               </div>
 
               {/* Manual Lookup Input / USB Barcode Scanner Field */}
-              <form onSubmit={handleManualSearch} className="flex gap-2">
+              <form
+                onSubmit={handleManualSearch}
+                className="flex flex-col sm:flex-row gap-2"
+              >
                 <input
                   type="text"
                   value={manualInput}
                   onChange={(e) => setManualInput(e.target.value)}
                   placeholder={d.manualPlaceholder}
-                  className="flex-1 h-10 px-3.5 py-2 rounded-xl text-xs font-light font-mono border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 min-h-[44px] h-11 sm:h-10 px-3.5 py-2 rounded-xl text-xs font-light font-mono border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 />
                 <button
                   type="submit"
@@ -1451,7 +1465,7 @@ export default function MobileBarcodeScannerModal({
                     !manualInput.trim() ||
                     detectedBarcodes.length >= MAX_STAGED_BARCODES
                   }
-                  className="h-10 px-5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
+                  className="min-h-[44px] h-11 sm:h-10 px-5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors shadow-xs cursor-pointer"
                 >
                   {d.btnSearch}
                 </button>
@@ -1598,7 +1612,8 @@ export default function MobileBarcodeScannerModal({
                                     </span>
                                     {entry.inventoryAsset && (
                                       <span className="font-mono text-purple-700 dark:text-purple-300 font-bold">
-                                        S/N: {entry.inventoryAsset.serial_number}
+                                        S/N:{' '}
+                                        {entry.inventoryAsset.serial_number}
                                       </span>
                                     )}
                                   </div>
@@ -1617,7 +1632,7 @@ export default function MobileBarcodeScannerModal({
                                     onClose();
                                   }
                                 }}
-                                className="h-9 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+                                className="min-h-[40px] px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
                               >
                                 {d.btnViewItem}
                               </button>
@@ -1631,7 +1646,7 @@ export default function MobileBarcodeScannerModal({
                                     entry.inventoryAsset
                                   );
                                 }}
-                                className="h-9 px-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-slate-800 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 text-xs font-bold transition-colors cursor-pointer"
+                                className="min-h-[40px] px-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-emerald-50 dark:hover:bg-slate-800 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 text-xs font-bold transition-colors cursor-pointer"
                               >
                                 {d.btnInbound}
                               </button>
@@ -1645,7 +1660,7 @@ export default function MobileBarcodeScannerModal({
                                     entry.inventoryAsset
                                   );
                                 }}
-                                className="h-9 px-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-amber-50 dark:hover:bg-slate-800 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 text-xs font-bold transition-colors cursor-pointer"
+                                className="min-h-[40px] px-3 rounded-xl bg-white dark:bg-slate-900 hover:bg-amber-50 dark:hover:bg-slate-800 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 text-xs font-bold transition-colors cursor-pointer"
                               >
                                 {d.btnOutbound}
                               </button>
@@ -1788,7 +1803,7 @@ export default function MobileBarcodeScannerModal({
                       onClick={() =>
                         handleProceedToAddNewItem(selectedNewEntry)
                       }
-                      className="h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
+                      className="min-h-[44px] h-11 sm:h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer shrink-0"
                     >
                       + {d.btnAddNewItem}
                     </button>
@@ -1832,7 +1847,7 @@ export default function MobileBarcodeScannerModal({
                 <button
                   type="button"
                   onClick={handleSwitchToScanLookup}
-                  className="text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer shrink-0 ml-2"
+                  className="min-h-[36px] px-2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer shrink-0 ml-2"
                 >
                   ✕ {common.cancel}
                 </button>
@@ -1847,7 +1862,7 @@ export default function MobileBarcodeScannerModal({
               {/* ========================================================= */}
               {/* MILESTONE v2.9.3: TOP-MOUNTED REFERENCE PHOTO HERO CARD   */}
               {/* Left: w-28 h-28 md:w-32 md:h-32 rounded-2xl frame         */}
-              {/* Right: Separate h-10 Take Photo (Live Camera) vs Upload   */}
+              {/* Right: Separate Take Photo (Live Camera) vs Upload        */}
               {/* ========================================================= */}
               <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 p-4 flex flex-col sm:flex-row items-center sm:items-start gap-4">
                 <input
@@ -1907,7 +1922,7 @@ export default function MobileBarcodeScannerModal({
                   )}
                 </div>
 
-                {/* Right: Title, Helper Subtext & Distinct h-10 Take Photo / Upload Image Controls */}
+                {/* Right: Title, Helper Subtext & Distinct min-h-[44px] Take Photo / Upload Image Controls */}
                 <div className="flex-1 min-w-0 flex flex-col justify-between space-y-3 text-center sm:text-left w-full">
                   <div>
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 block">
@@ -1932,11 +1947,10 @@ export default function MobileBarcodeScannerModal({
                         setRegPhotoSource('CAMERA');
                         setIsRefWebcamOpen(true);
                       }}
-                      className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center space-x-1.5 shadow-2xs transition-colors cursor-pointer"
+                      className="min-h-[44px] h-11 sm:h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center space-x-1.5 shadow-2xs transition-colors cursor-pointer"
                     >
                       <span>
-                        📷{' '}
-                        {regRefPhoto ? tc.retakePhoto : tc.takePhoto}
+                        📷 {regRefPhoto ? tc.retakePhoto : tc.takePhoto}
                       </span>
                     </button>
 
@@ -1944,7 +1958,7 @@ export default function MobileBarcodeScannerModal({
                       type="button"
                       disabled={regPhotoCompressing}
                       onClick={() => regDevicePhotoInputRef.current?.click()}
-                      className="h-10 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer"
+                      className="min-h-[44px] h-11 sm:h-10 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold flex items-center space-x-1.5 transition-colors cursor-pointer"
                     >
                       <span>
                         📁{' '}
@@ -1963,7 +1977,7 @@ export default function MobileBarcodeScannerModal({
                           }
                           setRegRefPhoto(null);
                         }}
-                        className="h-10 px-3.5 rounded-xl bg-rose-100 dark:bg-rose-950/60 hover:bg-rose-200 text-rose-700 dark:text-rose-300 text-xs font-bold transition-colors cursor-pointer"
+                        className="min-h-[44px] h-11 sm:h-10 px-3.5 rounded-xl bg-rose-100 dark:bg-rose-950/60 hover:bg-rose-200 text-rose-700 dark:text-rose-300 text-xs font-bold transition-colors cursor-pointer"
                       >
                         {d.btnRemovePhoto}
                       </button>
@@ -2177,12 +2191,12 @@ export default function MobileBarcodeScannerModal({
                       onChange={(e) =>
                         setRegBaseCostEur(Number(e.target.value))
                       }
-                      className="flex-1 h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                      className="flex-1 min-h-[44px] h-11 sm:h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                     />
                     <select
                       value={regSourceCurrency}
                       onChange={(e) => setRegSourceCurrency(e.target.value)}
-                      className="w-24 h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                      className="w-24 min-h-[44px] h-11 sm:h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 cursor-pointer"
                     >
                       <option value="EUR">EUR</option>
                       <option value="USD">USD</option>
@@ -2309,7 +2323,7 @@ export default function MobileBarcodeScannerModal({
 
                 {/* Trackable Serialized Asset Options */}
                 <div className="sm:col-span-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                  <label className="flex items-center space-x-2 cursor-pointer mb-2">
+                  <label className="min-h-[36px] flex items-center space-x-2 cursor-pointer mb-2">
                     <input
                       type="checkbox"
                       checked={regIsTrackable}
@@ -2322,7 +2336,7 @@ export default function MobileBarcodeScannerModal({
                   </label>
 
                   {regIsTrackable && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-2 sm:pl-6">
                       <div>
                         <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
                           {d.lblSerial}
@@ -2352,18 +2366,18 @@ export default function MobileBarcodeScannerModal({
               </div>
 
               {/* Form Action Buttons */}
-              <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={handleSwitchToScanLookup}
-                  className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
                 >
                   {common.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={regSubmitting || !regNameTr.trim()}
-                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1.5 cursor-pointer"
+                  className="min-h-[44px] px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1.5 cursor-pointer"
                 >
                   <span>
                     {regSubmitting
@@ -2378,14 +2392,15 @@ export default function MobileBarcodeScannerModal({
           )}
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-4 sm:px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
+        {/* Sticky Modal Footer with Safe-Area Bottom Padding */}
+        <div className="px-4 sm:px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between gap-2 shrink-0">
           <div className="text-[10px] font-mono font-bold text-slate-400">
             {activeDepotId}
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            className="min-h-[40px] px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
           >
             {common.close}
           </button>

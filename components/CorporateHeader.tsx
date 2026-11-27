@@ -6,7 +6,11 @@ import React from 'react';
 import Link from 'next/link';
 import { RoleTier, DepartmentCode } from '@/types/requisition';
 import { ROLE_METADATA } from '@/lib/rbac';
-import { DICTIONARY } from '@/lib/i18n';
+import {
+  DICTIONARY,
+  useCaesarLanguage,
+  useCaesarTheme,
+} from '@/lib/i18n';
 
 interface CorporateHeaderProps {
   currentRole: RoleTier;
@@ -14,6 +18,7 @@ interface CorporateHeaderProps {
   lang: 'tr' | 'en';
   isSidebarCollapsed: boolean;
   onToggleSidebar: () => void;
+  onOpenMobileDrawer?: () => void;
   currentUserEmail?: string | null;
   avatarUrl?: string | null;
   isLoggedIn?: boolean;
@@ -37,27 +42,34 @@ export default function CorporateHeader({
   currentRole,
   lang,
   onToggleSidebar,
+  onOpenMobileDrawer,
   currentUserEmail,
   avatarUrl,
   isLoggedIn = false,
   onLogout,
 }: CorporateHeaderProps) {
+  const [, setLang] = useCaesarLanguage();
+  const [theme, setTheme] = useCaesarTheme();
   const t = DICTIONARY[lang].header;
+  const tf = DICTIONARY[lang].fab;
   const activeMeta = ROLE_METADATA[currentRole];
   const departmentColor = activeMeta?.department
     ? DEPT_BADGE_COLORS[activeMeta.department]
     : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200';
 
   return (
-    <header className="bg-white dark:bg-[#090d16] border-b border-slate-200 dark:border-slate-800 transition-colors sticky top-0 z-20 select-none font-sans">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-20">
-          {/* Left: Sidebar Toggle & Concise Bilingual Context Header */}
-          <div className="flex items-center space-x-3">
+    <header className="bg-white dark:bg-[#090d16] border-b border-slate-200 dark:border-slate-800 transition-colors sticky top-0 z-30 select-none font-sans pt-[env(safe-area-inset-top)]">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between gap-2 h-14 md:h-20">
+          {/* Left: 44x44px Hamburger Toggle (Mobile Drawer vs Desktop Rail) & Context Header */}
+          <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+            {/* Mobile Hamburger Button (< md) */}
             <button
-              onClick={onToggleSidebar}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              type="button"
+              onClick={onOpenMobileDrawer || onToggleSidebar}
+              className="md:hidden w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               title={t.toggleSidebar}
+              aria-label={t.toggleSidebar}
             >
               <svg
                 className="w-5 h-5"
@@ -73,7 +85,31 @@ export default function CorporateHeader({
                 />
               </svg>
             </button>
-            <div className="hidden sm:block">
+
+            {/* Desktop Collapse Button (md:+) */}
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="hidden md:flex w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title={t.toggleSidebar}
+              aria-label={t.toggleSidebar}
+            >
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </button>
+
+            <div className="hidden md:block">
               <span className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wide block leading-tight">
                 {t.controlCenter}
               </span>
@@ -83,34 +119,60 @@ export default function CorporateHeader({
             </div>
           </div>
 
-          {/* Right: Immutable Production Session Role Badge & Red Sign Out Control */}
-          <div className="flex items-center space-x-3 sm:space-x-4">
-            {/* Immutable Production Session Role Badge */}
-            <div className="flex items-center space-x-2 bg-slate-50 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs">
+          {/* Center / Right: Compact Role Badge + Inline Mobile Utility Controls + Avatar + Reachable Red Sign Out */}
+          <div className="flex items-center justify-end gap-1.5 sm:gap-3 min-w-0 flex-1">
+            {/* Compact Responsive Production Session Role Badge */}
+            <div className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-50 dark:bg-slate-800/80 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs min-w-0 overflow-hidden">
               <span
-                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${departmentColor}`}
+                className={`inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${departmentColor}`}
               >
-                {activeMeta?.department || 'CORP'} • Tier{' '}
-                {activeMeta?.tier ?? 4}
+                <span className="sm:hidden">
+                  {activeMeta?.department || 'CORP'} • T{activeMeta?.tier ?? 4}
+                </span>
+                <span className="hidden sm:inline">
+                  {activeMeta?.department || 'CORP'} • Tier{' '}
+                  {activeMeta?.tier ?? 4}
+                </span>
               </span>
-              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+              <span className="text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
                 {lang === 'tr'
                   ? activeMeta?.titleTr || currentRole
                   : activeMeta?.titleEn || currentRole}
               </span>
             </div>
 
-            {/* User Session & Red Sign Out Button */}
+            {/* Inline Mobile EN/TR & Light/Dark Toggle (< md) */}
+            <div className="flex md:hidden items-center bg-slate-100 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 p-0.5 h-9 shrink-0">
+              <button
+                type="button"
+                onClick={() => setLang(lang === 'tr' ? 'en' : 'tr')}
+                title={lang === 'tr' ? tf.switchToEnglish : tf.switchToTurkish}
+                className="h-8 px-2 rounded-lg text-[11px] font-bold text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                {lang === 'tr' ? 'TR' : 'EN'}
+              </button>
+              <div className="w-px h-4 bg-slate-300 dark:bg-slate-700" />
+              <button
+                type="button"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                title={theme === 'dark' ? tf.switchToLight : tf.switchToDark}
+                className="h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                {theme === 'dark' ? '☀️' : '🌙'}
+              </button>
+            </div>
+
+            {/* User Session & Reachable Red Sign Out Button */}
             {isLoggedIn ? (
-              <div className="flex items-center space-x-2.5 pl-2 border-l border-slate-200 dark:border-slate-800">
+              <div className="flex items-center space-x-1.5 sm:space-x-2.5 pl-1.5 sm:pl-2 border-l border-slate-200 dark:border-slate-800 shrink-0">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
                     alt={currentUserEmail || t.activeUser}
-                    className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800"
+                    className="w-8 h-8 md:w-9 md:h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800"
                   />
                 ) : (
-                  <div className="w-9 h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/20 shrink-0">
+                  <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/20 shrink-0">
                     {currentUserEmail
                       ? currentUserEmail.charAt(0).toUpperCase()
                       : 'U'}
@@ -126,9 +188,11 @@ export default function CorporateHeader({
                 </div>
                 {onLogout && (
                   <button
+                    type="button"
                     onClick={onLogout}
                     title={t.signOut}
-                    className="px-2.5 py-1.5 text-xs font-bold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/60 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors flex items-center space-x-1.5 cursor-pointer"
+                    aria-label={t.signOut}
+                    className="h-9 px-2.5 text-xs font-bold text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/60 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors flex items-center justify-center space-x-1.5 cursor-pointer shrink-0"
                   >
                     <svg
                       className="w-4 h-4 shrink-0"
@@ -150,7 +214,7 @@ export default function CorporateHeader({
             ) : (
               <Link
                 href="/login"
-                className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center space-x-1.5 cursor-pointer"
+                className="h-9 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center space-x-1.5 cursor-pointer shrink-0"
               >
                 <svg
                   className="w-3.5 h-3.5"

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Oswald } from "next/font/google";
 import "./globals.css";
 import GlobalUtilityFab from "@/components/GlobalUtilityFab";
@@ -10,6 +10,12 @@ const oswald = Oswald({
   weight: ["200", "300", "400", "500", "600", "700"],
   display: "swap",
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: "CAESAR CENTRAL HUB — Internal Operations Portal",
@@ -26,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${oswald.variable} h-full antialiased dark`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-canvas-dark text-slate-100 dark:bg-canvas-dark dark:text-slate-100 selection:bg-amber-500 selection:text-slate-950">
+      <body className="min-h-full w-full max-w-full overflow-x-hidden flex flex-col bg-canvas-dark text-slate-100 dark:bg-canvas-dark dark:text-slate-100 selection:bg-amber-500 selection:text-slate-950">
         <SplashOverlay />
         {children}
         <GlobalUtilityFab />

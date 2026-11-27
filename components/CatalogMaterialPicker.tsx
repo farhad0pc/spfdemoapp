@@ -145,7 +145,7 @@ export default function CatalogMaterialPicker({
   );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 min-w-0">
       {/* 1. Selected Material Summary Card with Inline Clear (✕) Action */}
       <div
         className={`p-3 rounded-xl border transition-colors ${
@@ -164,7 +164,7 @@ export default function CatalogMaterialPicker({
               onClick={onClearSelection}
               title={tc.clearSelection}
               aria-label={tc.clearSelection}
-              className="inline-flex items-center space-x-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/50 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+              className="min-h-[32px] inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/50 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
             >
               <span>✕</span>
               <span>{tc.clearSelection}</span>
@@ -246,7 +246,7 @@ export default function CatalogMaterialPicker({
                 setActiveDomain(tab.key);
                 setSelectedCategory('ALL');
               }}
-              className={`min-h-11 px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 text-center border transition-all cursor-pointer ${
+              className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 text-center border transition-all cursor-pointer ${
                 isActive
                   ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
                   : 'bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -269,13 +269,13 @@ export default function CatalogMaterialPicker({
         })}
       </div>
 
-      {/* 3. Category Dropdown (h-10 + Inline ✕ Reset) & Turkish-Locale Search Bar (h-10 + Inline ✕ Clear) */}
+      {/* 3. Category Dropdown (min-h-[44px] + Inline ✕ Reset) & Turkish-Locale Search Bar (min-h-[44px] + Inline ✕ Clear) */}
       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
         <div className="sm:col-span-5 flex items-center gap-1.5">
           <select
             value={effectiveCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full h-10 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+            className="w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
           >
             <option value="ALL">
               {tc.allCategories} ({domainFilteredItems.length})
@@ -292,7 +292,7 @@ export default function CatalogMaterialPicker({
               onClick={() => setSelectedCategory('ALL')}
               title={tc.clearSelection}
               aria-label={tc.clearSelection}
-              className="h-10 w-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+              className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
             >
               ✕
             </button>
@@ -306,7 +306,7 @@ export default function CatalogMaterialPicker({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={tc.searchPlaceholder}
-              className="w-full h-10 pl-3.5 pr-9 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+              className="w-full min-h-[44px] h-11 sm:h-10 pl-3.5 pr-10 py-2 text-xs font-light rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
             />
             {searchQuery.trim().length > 0 && (
               <button
@@ -314,7 +314,7 @@ export default function CatalogMaterialPicker({
                 onClick={() => setSearchQuery('')}
                 title={tc.clearSearch}
                 aria-label={tc.clearSearch}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded-lg text-xs font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg text-xs font-bold bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-950/60 dark:hover:text-rose-400 flex items-center justify-center transition-colors cursor-pointer"
               >
                 ✕
               </button>
@@ -332,7 +332,7 @@ export default function CatalogMaterialPicker({
           <button
             type="button"
             onClick={onOpenDepot}
-            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-800 transition-colors cursor-pointer"
+            className="min-h-[36px] inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-800 transition-colors cursor-pointer"
           >
             <svg
               className="w-3.5 h-3.5 shrink-0"
@@ -386,7 +386,7 @@ export default function CatalogMaterialPicker({
                       key={item.item_id}
                       type="button"
                       onClick={() => onSelect(item)}
-                      className={`w-full px-3.5 py-2.5 text-left flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 transition-colors cursor-pointer ${
+                      className={`w-full min-h-[48px] px-3.5 py-3 sm:py-2.5 text-left flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 transition-colors cursor-pointer ${
                         isSelected
                           ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200'
                           : 'hover:bg-slate-50 dark:hover:bg-slate-900/60 text-slate-800 dark:text-slate-200'
@@ -405,7 +405,7 @@ export default function CatalogMaterialPicker({
                               {item.legacy_code}
                             </span>
                           )}
-                          <span className="text-xs font-bold text-slate-900 dark:text-white">
+                          <span className="text-xs font-bold text-slate-900 dark:text-white break-words">
                             {displayName}
                           </span>
                           {item.subcategory && (

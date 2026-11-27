@@ -51,7 +51,7 @@ export const DICTIONARY = {
     },
     sidebar: {
       brand: 'CAESAR CENTRAL HUB',
-      version: 'v2.9.7',
+      version: 'v2.9.8',
       subLedger: 'DAHİLİ OPERASYON PORTALI',
       activeSection: 'Operasyon Modülleri',
       roadmapSection: 'Yol Haritası & Yakında',
@@ -667,7 +667,7 @@ export const DICTIONARY = {
     },
     sidebar: {
       brand: 'CAESAR CENTRAL HUB',
-      version: 'v2.9.7',
+      version: 'v2.9.8',
       subLedger: 'INTERNAL OPERATIONS PORTAL',
       activeSection: 'Operational Modules',
       roadmapSection: 'Roadmap & Upcoming',

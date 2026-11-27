@@ -140,18 +140,18 @@ export default function TechnicalIntakeModule({
   };
 
   return (
-    <div className="bg-slate-50 dark:bg-[#090d16] text-slate-800 dark:text-slate-100 p-6 font-sans transition-colors pb-16">
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-6 mb-6 border-b border-slate-200 dark:border-slate-800">
-        <div className="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+    <div className="w-full max-w-full overflow-x-hidden bg-slate-50 dark:bg-[#090d16] text-slate-800 dark:text-slate-100 p-2 sm:p-6 font-sans transition-colors pb-16">
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 pb-5 mb-5 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center space-x-2.5 sm:space-x-4 min-w-0 flex-1">
           <button
             type="button"
             onClick={onBack}
-            className="h-10 shrink-0 flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600 bg-white dark:bg-slate-900 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs transition-colors cursor-pointer"
+            className="min-h-[44px] h-11 sm:h-10 shrink-0 flex items-center space-x-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-blue-600 bg-white dark:bg-slate-900 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs transition-colors cursor-pointer"
           >
             <span>{d.btnBack}</span>
           </button>
           <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 shrink-0" />
-          <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white uppercase min-w-0 break-words leading-tight">
+          <h1 className="text-sm sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white uppercase min-w-0 break-words leading-tight">
             {d.title}
           </h1>
         </div>
@@ -161,9 +161,9 @@ export default function TechnicalIntakeModule({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto">
-        <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
-          {/* Section 1: 3-Tier Cascading Location Hierarchy (Standardized h-10 Controls + Inline ✕ Reset Icons) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 max-w-7xl mx-auto">
+        <div className="lg:col-span-7 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-xs space-y-6 min-w-0">
+          {/* Section 1: 3-Tier Cascading Location Hierarchy (min-h-[44px] Touch Controls + Inline ✕ Reset Icons) */}
           <div className="space-y-4">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 pb-2">
               {d.step1Title}
@@ -179,7 +179,7 @@ export default function TechnicalIntakeModule({
                   <select
                     value={selectedProjectId}
                     onChange={(e) => handleProjectChange(e.target.value)}
-                    className="w-full h-10 text-xs font-bold px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                    className="w-full min-h-[44px] h-11 sm:h-10 text-xs font-bold px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">
                       {lang === 'tr' ? 'Proje Seçiniz...' : 'Select Project...'}
@@ -196,7 +196,7 @@ export default function TechnicalIntakeModule({
                       onClick={() => handleProjectChange('')}
                       title={tc.clearSelection}
                       aria-label={tc.clearSelection}
-                      className="h-10 w-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+                      className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
                     >
                       ✕
                     </button>
@@ -214,7 +214,7 @@ export default function TechnicalIntakeModule({
                     value={selectedBuildingType}
                     onChange={(e) => handleBuildingTypeChange(e.target.value)}
                     disabled={!selectedProjectId}
-                    className="w-full h-10 text-xs font-bold px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full min-h-[44px] h-11 sm:h-10 text-xs font-bold px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {selectedProjectId
@@ -237,7 +237,7 @@ export default function TechnicalIntakeModule({
                       onClick={() => handleBuildingTypeChange('')}
                       title={tc.clearSelection}
                       aria-label={tc.clearSelection}
-                      className="h-10 w-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+                      className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
                     >
                       ✕
                     </button>
@@ -255,7 +255,7 @@ export default function TechnicalIntakeModule({
                     value={selectedBuildingId}
                     onChange={(e) => setSelectedBuildingId(e.target.value)}
                     disabled={!selectedBuildingType}
-                    className="w-full h-10 text-xs font-bold px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full min-h-[44px] h-11 sm:h-10 text-xs font-bold px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <option value="">
                       {selectedBuildingType
@@ -283,7 +283,7 @@ export default function TechnicalIntakeModule({
                       onClick={() => setSelectedBuildingId('')}
                       title={tc.clearSelection}
                       aria-label={tc.clearSelection}
-                      className="h-10 w-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+                      className="min-h-[44px] min-w-[44px] h-11 w-11 sm:h-10 sm:w-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
                     >
                       ✕
                     </button>
@@ -293,21 +293,21 @@ export default function TechnicalIntakeModule({
             </div>
 
             {selectedBuilding && (
-              <div className="flex items-center justify-between text-[11px] p-2.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/60">
-                <div className="flex items-center space-x-2">
-                  <span className="font-bold text-blue-700 dark:text-blue-400">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] p-2.5 rounded-xl bg-blue-50/60 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/60">
+                <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                  <span className="font-bold text-blue-700 dark:text-blue-400 break-words">
                     {selectedProject?.project_name} •{' '}
                     {selectedBuilding.building_name}
                   </span>
                   <span className="text-slate-400 font-light">•</span>
-                  <span className="text-slate-600 dark:text-slate-400 font-light">
+                  <span className="text-slate-600 dark:text-slate-400 font-light break-words">
                     {selectedBuilding.building_type}
                     {selectedBuilding.category_name
                       ? ` (${selectedBuilding.category_name})`
                       : ''}
                   </span>
                 </div>
-                <span className="font-mono text-[10px] bg-blue-100 dark:bg-blue-900/80 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded font-bold">
+                <span className="font-mono text-[10px] bg-blue-100 dark:bg-blue-900/80 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded font-bold shrink-0">
                   {selectedBuilding.building_id}
                 </span>
               </div>
@@ -345,7 +345,7 @@ export default function TechnicalIntakeModule({
                   min="1"
                   value={targetVolume}
                   onChange={(e) => setTargetVolume(Number(e.target.value))}
-                  className="w-full h-10 text-xs font-light px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  className="w-full min-h-[44px] h-11 sm:h-10 text-xs font-light px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-[10px] text-slate-400 font-light mt-1 block">
                   {lang === 'tr'
@@ -370,7 +370,7 @@ export default function TechnicalIntakeModule({
                   }
                   value={brandPreference}
                   onChange={(e) => setBrandPreference(e.target.value)}
-                  className="w-full h-10 text-xs font-light px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
+                  className="w-full min-h-[44px] h-11 sm:h-10 text-xs font-light px-3.5 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -395,18 +395,18 @@ export default function TechnicalIntakeModule({
         </div>
 
         {/* Section 3: Summary & Algorithmic Lock Card */}
-        <div className="lg:col-span-5 flex flex-col space-y-6">
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-xs space-y-6">
+        <div className="lg:col-span-5 flex flex-col space-y-6 min-w-0">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 shadow-xs space-y-6">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 pb-2">
               {d.step3Title}
             </h2>
 
             <div className="space-y-4">
-              <div className="flex justify-between items-start py-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex flex-wrap justify-between items-start gap-2 py-2 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-xs font-light text-slate-500 dark:text-slate-400">
                   {lang === 'tr' ? 'Seçilen Lokasyon:' : 'Selected Location:'}
                 </span>
-                <span className="text-xs font-bold text-slate-900 dark:text-white text-right">
+                <span className="text-xs font-bold text-slate-900 dark:text-white text-right break-words">
                   {selectedBuilding ? (
                     <>
                       <span>
@@ -423,11 +423,11 @@ export default function TechnicalIntakeModule({
                 </span>
               </div>
 
-              <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex flex-wrap justify-between items-center gap-2 py-2 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-xs font-light text-slate-500 dark:text-slate-400">
                   {lang === 'tr' ? 'Seçilen Malzeme:' : 'Selected Material:'}
                 </span>
-                <span className="text-xs font-bold text-slate-900 dark:text-white text-right">
+                <span className="text-xs font-bold text-slate-900 dark:text-white text-right break-words">
                   {selectedItem
                     ? lang === 'tr'
                       ? selectedItem.item_name_tr
@@ -436,7 +436,7 @@ export default function TechnicalIntakeModule({
                 </span>
               </div>
 
-              <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex flex-wrap justify-between items-center gap-2 py-2 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-xs font-light text-slate-500 dark:text-slate-400">
                   {lang === 'tr'
                     ? 'Standart Tüketim Katsayısı:'
@@ -449,7 +449,7 @@ export default function TechnicalIntakeModule({
                 </span>
               </div>
 
-              <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex flex-wrap justify-between items-center gap-2 py-2 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-xs font-light text-slate-500 dark:text-slate-400">
                   {d.calculatedQty}
                 </span>
@@ -461,7 +461,7 @@ export default function TechnicalIntakeModule({
                 </span>
               </div>
 
-              <div className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex flex-wrap justify-between items-center gap-2 py-2 border-b border-slate-100 dark:border-slate-800">
                 <span className="text-xs font-light text-slate-500 dark:text-slate-400">
                   {d.refUnitPrice}
                 </span>
@@ -471,7 +471,7 @@ export default function TechnicalIntakeModule({
                 </span>
               </div>
 
-              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-xl p-4 flex justify-between items-center">
+              <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-xl p-4 flex flex-wrap justify-between items-center gap-2">
                 <div>
                   <span className="block text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide">
                     {d.lockedCeiling}
@@ -495,7 +495,7 @@ export default function TechnicalIntakeModule({
               type="button"
               onClick={handleGenerateTicket}
               disabled={submitting || !selectedItemId || !selectedBuildingId}
-              className="w-full h-10 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-bold text-xs rounded-xl transition-colors shadow-xs cursor-pointer disabled:cursor-not-allowed"
+              className="w-full min-h-[44px] h-11 sm:h-10 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-800 text-white font-bold text-xs rounded-xl transition-colors shadow-xs cursor-pointer disabled:cursor-not-allowed"
             >
               {submitting ? d.submitting : d.submitBtn}
             </button>

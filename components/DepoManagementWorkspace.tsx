@@ -35,7 +35,7 @@ const TIER_0_TO_2_FINANCIAL_ROLES: RoleTier[] = [
 ];
 
 const CONTROL_CLASS =
-  'w-full h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
+  'w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
 
 function hasMovementDocAlert(tx: DepotTransaction): boolean {
   if (tx.movement_type === 'INBOUND_RECEIPT') {
@@ -89,30 +89,36 @@ export default function DepoManagementWorkspace({
   const [loading, setLoading] = useState<boolean>(true);
 
   // UI Navigation & Dynamic Multi-Dimensional Filters
-  const [activeTab, setActiveTab] = useState<'BALANCES' | 'MOVEMENTS' | 'ASSETS'>('BALANCES');
+  const [activeTab, setActiveTab] = useState<
+    'BALANCES' | 'MOVEMENTS' | 'ASSETS'
+  >('BALANCES');
   const [filterProject, setFilterProject] = useState<string>('ALL');
   const [filterDepot, setFilterDepot] = useState<string>('ALL');
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
   const [filterText, setFilterText] = useState<string>('');
   const [missingDocsOnly, setMissingDocsOnly] = useState<boolean>(false);
-  const [isFilterPopoverOpen, setIsFilterPopoverOpen] = useState<boolean>(false);
+  const [isFilterPopoverOpen, setIsFilterPopoverOpen] =
+    useState<boolean>(false);
 
   // Modals & Drawers
   const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
   const [selectedBalanceForDetails, setSelectedBalanceForDetails] =
     useState<DepotStockBalance | null>(null);
   const [isDocDrawerOpen, setIsDocDrawerOpen] = useState<boolean>(false);
-  const [selectedTxForDocs, setSelectedTxForDocs] = useState<DepotTransaction | null>(null);
+  const [selectedTxForDocs, setSelectedTxForDocs] =
+    useState<DepotTransaction | null>(null);
   const [docDrawerIrsaliye, setDocDrawerIrsaliye] = useState<string>('');
   const [docDrawerInvoice, setDocDrawerInvoice] = useState<string>('');
   const [docDrawerSupplier, setDocDrawerSupplier] = useState<string>('');
 
   const [isInboundModalOpen, setIsInboundModalOpen] = useState<boolean>(false);
-  const [isOutboundModalOpen, setIsOutboundModalOpen] = useState<boolean>(false);
+  const [isOutboundModalOpen, setIsOutboundModalOpen] =
+    useState<boolean>(false);
 
   // Inbound Form State
   const [inboundCatalogId, setInboundCatalogId] = useState<string>('');
-  const [inboundDepotId, setInboundDepotId] = useState<string>('DEPOT-PRJ02-MAIN');
+  const [inboundDepotId, setInboundDepotId] =
+    useState<string>('DEPOT-PRJ02-MAIN');
   const [inboundQty, setInboundQty] = useState<number>(1);
   const [inboundCostEur, setInboundCostEur] = useState<number>(0);
   const [inboundIrsaliye, setInboundIrsaliye] = useState<string>('');
@@ -122,7 +128,8 @@ export default function DepoManagementWorkspace({
 
   // Outbound Form State
   const [outboundCatalogId, setOutboundCatalogId] = useState<string>('');
-  const [outboundDepotId, setOutboundDepotId] = useState<string>('DEPOT-PRJ02-MAIN');
+  const [outboundDepotId, setOutboundDepotId] =
+    useState<string>('DEPOT-PRJ02-MAIN');
   const [outboundBuildingId, setOutboundBuildingId] = useState<string>('');
   const [outboundUnitLabel, setOutboundUnitLabel] = useState<string>('');
   const [outboundReqId, setOutboundReqId] = useState<string>('');
@@ -925,8 +932,9 @@ export default function DepoManagementWorkspace({
       {onBackToRequisitions && (
         <div className="flex items-center justify-between">
           <button
+            type="button"
             onClick={onBackToRequisitions}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-2xs hover:border-blue-400 hover:text-blue-600 transition-colors cursor-pointer"
+            className="min-h-[40px] inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-2xs hover:border-blue-400 hover:text-blue-600 transition-colors cursor-pointer"
           >
             <span>
               {t.btnBackToRequisitions ||
@@ -937,7 +945,7 @@ export default function DepoManagementWorkspace({
       )}
 
       {/* Clean Master Hero Card */}
-      <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-xs">
+      <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Left: Clean 1-Line Title & Subtitle */}
           <div className="space-y-1 min-w-0">
@@ -949,11 +957,12 @@ export default function DepoManagementWorkspace({
             </p>
           </div>
 
-          {/* Right: Stacked Action Container */}
-          <div className="flex flex-col gap-2 min-w-[280px] sm:min-w-[320px]">
+          {/* Right: Stacked Action Container (Zero hardcoded min-w on mobile) */}
+          <div className="flex flex-col gap-2 w-full lg:w-auto lg:min-w-[320px]">
             <button
+              type="button"
               onClick={() => setIsScannerOpen(true)}
-              className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs transition-all cursor-pointer"
+              className="w-full min-h-[44px] flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xs transition-all cursor-pointer"
             >
               <svg
                 className="w-4 h-4 shrink-0"
@@ -973,8 +982,9 @@ export default function DepoManagementWorkspace({
 
             <div className="grid grid-cols-2 gap-2">
               <button
+                type="button"
                 onClick={() => openInboundModal()}
-                className="flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white transition-colors shadow-xs cursor-pointer"
+                className="min-h-[44px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white transition-colors shadow-xs cursor-pointer"
               >
                 <svg
                   className="w-3.5 h-3.5 shrink-0"
@@ -993,8 +1003,9 @@ export default function DepoManagementWorkspace({
               </button>
 
               <button
+                type="button"
                 onClick={() => openOutboundModal()}
-                className="flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-yellow-400 hover:bg-yellow-500 text-slate-950 transition-colors shadow-xs cursor-pointer"
+                className="min-h-[44px] flex items-center justify-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-yellow-400 hover:bg-yellow-500 text-slate-950 transition-colors shadow-xs cursor-pointer"
               >
                 <svg
                   className="w-3.5 h-3.5 shrink-0"
@@ -1017,14 +1028,14 @@ export default function DepoManagementWorkspace({
       </div>
 
       {/* Dynamic Category-Aware 4-Stat Telemetry Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* KPI 1: Catalog SKUs & Distinct Categories */}
-        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             {t.kpiSkus}
           </span>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-light text-slate-900 dark:text-white">
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-xl sm:text-2xl font-light text-slate-900 dark:text-white">
               {kpis.activeSkus}
             </span>
             <span className="text-xs font-light text-slate-400">
@@ -1035,12 +1046,12 @@ export default function DepoManagementWorkspace({
         </div>
 
         {/* KPI 2: Stock Health */}
-        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             {t.kpiStockHealth}
           </span>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-light text-emerald-600 dark:text-emerald-400">
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-xl sm:text-2xl font-light text-emerald-600 dark:text-emerald-400">
               {kpis.inStockCount}
             </span>
             <span className="text-xs font-light text-slate-400">
@@ -1058,12 +1069,12 @@ export default function DepoManagementWorkspace({
         </div>
 
         {/* KPI 3: Live Inventory Valuation (€) */}
-        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+        <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs min-w-0">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
             {t.kpiValuation}
           </span>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-light text-blue-600 dark:text-blue-400">
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-lg sm:text-2xl font-light text-blue-600 dark:text-blue-400 break-all">
               €
               {kpis.totalValuedEur.toLocaleString('en-US', {
                 minimumFractionDigits: 2,
@@ -1090,22 +1101,22 @@ export default function DepoManagementWorkspace({
               setMissingDocsOnly((prev) => !prev);
             }
           }}
-          className={`bg-white dark:bg-[#0f172a] rounded-2xl border p-4 shadow-xs cursor-pointer transition-colors ${
+          className={`bg-white dark:bg-[#0f172a] rounded-2xl border p-3.5 sm:p-4 shadow-xs cursor-pointer transition-colors min-w-0 ${
             missingDocsOnly
               ? 'border-amber-400 dark:border-amber-600 ring-1 ring-amber-400/40'
               : 'border-slate-200 dark:border-slate-800 hover:border-amber-400'
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
               {t.kpiAlerts}
             </span>
             {kpis.totalComplianceAlerts > 0 && (
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />
             )}
           </div>
-          <div className="mt-2 flex items-baseline space-x-2 flex-wrap">
-            <span className="text-2xl font-light text-amber-600 dark:text-amber-400">
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+            <span className="text-xl sm:text-2xl font-light text-amber-600 dark:text-amber-400">
               {kpis.totalComplianceAlerts}
             </span>
             <span className="text-xs font-light text-slate-400">
@@ -1117,14 +1128,15 @@ export default function DepoManagementWorkspace({
       </div>
 
       {/* 3-Tab Ledger Container */}
-      <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-xs space-y-4">
+      <div className="bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-3.5 sm:p-4 shadow-xs space-y-4">
         {/* Tab Headers & Filter Popover Row */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
-          {/* Tabs */}
-          <div className="flex space-x-2">
+          {/* Tabs (Wrap cleanly on mobile) */}
+          <div className="flex flex-wrap gap-2">
             <button
+              type="button"
               onClick={() => setActiveTab('BALANCES')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'BALANCES'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -1134,8 +1146,9 @@ export default function DepoManagementWorkspace({
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('MOVEMENTS')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all relative cursor-pointer ${
+              className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-bold transition-all relative cursor-pointer ${
                 activeTab === 'MOVEMENTS'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -1150,8 +1163,9 @@ export default function DepoManagementWorkspace({
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('ASSETS')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              className={`min-h-[40px] px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 activeTab === 'ASSETS'
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -1165,8 +1179,9 @@ export default function DepoManagementWorkspace({
           <div className="flex items-center flex-wrap gap-2">
             {activeTab === 'MOVEMENTS' && (
               <button
+                type="button"
                 onClick={() => setMissingDocsOnly(!missingDocsOnly)}
-                className={`h-10 px-3 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
+                className={`min-h-[44px] h-11 sm:h-10 px-3 rounded-xl text-xs font-bold border transition-colors cursor-pointer ${
                   missingDocsOnly
                     ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800'
                     : 'bg-slate-50 dark:bg-slate-900 text-slate-500 border-slate-200 dark:border-slate-800 hover:text-slate-800 dark:hover:text-slate-200'
@@ -1182,7 +1197,7 @@ export default function DepoManagementWorkspace({
               onClick={handleExportActiveTabCsv}
               disabled={activeExportRowCount === 0}
               title={t.exportCsvTooltip}
-              className={`h-10 px-4 rounded-xl text-xs font-bold flex items-center space-x-2 border transition-all ${
+              className={`min-h-[44px] h-11 sm:h-10 px-3.5 sm:px-4 rounded-xl text-xs font-bold flex items-center space-x-2 border transition-all ${
                 activeExportRowCount === 0
                   ? 'bg-slate-100 dark:bg-slate-900 text-slate-400 dark:text-slate-600 border-slate-200 dark:border-slate-800 cursor-not-allowed opacity-60'
                   : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800 shadow-2xs cursor-pointer'
@@ -1207,11 +1222,12 @@ export default function DepoManagementWorkspace({
               </span>
             </button>
 
-            {/* Unified Filters Popover Trigger Button */}
+            {/* Unified Filters Popover Trigger Button (Bottom-Sheet on Mobile < sm, Popover on sm:+) */}
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setIsFilterPopoverOpen(!isFilterPopoverOpen)}
-                className={`h-10 px-4 rounded-xl text-xs font-bold flex items-center space-x-2 border transition-all cursor-pointer ${
+                className={`min-h-[44px] h-11 sm:h-10 px-3.5 sm:px-4 rounded-xl text-xs font-bold flex items-center space-x-2 border transition-all cursor-pointer ${
                   activeFilterCount > 0
                     ? 'bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/60 dark:text-blue-400 dark:border-blue-800 shadow-xs'
                     : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800'
@@ -1241,16 +1257,22 @@ export default function DepoManagementWorkspace({
               {isFilterPopoverOpen && (
                 <>
                   <div
-                    className="fixed inset-0 z-40"
+                    className="fixed inset-0 z-40 bg-slate-950/40 sm:bg-transparent backdrop-blur-[1px] sm:backdrop-blur-none"
                     onClick={() => setIsFilterPopoverOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl p-4 z-50 space-y-3.5 animate-fade-in">
+                  <div className="fixed inset-x-0 bottom-0 sm:inset-auto sm:absolute sm:right-0 sm:mt-2 w-full sm:w-80 max-h-[85dvh] overflow-y-auto bg-white dark:bg-[#0f172a] rounded-t-2xl sm:rounded-2xl border-t sm:border border-slate-200 dark:border-slate-800 shadow-2xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 z-50 space-y-3.5 animate-fade-in">
+                    {/* Mobile Bottom-Sheet Drag Handle Pill */}
+                    <div className="sm:hidden flex justify-center pb-1">
+                      <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+                    </div>
+
                     <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
                       <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                         {t.filtersTitle || 'Filtreler'}
                       </span>
                       {activeFilterCount > 0 && (
                         <button
+                          type="button"
                           onClick={handleResetFilters}
                           className="text-[11px] font-bold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer"
                         >
@@ -1324,7 +1346,7 @@ export default function DepoManagementWorkspace({
 
                     {/* Dimension 4: Incomplete / Missing Docs Compliance Toggle */}
                     <div className="pt-1">
-                      <label className="h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center space-x-2.5 cursor-pointer hover:border-amber-400 transition-colors">
+                      <label className="min-h-[44px] h-11 sm:h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center space-x-2.5 cursor-pointer hover:border-amber-400 transition-colors">
                         <input
                           type="checkbox"
                           checked={missingDocsOnly}
@@ -1339,8 +1361,9 @@ export default function DepoManagementWorkspace({
 
                     <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
                       <button
+                        type="button"
                         onClick={() => setIsFilterPopoverOpen(false)}
-                        className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                        className="w-full min-h-[44px] py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer"
                       >
                         {lang === 'tr' ? 'Uygula & Kapat' : 'Apply & Close'}
                       </button>
@@ -1359,7 +1382,7 @@ export default function DepoManagementWorkspace({
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             placeholder={t.searchPlaceholder}
-            className="w-full h-10 pl-10 pr-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sans"
+            className="w-full min-h-[44px] h-11 sm:h-10 pl-10 pr-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-500 font-sans"
           />
           <svg
             className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"
@@ -1376,160 +1399,124 @@ export default function DepoManagementWorkspace({
           </svg>
         </div>
 
-        {/* TAB 1: LIVE STOCK BALANCES TABLE (CLICKABLE ROWS WITH 40x40px THUMBNAILS) */}
+        {/* =============================================================== */}
+        {/* TAB 1: LIVE STOCK BALANCES (MOBILE CARDS < md + DESKTOP TABLE)  */}
+        {/* =============================================================== */}
         {activeTab === 'BALANCES' && (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
-              <thead className="bg-blue-50/95 dark:bg-blue-950/45 border-b border-blue-200 dark:border-blue-800/60 font-bold uppercase text-[10px] text-blue-950 dark:text-blue-100 tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">{t.thBarcode}</th>
-                  <th className="px-4 py-3">{t.thMaterial}</th>
-                  <th className="px-4 py-3">{t.thPackaging}</th>
-                  <th className="px-4 py-3 text-right">{t.thOnHand}</th>
-                  <th className="px-4 py-3 text-right">{t.thReserved}</th>
-                  <th className="px-4 py-3 text-right">{t.thBaseCost}</th>
-                  <th className="px-4 py-3 text-right">{t.thValuedCost}</th>
-                  <th className="px-4 py-3 text-center">{t.thAction}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-700 dark:text-slate-300 font-sans">
-                {loading ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-4 py-8 text-center text-slate-400 font-light"
+          <>
+            {/* Mobile (< md) Live Stock Summary Cards */}
+            <div className="md:hidden space-y-3">
+              {loading ? (
+                <div className="p-8 text-center text-xs font-light text-slate-400 rounded-xl border border-slate-200 dark:border-slate-800">
+                  {tc.loading}
+                </div>
+              ) : filteredBalances.length === 0 ? (
+                <div className="p-8 text-center rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+                  <p className="text-xs font-light text-slate-400">
+                    {t.emptyBalances}
+                  </p>
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => openInboundModal()}
+                      className="min-h-[44px] px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
                     >
-                      {tc.loading}
-                    </td>
-                  </tr>
-                ) : filteredBalances.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center">
-                      <div className="flex flex-col items-center justify-center space-y-3">
-                        <p className="text-xs font-light text-slate-400">
-                          {t.emptyBalances}
-                        </p>
-                        {canEdit && (
-                          <button
-                            onClick={() => openInboundModal()}
-                            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
-                          >
-                            {t.emptyBalancesCta}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  filteredBalances.map((b) => {
-                    const item = b.catalog_item;
-                    const baseCost = item?.base_cost_eur || 0;
-                    const markup = item?.commercial_markup_pct ?? 15;
-                    const valued = Number(
-                      (baseCost * (1 + markup / 100)).toFixed(2)
-                    );
-                    const isLowStock =
-                      b.quantity_on_hand <= b.min_stock_threshold;
-                    const complianceIssues = getItemComplianceIssues(item);
+                      {t.emptyBalancesCta}
+                    </button>
+                  )}
+                </div>
+              ) : (
+                filteredBalances.map((b) => {
+                  const item = b.catalog_item;
+                  const baseCost = item?.base_cost_eur || 0;
+                  const markup = item?.commercial_markup_pct ?? 15;
+                  const valued = Number(
+                    (baseCost * (1 + markup / 100)).toFixed(2)
+                  );
+                  const isLowStock =
+                    b.quantity_on_hand <= b.min_stock_threshold;
+                  const complianceIssues = getItemComplianceIssues(item);
+                  const materialTitle =
+                    lang === 'tr'
+                      ? item?.item_name_tr
+                      : item?.item_name_en || item?.item_name_tr;
 
-                    return (
-                      <tr
-                        key={b.balance_id}
-                        onClick={() => setSelectedBalanceForDetails(b)}
-                        className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
-                      >
-                        <td className="px-4 py-3 font-mono font-bold text-slate-900 dark:text-white">
-                          <div className="flex flex-col">
-                            <span>
-                              {item?.barcode_ean ||
-                                item?.legacy_code ||
+                  return (
+                    <div
+                      key={`mob-bal-${b.balance_id}`}
+                      onClick={() => setSelectedBalanceForDetails(b)}
+                      className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/60 p-3.5 space-y-3 cursor-pointer hover:border-blue-400 transition-colors"
+                    >
+                      {/* Card Header: Thumbnail + SKU/EAN + Title + Compliance/Packaging */}
+                      <div className="flex items-start gap-3">
+                        {item?.primary_image_url ? (
+                          <img
+                            src={item.primary_image_url}
+                            alt={materialTitle || ''}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-11 h-11 rounded-xl object-cover shrink-0 border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900"
+                          />
+                        ) : (
+                          <div className="w-11 h-11 rounded-xl shrink-0 border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 flex items-center justify-center text-slate-400 dark:text-slate-600">
+                            <svg
+                              className="w-5 h-5"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="1.75"
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </div>
+                        )}
+
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex items-center flex-wrap gap-1.5">
+                            <span className="font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200/70 dark:border-blue-900/70">
+                              {item?.legacy_code ||
+                                item?.barcode_ean ||
                                 b.catalog_item_id}
                             </span>
-                            {item?.legacy_code && item?.barcode_ean && (
-                              <span className="text-[10px] text-slate-400 font-mono font-light">
-                                {item.legacy_code}
+                            {item?.packaging_unit_type === 'ATOMIC_SET' ? (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+                                {t.atomicSet} ({item.set_piece_count || 1})
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-light bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                {t.singleItem}
+                              </span>
+                            )}
+                            {complianceIssues.length > 0 && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                {t.incompleteSkuBadge}
                               </span>
                             )}
                           </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            {/* 40x40px Lazy-Loaded Row Thumbnail or Muted Icon Fallback */}
-                            {item?.primary_image_url ? (
-                              <img
-                                src={item.primary_image_url}
-                                alt={
-                                  (lang === 'tr'
-                                    ? item.item_name_tr
-                                    : item.item_name_en || item.item_name_tr) ||
-                                  ''
-                                }
-                                loading="lazy"
-                                decoding="async"
-                                className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded-lg shrink-0 border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 flex items-center justify-center text-slate-400 dark:text-slate-600">
-                                <svg
-                                  className="w-4 h-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    strokeWidth="1.75"
-                                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                                  />
-                                </svg>
-                              </div>
-                            )}
 
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-bold text-slate-900 dark:text-slate-100">
-                                  {lang === 'tr'
-                                    ? item?.item_name_tr
-                                    : item?.item_name_en || item?.item_name_tr}
-                                </span>
-                                {complianceIssues.length > 0 && (
-                                  <span
-                                    title={complianceIssues
-                                      .map((issue) =>
-                                        getComplianceIssueLabel(issue, lang)
-                                      )
-                                      .join(' • ')}
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800 shrink-0"
-                                  >
-                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                    {t.incompleteSkuBadge}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-[11px] font-light text-slate-400">
-                                {item?.category}{' '}
-                                {item?.subcategory
-                                  ? `• ${item.subcategory}`
-                                  : ''}
-                              </div>
-                            </div>
+                          <div className="text-xs font-bold text-slate-900 dark:text-slate-100 leading-snug break-words">
+                            {materialTitle}
                           </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {item?.packaging_unit_type === 'ATOMIC_SET' ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
-                              {t.atomicSet} ({item.set_piece_count || 1}{' '}
-                              {lang === 'tr' ? 'parça' : 'pcs'})
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-light bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
-                              {t.singleItem}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end space-x-1.5">
+
+                          <div className="text-[11px] font-light text-slate-400 break-words">
+                            {item?.category}
+                            {item?.subcategory ? ` • ${item.subcategory}` : ''}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Stock & Price Metrics */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
+                          <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                            {t.thOnHand} / {t.thReserved}
+                          </span>
+                          <div className="flex items-center space-x-1.5 mt-0.5">
                             {isLowStock && (
                               <span
                                 className="w-2 h-2 rounded-full bg-rose-500 animate-ping"
@@ -1537,77 +1524,312 @@ export default function DepoManagementWorkspace({
                               />
                             )}
                             <span
-                              className={`text-sm font-light ${
+                              className={`text-sm font-bold ${
                                 isLowStock
-                                  ? 'text-rose-600 dark:text-rose-400 font-bold'
+                                  ? 'text-rose-600 dark:text-rose-400'
                                   : 'text-slate-900 dark:text-white'
                               }`}
                             >
                               {b.quantity_on_hand}
                             </span>
                             <span className="text-[11px] font-light text-slate-400">
-                              {item?.unit_of_measure}
+                              {item?.unit_of_measure} ({b.quantity_reserved} rez)
                             </span>
                           </div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-light text-slate-500">
-                          {b.quantity_reserved} {item?.unit_of_measure}
-                        </td>
-                        <td className="px-4 py-3 text-right font-light text-slate-600 dark:text-slate-400">
-                          €
-                          {baseCost.toLocaleString('en-US', {
-                            minimumFractionDigits: 2,
-                          })}
-                        </td>
-                        <td className="px-4 py-3 text-right font-light text-emerald-600 dark:text-emerald-400">
-                          €
-                          {valued.toLocaleString('en-US', {
-                            minimumFractionDigits: 2,
-                          })}
-                        </td>
-                        <td
-                          className="px-4 py-3 text-center"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="flex items-center justify-center space-x-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (!canEdit) return;
-                                setOutboundCatalogId(b.catalog_item_id);
-                                setOutboundDepotId(b.depot_id);
-                                setIsOutboundModalOpen(true);
-                              }}
-                              disabled={!canEdit}
-                              title={
-                                !canEdit
-                                  ? lang === 'tr'
-                                    ? 'Yetki yetersiz'
-                                    : 'Insufficient permission'
-                                  : undefined
-                              }
-                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
-                                canEdit
-                                  ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 cursor-pointer'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 cursor-not-allowed'
-                              }`}
-                            >
-                              {t.btnFastOutbound}
-                            </button>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800">
+                          <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                            {t.thBaseCost} / {t.thValuedCost}
+                          </span>
+                          <div className="mt-0.5">
+                            <span className="text-xs font-light text-slate-500 dark:text-slate-400">
+                              €
+                              {baseCost.toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                              })}
+                            </span>{' '}
+                            <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                              → €
+                              {valued.toLocaleString('en-US', {
+                                minimumFractionDigits: 2,
+                              })}
+                            </span>
                           </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+                        </div>
+                      </div>
+
+                      {/* Primary Touch Actions */}
+                      <div
+                        className="flex items-center gap-2 pt-1"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setSelectedBalanceForDetails(b)}
+                          className="flex-1 min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                        >
+                          {lang === 'tr' ? 'Detay / Düzenle' : 'Details / Edit'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!canEdit) return;
+                            setOutboundCatalogId(b.catalog_item_id);
+                            setOutboundDepotId(b.depot_id);
+                            setIsOutboundModalOpen(true);
+                          }}
+                          disabled={!canEdit}
+                          className={`min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+                            canEdit
+                              ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 cursor-pointer'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                          }`}
+                        >
+                          {t.btnFastOutbound}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Desktop (md:+) Live Stock Balances Table */}
+            <div className="hidden md:block w-full overflow-x-auto touch-scroll-x rounded-xl border border-slate-200 dark:border-slate-800">
+              <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
+                <thead className="bg-blue-50/95 dark:bg-blue-950/45 border-b border-blue-200 dark:border-blue-800/60 font-bold uppercase text-[10px] text-blue-950 dark:text-blue-100 tracking-wider">
+                  <tr>
+                    <th className="px-4 py-3">{t.thBarcode}</th>
+                    <th className="px-4 py-3">{t.thMaterial}</th>
+                    <th className="px-4 py-3">{t.thPackaging}</th>
+                    <th className="px-4 py-3 text-right">{t.thOnHand}</th>
+                    <th className="px-4 py-3 text-right">{t.thReserved}</th>
+                    <th className="px-4 py-3 text-right">{t.thBaseCost}</th>
+                    <th className="px-4 py-3 text-right">{t.thValuedCost}</th>
+                    <th className="px-4 py-3 text-center">{t.thAction}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-slate-800 text-slate-700 dark:text-slate-300 font-sans">
+                  {loading ? (
+                    <tr>
+                      <td
+                        colSpan={8}
+                        className="px-4 py-8 text-center text-slate-400 font-light"
+                      >
+                        {tc.loading}
+                      </td>
+                    </tr>
+                  ) : filteredBalances.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-10 text-center">
+                        <div className="flex flex-col items-center justify-center space-y-3">
+                          <p className="text-xs font-light text-slate-400">
+                            {t.emptyBalances}
+                          </p>
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() => openInboundModal()}
+                              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer"
+                            >
+                              {t.emptyBalancesCta}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredBalances.map((b) => {
+                      const item = b.catalog_item;
+                      const baseCost = item?.base_cost_eur || 0;
+                      const markup = item?.commercial_markup_pct ?? 15;
+                      const valued = Number(
+                        (baseCost * (1 + markup / 100)).toFixed(2)
+                      );
+                      const isLowStock =
+                        b.quantity_on_hand <= b.min_stock_threshold;
+                      const complianceIssues = getItemComplianceIssues(item);
+
+                      return (
+                        <tr
+                          key={b.balance_id}
+                          onClick={() => setSelectedBalanceForDetails(b)}
+                          className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                        >
+                          <td className="px-4 py-3 font-mono font-bold text-slate-900 dark:text-white">
+                            <div className="flex flex-col">
+                              <span>
+                                {item?.barcode_ean ||
+                                  item?.legacy_code ||
+                                  b.catalog_item_id}
+                              </span>
+                              {item?.legacy_code && item?.barcode_ean && (
+                                <span className="text-[10px] text-slate-400 font-mono font-light">
+                                  {item.legacy_code}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              {/* 40x40px Lazy-Loaded Row Thumbnail or Muted Icon Fallback */}
+                              {item?.primary_image_url ? (
+                                <img
+                                  src={item.primary_image_url}
+                                  alt={
+                                    (lang === 'tr'
+                                      ? item.item_name_tr
+                                      : item.item_name_en ||
+                                        item.item_name_tr) || ''
+                                  }
+                                  loading="lazy"
+                                  decoding="async"
+                                  className="w-10 h-10 rounded-lg object-cover shrink-0 border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-900"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-lg shrink-0 border border-slate-200 dark:border-slate-700 bg-slate-100/80 dark:bg-slate-800/60 flex items-center justify-center text-slate-400 dark:text-slate-600">
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth="1.75"
+                                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                    />
+                                  </svg>
+                                </div>
+                              )}
+
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-slate-900 dark:text-slate-100">
+                                    {lang === 'tr'
+                                      ? item?.item_name_tr
+                                      : item?.item_name_en ||
+                                        item?.item_name_tr}
+                                  </span>
+                                  {complianceIssues.length > 0 && (
+                                    <span
+                                      title={complianceIssues
+                                        .map((issue) =>
+                                          getComplianceIssueLabel(issue, lang)
+                                        )
+                                        .join(' • ')}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800 shrink-0"
+                                    >
+                                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                      {t.incompleteSkuBadge}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] font-light text-slate-400">
+                                  {item?.category}{' '}
+                                  {item?.subcategory
+                                    ? `• ${item.subcategory}`
+                                    : ''}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            {item?.packaging_unit_type === 'ATOMIC_SET' ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+                                {t.atomicSet} ({item.set_piece_count || 1}{' '}
+                                {lang === 'tr' ? 'parça' : 'pcs'})
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-light bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+                                {t.singleItem}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex items-center justify-end space-x-1.5">
+                              {isLowStock && (
+                                <span
+                                  className="w-2 h-2 rounded-full bg-rose-500 animate-ping"
+                                  title={t.lowStock}
+                                />
+                              )}
+                              <span
+                                className={`text-sm font-light ${
+                                  isLowStock
+                                    ? 'text-rose-600 dark:text-rose-400 font-bold'
+                                    : 'text-slate-900 dark:text-white'
+                                }`}
+                              >
+                                {b.quantity_on_hand}
+                              </span>
+                              <span className="text-[11px] font-light text-slate-400">
+                                {item?.unit_of_measure}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right font-light text-slate-500">
+                            {b.quantity_reserved} {item?.unit_of_measure}
+                          </td>
+                          <td className="px-4 py-3 text-right font-light text-slate-600 dark:text-slate-400">
+                            €
+                            {baseCost.toLocaleString('en-US', {
+                              minimumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td className="px-4 py-3 text-right font-light text-emerald-600 dark:text-emerald-400">
+                            €
+                            {valued.toLocaleString('en-US', {
+                              minimumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td
+                            className="px-4 py-3 text-center"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="flex items-center justify-center space-x-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (!canEdit) return;
+                                  setOutboundCatalogId(b.catalog_item_id);
+                                  setOutboundDepotId(b.depot_id);
+                                  setIsOutboundModalOpen(true);
+                                }}
+                                disabled={!canEdit}
+                                title={
+                                  !canEdit
+                                    ? lang === 'tr'
+                                      ? 'Yetki yetersiz'
+                                      : 'Insufficient permission'
+                                    : undefined
+                                }
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                                  canEdit
+                                    ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800 cursor-pointer'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 border border-slate-200 dark:border-slate-700 cursor-not-allowed'
+                                }`}
+                              >
+                                {t.btnFastOutbound}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {/* TAB 2: TRANSACTION & DISPATCH LEDGER TABLE */}
         {activeTab === 'MOVEMENTS' && (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="w-full overflow-x-auto touch-scroll-x rounded-xl border border-slate-200 dark:border-slate-800">
             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
               <thead className="bg-blue-50/95 dark:bg-blue-950/45 border-b border-blue-200 dark:border-blue-800/60 font-bold uppercase text-[10px] text-blue-950 dark:text-blue-100 tracking-wider">
                 <tr>
@@ -1779,8 +2001,9 @@ export default function DepoManagementWorkspace({
 
                             {hasMovementDocAlert(tx) && (
                               <button
+                                type="button"
                                 onClick={() => handleOpenDocDrawer(tx)}
-                                className="mt-1 px-2 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 rounded-md hover:bg-amber-100 transition-colors w-fit cursor-pointer"
+                                className="mt-1 min-h-[32px] px-2.5 py-1 text-[10px] font-bold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 rounded-lg hover:bg-amber-100 transition-colors w-fit cursor-pointer"
                               >
                                 ✏️{' '}
                                 {lang === 'tr'
@@ -1802,6 +2025,7 @@ export default function DepoManagementWorkspace({
                                 ⏳ {t.pendingDelivery}
                               </span>
                               <button
+                                type="button"
                                 onClick={() =>
                                   canConfirm &&
                                   handleConfirmDelivery(tx.transaction_id)
@@ -1814,7 +2038,7 @@ export default function DepoManagementWorkspace({
                                       : 'Only Depot Manager or Executive can confirm delivery'
                                     : undefined
                                 }
-                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors shadow-xs ${
+                                className={`min-h-[34px] px-2.5 py-1 rounded-lg text-[10px] font-bold transition-colors shadow-xs ${
                                   canConfirm
                                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
                                     : 'bg-slate-300 dark:bg-slate-700 text-slate-500 cursor-not-allowed'
@@ -1836,7 +2060,7 @@ export default function DepoManagementWorkspace({
 
         {/* TAB 3: SERIALIZED ASSET REGISTER TABLE */}
         {activeTab === 'ASSETS' && (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="w-full overflow-x-auto touch-scroll-x rounded-xl border border-slate-200 dark:border-slate-800">
             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
               <thead className="bg-blue-50/95 dark:bg-blue-950/45 border-b border-blue-200 dark:border-blue-800/60 font-bold uppercase text-[10px] text-blue-950 dark:text-blue-100 tracking-wider">
                 <tr>
@@ -2016,7 +2240,8 @@ export default function DepoManagementWorkspace({
               if (b.catalog_item_id === updatedItem.item_id) {
                 return {
                   ...b,
-                  ...(updatedBalance && b.balance_id === updatedBalance.balance_id
+                  ...(updatedBalance &&
+                  b.balance_id === updatedBalance.balance_id
                     ? {
                         depot_id: updatedBalance.depot_id,
                         min_stock_threshold: updatedBalance.min_stock_threshold,
@@ -2053,7 +2278,7 @@ export default function DepoManagementWorkspace({
       {/* ================================================= */}
       {isDocDrawerOpen && selectedTxForDocs && (
         <div className="fixed inset-0 z-50 flex items-center justify-end bg-slate-900/60 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-md h-full bg-white dark:bg-[#0f172a] shadow-2xl p-6 flex flex-col justify-between border-l border-slate-200 dark:border-slate-800">
+          <div className="w-full max-w-md h-full max-h-[100dvh] overflow-y-auto bg-white dark:bg-[#0f172a] shadow-2xl p-5 sm:p-6 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] flex flex-col justify-between border-l border-slate-200 dark:border-slate-800">
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                 <div>
@@ -2065,8 +2290,9 @@ export default function DepoManagementWorkspace({
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsDocDrawerOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   ✕
                 </button>
@@ -2116,14 +2342,16 @@ export default function DepoManagementWorkspace({
 
             <div className="flex justify-end space-x-2 pt-4 border-t border-slate-200 dark:border-slate-800">
               <button
+                type="button"
                 onClick={() => setIsDocDrawerOpen(false)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                className="min-h-[44px] px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
               >
                 {tc.cancel}
               </button>
               <button
+                type="button"
                 onClick={handleSaveMissingDocs}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer"
+                className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold cursor-pointer"
               >
                 {t.btnSaveDocs}
               </button>
@@ -2136,8 +2364,8 @@ export default function DepoManagementWorkspace({
       {/* MODAL 3: INBOUND MATERIAL RECEIPT DIALOG */}
       {/* ================================================= */}
       {isInboundModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-lg bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-fade-in">
+          <div className="w-[calc(100vw-1rem)] sm:w-full max-w-lg bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl space-y-4 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase">
@@ -2148,8 +2376,9 @@ export default function DepoManagementWorkspace({
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setIsInboundModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -2209,7 +2438,7 @@ export default function DepoManagementWorkspace({
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
                     {t.lblQuantity}
@@ -2239,7 +2468,7 @@ export default function DepoManagementWorkspace({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
                     {t.lblIrsaliyeNo}
@@ -2300,15 +2529,17 @@ export default function DepoManagementWorkspace({
 
             <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
               <button
+                type="button"
                 onClick={() => setIsInboundModalOpen(false)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                className="min-h-[44px] px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
               >
                 {tc.cancel}
               </button>
               <button
+                type="button"
                 onClick={handleCreateInbound}
                 disabled={!inboundCatalogId || inboundQty <= 0}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
+                className="min-h-[44px] px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
               >
                 {t.btnSaveInbound}
               </button>
@@ -2321,8 +2552,8 @@ export default function DepoManagementWorkspace({
       {/* MODAL 4: OUTBOUND JOBSITE HANDOVER DIALOG */}
       {/* ================================================= */}
       {isOutboundModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-fade-in">
-          <div className="w-full max-w-lg bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-fade-in">
+          <div className="w-[calc(100vw-1rem)] sm:w-full max-w-lg bg-white dark:bg-[#0f172a] rounded-2xl border border-slate-200 dark:border-slate-800 p-4 sm:p-6 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl space-y-4 max-h-[90dvh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white uppercase">
@@ -2333,8 +2564,9 @@ export default function DepoManagementWorkspace({
                 </p>
               </div>
               <button
+                type="button"
                 onClick={() => setIsOutboundModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -2399,7 +2631,7 @@ export default function DepoManagementWorkspace({
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
                     {t.lblTargetBuilding}
@@ -2436,7 +2668,7 @@ export default function DepoManagementWorkspace({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
                     {t.lblQuantity}
@@ -2483,15 +2715,17 @@ export default function DepoManagementWorkspace({
 
             <div className="flex justify-end space-x-2 pt-3 border-t border-slate-200 dark:border-slate-800">
               <button
+                type="button"
                 onClick={() => setIsOutboundModalOpen(false)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
+                className="min-h-[44px] px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-bold cursor-pointer"
               >
                 {tc.cancel}
               </button>
               <button
+                type="button"
                 onClick={handleCreateOutbound}
                 disabled={!outboundCatalogId || outboundQty <= 0}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
+                className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold cursor-pointer"
               >
                 {t.btnSaveOutbound}
               </button>

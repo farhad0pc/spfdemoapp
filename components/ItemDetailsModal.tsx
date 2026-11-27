@@ -26,7 +26,7 @@ const TIER_0_TO_2_EDIT_ROLES: RoleTier[] = [
 ];
 
 const CONTROL_CLASS =
-  'w-full h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
+  'w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
 
 export type ItemComplianceIssue =
   | 'UNPRICED'
@@ -453,10 +453,15 @@ export default function ItemDetailsModal({
     lang === 'tr' ? item.item_name_tr : item.item_name_en || item.item_name_tr;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in font-sans select-none">
-      <div className="relative w-full max-w-4xl bg-white dark:bg-[#0f172a] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in font-sans select-none">
+      <div className="relative w-full md:w-[calc(100vw-1rem)] md:max-w-4xl bg-white dark:bg-[#0f172a] rounded-t-2xl md:rounded-2xl shadow-2xl border-t md:border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90dvh]">
+        {/* Mobile Bottom-Sheet Drag Handle Pill */}
+        <div className="md:hidden flex justify-center pt-2.5 pb-1 bg-slate-50 dark:bg-slate-900/60">
+          <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
+        </div>
+
+        {/* Sticky Modal Header */}
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 shrink-0">
           <div className="min-w-0 pr-3">
             <div className="flex items-center space-x-2 flex-wrap gap-y-1">
               <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300 dark:border-blue-800">
@@ -478,7 +483,7 @@ export default function ItemDetailsModal({
                 </span>
               )}
             </div>
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate mt-1">
+            <h2 className="text-sm sm:text-lg font-bold text-slate-900 dark:text-white truncate mt-1">
               {itemDisplayTitle}
             </h2>
           </div>
@@ -489,7 +494,7 @@ export default function ItemDetailsModal({
               <button
                 type="button"
                 onClick={enterEditMode}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-1.5 shadow-xs transition-colors cursor-pointer"
+                className="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white flex items-center space-x-1.5 shadow-xs transition-colors cursor-pointer"
                 title={t.btnEdit}
               >
                 <svg
@@ -517,7 +522,7 @@ export default function ItemDetailsModal({
                   setShowConfirmPrompt(false);
                   setErrorMessage(null);
                 }}
-                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 transition-colors cursor-pointer"
+                className="min-h-[40px] px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 transition-colors cursor-pointer"
               >
                 {t.btnCancelEdit}
               </button>
@@ -530,7 +535,7 @@ export default function ItemDetailsModal({
                 setIsUploadModalOpen(false);
                 onClose();
               }}
-              className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               title={tc.close}
             >
               <svg
@@ -551,11 +556,11 @@ export default function ItemDetailsModal({
         </div>
 
         {/* Navigation Tabs: Full Database Record vs Item History */}
-        <div className="px-5 pt-3 border-b border-slate-200 dark:border-slate-800 flex space-x-2 bg-white dark:bg-[#0f172a]">
+        <div className="px-4 sm:px-5 pt-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap gap-2 bg-white dark:bg-[#0f172a] shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('RECORD')}
-            className={`px-4 py-2 text-xs font-bold rounded-t-xl border-b-2 transition-all cursor-pointer ${
+            className={`min-h-[40px] px-4 py-2 text-xs font-bold rounded-t-xl border-b-2 transition-all cursor-pointer ${
               activeTab === 'RECORD'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/30'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -570,7 +575,7 @@ export default function ItemDetailsModal({
               setIsEditing(false);
               setShowConfirmPrompt(false);
             }}
-            className={`px-4 py-2 text-xs font-bold rounded-t-xl border-b-2 transition-all cursor-pointer ${
+            className={`min-h-[40px] px-4 py-2 text-xs font-bold rounded-t-xl border-b-2 transition-all cursor-pointer ${
               activeTab === 'HISTORY'
                 ? 'border-blue-600 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/30'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -581,7 +586,7 @@ export default function ItemDetailsModal({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-5">
           {errorMessage && (
             <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 rounded-xl text-xs font-bold text-rose-700 dark:text-rose-300">
               {errorMessage}
@@ -627,12 +632,12 @@ export default function ItemDetailsModal({
               <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
                 {t.confirmPrompt}
               </p>
-              <div className="flex items-center justify-end space-x-2 pt-1">
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
                 <button
                   type="button"
                   onClick={() => setShowConfirmPrompt(false)}
                   disabled={saving}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+                  className="min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
                 >
                   {tc.cancel}
                 </button>
@@ -640,7 +645,7 @@ export default function ItemDetailsModal({
                   type="button"
                   onClick={handleExecuteConfirmedSave}
                   disabled={saving}
-                  className="px-4 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
+                  className="min-h-[40px] px-4 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer"
                 >
                   {saving ? tc.saving : t.btnConfirmSave}
                 </button>
@@ -785,7 +790,7 @@ export default function ItemDetailsModal({
                             key={slotMedia.id}
                             type="button"
                             onClick={() => setSelectedMediaId(slotMedia.id)}
-                            className={`relative w-8 h-8 rounded-lg overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                            className={`relative w-9 h-9 md:w-8 md:h-8 rounded-lg overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
                               isSelected
                                 ? 'border-blue-600 dark:border-blue-400 ring-1 ring-blue-500/40'
                                 : 'border-slate-200 dark:border-slate-700 opacity-75 hover:opacity-100'
@@ -818,7 +823,7 @@ export default function ItemDetailsModal({
                               setIsUploadModalOpen(true);
                             }
                           }}
-                          className={`w-8 h-8 rounded-lg shrink-0 border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400 ${
+                          className={`w-9 h-9 md:w-8 md:h-8 rounded-lg shrink-0 border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-400 ${
                             canUploadMedia && albumMedia.length < 5
                               ? 'hover:border-blue-400 hover:text-blue-500 cursor-pointer'
                               : 'opacity-40 cursor-default'
@@ -837,7 +842,7 @@ export default function ItemDetailsModal({
                       type="button"
                       disabled={albumMedia.length >= 5}
                       onClick={() => setIsUploadModalOpen(true)}
-                      className={`w-full py-1.5 px-3 rounded-xl text-[11px] font-bold flex items-center justify-center space-x-1.5 border transition-colors ${
+                      className={`w-full min-h-[40px] py-2 px-3 rounded-xl text-[11px] font-bold flex items-center justify-center space-x-1.5 border transition-colors ${
                         albumMedia.length >= 5
                           ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 cursor-not-allowed'
                           : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-2xs cursor-pointer'
@@ -958,7 +963,7 @@ export default function ItemDetailsModal({
                       <span className="text-[10px] font-bold text-slate-400 uppercase block">
                         {t.lblBarcodeEan}
                       </span>
-                      <span className="font-mono font-bold text-slate-900 dark:text-white">
+                      <span className="font-mono font-bold text-slate-900 dark:text-white break-all">
                         {item.barcode_ean || '—'}
                       </span>
                     </div>
@@ -1007,7 +1012,7 @@ export default function ItemDetailsModal({
                       <span className="text-[10px] font-bold text-slate-400 uppercase block">
                         {t.lblProductDomain}
                       </span>
-                      <span className="font-bold text-slate-900 dark:text-white">
+                      <span className="font-bold text-slate-900 dark:text-white break-words">
                         {item.product_domain || 'CONSTRUCTION_MATERIALS'}
                       </span>
                     </div>
@@ -1491,7 +1496,7 @@ export default function ItemDetailsModal({
                     className={CONTROL_CLASS}
                   />
                 </div>
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
                     {t.lblLifecycleStatus}
                   </label>
@@ -1504,9 +1509,9 @@ export default function ItemDetailsModal({
                 </div>
               </div>
 
-              {/* Compact Inline Toolbar Row (Matched h-9 Heights) */}
+              {/* Compact Inline Toolbar Row */}
               <div className="flex flex-wrap items-center gap-3 pt-1">
-                <label className="h-9 px-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 inline-flex items-center space-x-2 cursor-pointer">
+                <label className="min-h-[40px] px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 inline-flex items-center space-x-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formIsTrackableAsset}
@@ -1525,7 +1530,7 @@ export default function ItemDetailsModal({
                   <select
                     value={formRecordStatus}
                     onChange={(e) => setFormRecordStatus(e.target.value)}
-                    className="h-9 px-3 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white cursor-pointer"
+                    className="min-h-[40px] px-3 rounded-xl text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white cursor-pointer"
                   >
                     <option value="active">active</option>
                     <option value="archived">archived</option>
@@ -1565,13 +1570,13 @@ export default function ItemDetailsModal({
                     setIsEditing(false);
                     setShowConfirmPrompt(false);
                   }}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
+                  className="min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 cursor-pointer"
                 >
                   {tc.cancel}
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
+                  className="min-h-[44px] px-5 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer"
                 >
                   {t.btnSaveChanges}
                 </button>
@@ -1592,7 +1597,7 @@ export default function ItemDetailsModal({
                     {t.noHistoryTx}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                  <div className="w-full overflow-x-auto touch-scroll-x rounded-xl border border-slate-200 dark:border-slate-800">
                     <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
                       <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold uppercase text-[10px] text-slate-400">
                         <tr>
@@ -1677,7 +1682,7 @@ export default function ItemDetailsModal({
                     {t.noHistoryAssets}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+                  <div className="w-full overflow-x-auto touch-scroll-x rounded-xl border border-slate-200 dark:border-slate-800">
                     <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800 text-left text-xs">
                       <thead className="bg-slate-50 dark:bg-slate-900/80 font-bold uppercase text-[10px] text-slate-400">
                         <tr>
@@ -1723,9 +1728,9 @@ export default function ItemDetailsModal({
           )}
         </div>
 
-        {/* Modal Footer */}
-        <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
-          <div className="text-[10px] font-mono font-light text-slate-400">
+        {/* Sticky Modal Footer with Safe-Area Padding */}
+        <div className="px-4 sm:px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between gap-2 shrink-0">
+          <div className="text-[10px] font-mono font-light text-slate-400 truncate">
             {balance?.depot_id || 'DEPOT'} • {item.item_id}
           </div>
           <button
@@ -1735,7 +1740,7 @@ export default function ItemDetailsModal({
               setIsUploadModalOpen(false);
               onClose();
             }}
-            className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            className="min-h-[40px] px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold transition-colors cursor-pointer shrink-0"
           >
             {tc.close}
           </button>
@@ -1760,7 +1765,7 @@ export default function ItemDetailsModal({
       {isLightboxOpen && displayImageUrl && (
         <div
           onClick={() => setIsLightboxOpen(false)}
-          className="fixed inset-0 z-[70] bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 z-[70] bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-fade-in"
         >
           <div className="w-full max-w-4xl flex items-center justify-between text-white mb-3">
             <div className="min-w-0 pr-4">
@@ -1774,7 +1779,7 @@ export default function ItemDetailsModal({
             <button
               type="button"
               onClick={() => setIsLightboxOpen(false)}
-              className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white cursor-pointer"
+              className="min-h-[40px] px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-bold text-white cursor-pointer shrink-0"
             >
               ✕ {tc.close}
             </button>
@@ -1782,26 +1787,26 @@ export default function ItemDetailsModal({
 
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative max-w-4xl max-h-[75vh] flex items-center justify-center"
+            className="relative max-w-4xl max-h-[75dvh] flex items-center justify-center"
           >
             <img
               src={displayImageUrl}
               alt={itemDisplayTitle}
-              className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-2xl border border-white/10"
+              className="max-w-full max-h-[75dvh] object-contain rounded-2xl shadow-2xl border border-white/10"
             />
           </div>
 
           {albumMedia.length > 1 && (
             <div
               onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-2 mt-4"
+              className="flex items-center gap-2 mt-4 overflow-x-auto max-w-full pb-1"
             >
               {albumMedia.map((m) => (
                 <button
                   key={`lb-${m.id}`}
                   type="button"
                   onClick={() => setSelectedMediaId(m.id)}
-                  className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                  className={`w-12 h-12 rounded-xl overflow-hidden border-2 shrink-0 transition-all cursor-pointer ${
                     activeMediaItem?.id === m.id
                       ? 'border-blue-500 scale-105'
                       : 'border-white/20 opacity-60 hover:opacity-100'

@@ -17,7 +17,7 @@ import { DICTIONARY } from '@/lib/i18n';
 import WebcamCaptureModal from '@/components/WebcamCaptureModal';
 
 const CONTROL_CLASS =
-  'w-full h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
+  'w-full min-h-[44px] h-11 sm:h-10 px-3.5 py-2 rounded-xl text-xs font-light border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500';
 
 interface ItemMediaUploadModalProps {
   isOpen: boolean;
@@ -259,16 +259,16 @@ export default function ItemMediaUploadModal({
       <div className="fixed inset-0" onClick={handleClose} />
 
       {/* Responsive Container: Mobile slide-up bottom sheet (< md) vs Desktop centered rounded modal (md:+) */}
-      <div className="relative z-10 w-full md:max-w-lg bg-white dark:bg-[#0f172a] rounded-t-2xl md:rounded-2xl shadow-2xl border-t md:border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="relative z-10 w-full md:w-[calc(100vw-1rem)] md:max-w-lg bg-white dark:bg-[#0f172a] rounded-t-2xl md:rounded-2xl shadow-2xl border-t md:border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90dvh]">
         {/* Mobile Bottom-Sheet Drag Handle Pill */}
-        <div className="md:hidden flex justify-center pt-2.5 pb-1">
+        <div className="md:hidden flex justify-center pt-2.5 pb-1 bg-slate-50 dark:bg-slate-900/60">
           <div className="w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-700" />
         </div>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60">
+        {/* Sticky Header */}
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 shrink-0">
           <div className="min-w-0 pr-3">
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center flex-wrap gap-2">
               <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white uppercase tracking-wide">
                 {tm.addPhoto}
               </h3>
@@ -285,7 +285,7 @@ export default function ItemMediaUploadModal({
             type="button"
             onClick={handleClose}
             disabled={uploading}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
             title={tc.close}
           >
             <svg
@@ -304,13 +304,13 @@ export default function ItemMediaUploadModal({
           </button>
         </div>
 
-        {/* 3 Source Tabs (Uniform h-10 Controls) */}
-        <div className="px-5 pt-3.5 bg-white dark:bg-[#0f172a]">
+        {/* 3 Source Tabs (min-h-[44px] Touch Controls) */}
+        <div className="px-4 sm:px-5 pt-3.5 bg-white dark:bg-[#0f172a] shrink-0">
           <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             <button
               type="button"
               onClick={() => handleSwitchTab('CAMERA')}
-              className={`h-10 px-2 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+              className={`min-h-[44px] h-11 sm:h-10 px-2 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
                 activeSource === 'CAMERA'
                   ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -341,7 +341,7 @@ export default function ItemMediaUploadModal({
             <button
               type="button"
               onClick={() => handleSwitchTab('LOCAL')}
-              className={`h-10 px-2 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+              className={`min-h-[44px] h-11 sm:h-10 px-2 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
                 activeSource === 'LOCAL'
                   ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -366,7 +366,7 @@ export default function ItemMediaUploadModal({
             <button
               type="button"
               onClick={() => handleSwitchTab('GOOGLE_DRIVE')}
-              className={`h-10 px-2 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
+              className={`min-h-[44px] h-11 sm:h-10 px-2 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer ${
                 activeSource === 'GOOGLE_DRIVE'
                   ? 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-xs'
                   : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
@@ -400,7 +400,7 @@ export default function ItemMediaUploadModal({
         />
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
           {errorMessage && (
             <div className="p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 rounded-xl text-xs font-bold text-rose-700 dark:text-rose-300">
               {errorMessage}
@@ -443,7 +443,7 @@ export default function ItemMediaUploadModal({
                 type="button"
                 disabled={compressing}
                 onClick={() => setIsWebcamOpen(true)}
-                className="h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center space-x-2 transition-colors cursor-pointer"
+                className="min-h-[44px] h-11 sm:h-10 px-5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs flex items-center space-x-2 transition-colors cursor-pointer"
               >
                 <span>
                   {compressing ? tm.compressing : `📷 ${tm.takePhoto}`}
@@ -498,7 +498,7 @@ export default function ItemMediaUploadModal({
                   e.stopPropagation();
                   fileInputRef.current?.click();
                 }}
-                className="h-10 px-5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                className="min-h-[44px] h-11 sm:h-10 px-5 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
               >
                 {compressing ? tm.compressing : tm.uploadFromDevice}
               </button>
@@ -512,7 +512,7 @@ export default function ItemMediaUploadModal({
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
                   {tm.driveInputLabel}
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="url"
                     value={driveUrl}
@@ -524,7 +524,7 @@ export default function ItemMediaUploadModal({
                     type="button"
                     onClick={handleValidateDriveLink}
                     disabled={!driveUrl.trim()}
-                    className="h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shrink-0 cursor-pointer"
+                    className="min-h-[44px] h-11 sm:h-10 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold shrink-0 cursor-pointer"
                   >
                     {tm.btnValidateDrive}
                   </button>
@@ -545,7 +545,7 @@ export default function ItemMediaUploadModal({
                         'noopener,noreferrer'
                       )
                     }
-                    className="w-full h-10 px-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center space-x-2 cursor-pointer"
+                    className="w-full min-h-[44px] h-11 sm:h-10 px-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-200 flex items-center justify-center space-x-2 cursor-pointer"
                   >
                     <span>{tm.btnGooglePicker}</span>
                   </button>
@@ -584,14 +584,16 @@ export default function ItemMediaUploadModal({
                       {compressedResult.height})
                     </span>
                   ) : (
-                    <span>Google Drive • ID: {drivePreviewId?.slice(0, 8)}…</span>
+                    <span>
+                      Google Drive • ID: {drivePreviewId?.slice(0, 8)}…
+                    </span>
                   )}
                 </div>
               </div>
 
               {/* Set as Primary Toggle */}
               {existingCount > 0 && (
-                <label className="h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center space-x-2.5 cursor-pointer">
+                <label className="min-h-[44px] h-11 sm:h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center space-x-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={setAsPrimary}
@@ -605,7 +607,7 @@ export default function ItemMediaUploadModal({
               )}
 
               {/* Explicit Replace & Confirm & Save Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-1">
+              <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
                 <button
                   type="button"
                   disabled={uploading}
@@ -615,7 +617,7 @@ export default function ItemMediaUploadModal({
                       setIsWebcamOpen(true);
                     }
                   }}
-                  className="h-10 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
+                  className="min-h-[44px] h-11 sm:h-10 px-4 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-bold transition-colors cursor-pointer"
                 >
                   {tm.replacePhoto}
                 </button>
@@ -623,7 +625,7 @@ export default function ItemMediaUploadModal({
                   type="button"
                   disabled={uploading}
                   onClick={() => void handleConfirmUpload()}
-                  className="h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer"
+                  className="min-h-[44px] h-11 sm:h-10 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold shadow-xs flex items-center space-x-1.5 transition-colors cursor-pointer"
                 >
                   <span>
                     {uploading ? tm.uploading : `✓ ${tm.confirmAndSave}`}
@@ -634,8 +636,8 @@ export default function ItemMediaUploadModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
+        {/* Sticky Footer with Safe-Area Bottom Padding */}
+        <div className="px-4 sm:px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between gap-2 shrink-0">
           <span className="text-[10px] font-mono font-light text-slate-400">
             WebP ≤ 1024px • Cache-Control: 1y
           </span>
@@ -643,7 +645,7 @@ export default function ItemMediaUploadModal({
             type="button"
             disabled={uploading}
             onClick={handleClose}
-            className="px-4 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer"
+            className="min-h-[40px] px-4 py-1.5 rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-bold cursor-pointer"
           >
             {tc.cancel}
           </button>
