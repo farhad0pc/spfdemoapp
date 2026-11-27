@@ -6,11 +6,7 @@ import React from 'react';
 import Link from 'next/link';
 import { RoleTier, DepartmentCode } from '@/types/requisition';
 import { ROLE_METADATA } from '@/lib/rbac';
-import {
-  DICTIONARY,
-  useCaesarLanguage,
-  useCaesarTheme,
-} from '@/lib/i18n';
+import { DICTIONARY } from '@/lib/i18n';
 
 interface CorporateHeaderProps {
   currentRole: RoleTier;
@@ -48,22 +44,23 @@ export default function CorporateHeader({
   isLoggedIn = false,
   onLogout,
 }: CorporateHeaderProps) {
-  const [, setLang] = useCaesarLanguage();
-  const [theme, setTheme] = useCaesarTheme();
   const t = DICTIONARY[lang].header;
-  const tf = DICTIONARY[lang].fab;
   const activeMeta = ROLE_METADATA[currentRole];
   const departmentColor = activeMeta?.department
     ? DEPT_BADGE_COLORS[activeMeta.department]
     : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200';
 
+  const displayIdentity =
+    (lang === 'tr' ? activeMeta?.titleTr : activeMeta?.titleEn) ||
+    currentUserEmail ||
+    t.activeUser;
+
   return (
     <header className="bg-white dark:bg-[#090d16] border-b border-slate-200 dark:border-slate-800 transition-colors sticky top-0 z-30 select-none font-sans pt-[env(safe-area-inset-top)]">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-2 h-14 md:h-20">
-          {/* Left: 44x44px Hamburger Toggle (Mobile Drawer vs Desktop Rail) & Context Header */}
+          {/* Left: 44x44px Hamburger Toggle & Desktop Brand Context */}
           <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-            {/* Mobile Hamburger Button (< md) */}
             <button
               type="button"
               onClick={onOpenMobileDrawer || onToggleSidebar}
@@ -86,7 +83,6 @@ export default function CorporateHeader({
               </svg>
             </button>
 
-            {/* Desktop Collapse Button (md:+) */}
             <button
               type="button"
               onClick={onToggleSidebar}
@@ -119,60 +115,53 @@ export default function CorporateHeader({
             </div>
           </div>
 
-          {/* Center / Right: Compact Role Badge + Inline Mobile Utility Controls + Avatar + Reachable Red Sign Out */}
-          <div className="flex items-center justify-end gap-1.5 sm:gap-3 min-w-0 flex-1">
-            {/* Compact Responsive Production Session Role Badge */}
-            <div className="flex items-center space-x-1.5 sm:space-x-2 bg-slate-50 dark:bg-slate-800/80 px-2 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs min-w-0 overflow-hidden">
+          {/* Mobile (< md) Center: Centered User Photo + Name/Identity (Tier Card Removed) */}
+          <div className="flex md:hidden items-center justify-center gap-2 min-w-0 flex-1 px-1">
+            {isLoggedIn && (
+              <>
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt={displayIdentity}
+                    className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/20 shrink-0">
+                    {(displayIdentity || 'U').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate max-w-[175px]">
+                  {displayIdentity}
+                </span>
+              </>
+            )}
+          </div>
+
+          {/* Desktop (md:+) Right: Session Role Badge + User Identity + Sign In / Sign Out */}
+          <div className="hidden md:flex items-center justify-end gap-3 min-w-0 flex-1">
+            <div className="flex items-center space-x-2 bg-slate-50 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xs min-w-0 overflow-hidden">
               <span
-                className={`inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${departmentColor}`}
+                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${departmentColor}`}
               >
-                <span className="sm:hidden">
-                  {activeMeta?.department || 'CORP'} • T{activeMeta?.tier ?? 4}
-                </span>
-                <span className="hidden sm:inline">
-                  {activeMeta?.department || 'CORP'} • Tier{' '}
-                  {activeMeta?.tier ?? 4}
-                </span>
+                {activeMeta?.department || 'CORP'} • Tier {activeMeta?.tier ?? 4}
               </span>
-              <span className="text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">
                 {lang === 'tr'
                   ? activeMeta?.titleTr || currentRole
                   : activeMeta?.titleEn || currentRole}
               </span>
             </div>
 
-            {/* Inline Mobile EN/TR & Light/Dark Toggle (< md) */}
-            <div className="flex md:hidden items-center bg-slate-100 dark:bg-slate-800/90 rounded-xl border border-slate-200 dark:border-slate-700 p-0.5 h-9 shrink-0">
-              <button
-                type="button"
-                onClick={() => setLang(lang === 'tr' ? 'en' : 'tr')}
-                title={lang === 'tr' ? tf.switchToEnglish : tf.switchToTurkish}
-                className="h-8 px-2 rounded-lg text-[11px] font-bold text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              >
-                {lang === 'tr' ? 'TR' : 'EN'}
-              </button>
-              <div className="w-px h-4 bg-slate-300 dark:bg-slate-700" />
-              <button
-                type="button"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                title={theme === 'dark' ? tf.switchToLight : tf.switchToDark}
-                className="h-8 w-8 rounded-lg flex items-center justify-center text-xs font-bold text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-700 transition-colors cursor-pointer"
-              >
-                {theme === 'dark' ? '☀️' : '🌙'}
-              </button>
-            </div>
-
-            {/* User Session & Reachable Red Sign Out Button */}
             {isLoggedIn ? (
-              <div className="flex items-center space-x-1.5 sm:space-x-2.5 pl-1.5 sm:pl-2 border-l border-slate-200 dark:border-slate-800 shrink-0">
+              <div className="flex items-center space-x-2.5 pl-2 border-l border-slate-200 dark:border-slate-800 shrink-0">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
                     alt={currentUserEmail || t.activeUser}
-                    className="w-8 h-8 md:w-9 md:h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800"
+                    className="w-9 h-9 rounded-full object-cover border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 dark:bg-slate-800"
                   />
                 ) : (
-                  <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/20 shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-blue-600/10 text-blue-600 dark:text-blue-400 font-bold flex items-center justify-center text-xs border border-blue-500/20 shrink-0">
                     {currentUserEmail
                       ? currentUserEmail.charAt(0).toUpperCase()
                       : 'U'}
@@ -207,7 +196,7 @@ export default function CorporateHeader({
                         d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
                       />
                     </svg>
-                    <span className="hidden sm:inline">{t.signOut}</span>
+                    <span>{t.signOut}</span>
                   </button>
                 )}
               </div>
@@ -229,6 +218,40 @@ export default function CorporateHeader({
                     d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
                   />
                 </svg>
+                <span>{t.signIn}</span>
+              </Link>
+            )}
+          </div>
+
+          {/* Mobile (< md) Right: Sign In / Sign Out Button */}
+          <div className="flex md:hidden items-center shrink-0">
+            {isLoggedIn && onLogout ? (
+              <button
+                type="button"
+                onClick={onLogout}
+                title={t.signOut}
+                aria-label={t.signOut}
+                className="h-9 w-9 min-w-[36px] text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/60 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors flex items-center justify-center cursor-pointer shrink-0"
+              >
+                <svg
+                  className="w-4 h-4 shrink-0"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="h-9 px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-colors shadow-xs flex items-center gap-1 cursor-pointer shrink-0"
+              >
                 <span>{t.signIn}</span>
               </Link>
             )}

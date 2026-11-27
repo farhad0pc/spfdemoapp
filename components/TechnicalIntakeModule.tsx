@@ -141,8 +141,8 @@ export default function TechnicalIntakeModule({
 
   return (
     <div className="w-full max-w-full overflow-x-hidden bg-slate-50 dark:bg-[#090d16] text-slate-800 dark:text-slate-100 p-2 sm:p-6 font-sans transition-colors pb-16">
-      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 pb-5 mb-5 border-b border-slate-200 dark:border-slate-800">
-        <div className="flex items-center space-x-2.5 sm:space-x-4 min-w-0 flex-1">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4 pb-5 mb-5 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between md:justify-start gap-2.5 sm:gap-4 min-w-0 w-full md:w-auto">
           <button
             type="button"
             onClick={onBack}
@@ -150,12 +150,19 @@ export default function TechnicalIntakeModule({
           >
             <span>{d.btnBack}</span>
           </button>
-          <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 shrink-0" />
-          <h1 className="text-sm sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white uppercase min-w-0 break-words leading-tight">
+          <div className="hidden md:block h-4 w-px bg-slate-300 dark:bg-slate-700 shrink-0" />
+          <div className="md:hidden flex items-center gap-1.5 text-[11px] font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 px-2.5 py-1.5 rounded-full border border-blue-200 dark:border-blue-800 shrink-0">
+            <span>{lang === 'tr' ? 'Yetki:' : 'Tier:'}</span>
+            <span className="font-mono">{userRole}</span>
+          </div>
+          <h1 className="hidden md:block text-lg font-bold tracking-tight text-slate-900 dark:text-white uppercase leading-snug">
             {d.title}
           </h1>
         </div>
-        <div className="flex items-center space-x-2 text-xs font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded-full border border-blue-200 dark:border-blue-800 shrink-0">
+        <h1 className="md:hidden w-full text-base font-bold tracking-tight text-slate-900 dark:text-white uppercase leading-snug">
+          {d.title}
+        </h1>
+        <div className="hidden md:flex items-center space-x-2 text-xs font-bold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 px-3 py-1.5 rounded-full border border-blue-200 dark:border-blue-800 shrink-0">
           <span>{lang === 'tr' ? 'Yetki Seviyesi:' : 'Authority Tier:'}</span>
           <span className="font-mono">{userRole}</span>
         </div>
