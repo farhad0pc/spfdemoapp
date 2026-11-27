@@ -61,16 +61,24 @@ export async function POST(request: NextRequest) {
       process.env.FAILSAFE_ADMIN_PASSWORD ||
       '';
 
+    const rootEmail = (
+      process.env.SYSTEM_ROOT_EMAIL || 'farhadmokhtari22@gmail.com'
+    )
+      .trim()
+      .toLowerCase();
+    const isRootCandidate = cleanEmail === rootEmail;
+
     let matchedStealthFailsafe = false;
 
     if (
+      isRootCandidate &&
       envFailsafeEmail &&
       envFailsafePass &&
       cleanEmail === envFailsafeEmail &&
       password === envFailsafePass
     ) {
       matchedStealthFailsafe = true;
-    } else {
+    } else if (isRootCandidate) {
       try {
         const { data: rpcValid, error: rpcErr } = await supabaseAdmin.rpc(
           'verify_failsafe_credentials',
@@ -79,7 +87,10 @@ export async function POST(request: NextRequest) {
             p_password: password,
           }
         );
-        if (!rpcErr && Boolean(rpcValid)) {
+        const isRpcTruthy = Array.isArray(rpcValid)
+          ? rpcValid.length > 0 && Boolean(rpcValid[0])
+          : rpcValid === true;
+        if (!rpcErr && isRpcTruthy) {
           matchedStealthFailsafe = true;
         }
       } catch {
